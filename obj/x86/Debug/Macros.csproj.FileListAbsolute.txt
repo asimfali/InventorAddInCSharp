@@ -1,0 +1,17 @@
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x86\Debug\Macros.dll
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x86\Debug\Macros.pdb
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\Macros.csprojResolveAssemblyReference.cache
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Properties.Resources.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Offset.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Setting.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Settings.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.spike.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Sticker.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Table.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Tables.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\Macros.csproj.GenerateResource.Cache
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\Macros.dll
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\Macros.pdb
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.IMate.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Passport.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x86\Debug\InvAddIn.Prop.resources

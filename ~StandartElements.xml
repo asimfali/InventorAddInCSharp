@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<head>
+  <StandartElements Name="Крепежные изделия">
+    <Value>Болт  M6-6gx20  ГОСТ 7798-70</Value>
+  </StandartElements>
+  <StandartElements Name="Крепежные изделия">
+    <Value>Гровер M8 оцинк. ГОСТ 6402-70</Value>
+    <Value>Гровер M6 оцинк. ГОСТ 6402-70</Value>
+    <Value>Гровер M5 оцинк. ГОСТ 6402-70</Value>
+    <Value>Гровер M4 оцинк. ГОСТ 6402-70</Value>
+    <Value>Шайба DIN9021 M8 куз.</Value>
+    <Value>Шайба DIN9021 M6 куз.</Value>
+    <Value>Шайба DIN9021 M5 куз.</Value>
+    <Value>Шайба DIN9021 M4 куз.</Value>
+    <Value>Шайба DIN 6798 A D8 с зуб.</Value>
+    <Value>Шайба DIN 6798 A D6 с зуб.</Value>
+    <Value>Шайба DIN 6798 A D5 с зуб.</Value>
+    <Value>Шайба DIN 6798 A D4 с зуб.</Value>
+    <Value>Шайба 8  оцинк. ГОСТ 11371-78</Value>
+    <Value>Шайба 6  оцинк. ГОСТ 11371-78</Value>
+    <Value>Шайба 5  оцинк. ГОСТ 11371-78</Value>
+    <Value>Шайба 4  оцинк. ГОСТ 11371-78</Value>
+    <Value>Шуруп JP81 - 4,2x16 DIN7504</Value>
+    <Value>Шуруп JP81 - 4,2x13 DIN7504</Value>
+    <Value>Шуруп JP81 - 3,5x9,5 DIN7504</Value>
+    <Value>Шуруп JP81 - 4,2x16 DIN7504 нерж.</Value>
+    <Value>Шуруп JP81 - 4,2x13 DIN7504 нерж.</Value>
+    <Value>Шуруп JP81 - 3,5x9,5 DIN7504 нерж.</Value>
+    <Value>Саморез остроконечный Zn 2,9 x 6,5 DIN 7981</Value>
+    <Value>Саморез остроконечный Zn 2,9 x 9,5 DIN 7981</Value>
+    <Value>Саморез остроконечный Zn 4,2 x 16 DIN 7981</Value>
+    <Value>Саморез остроконечный Zn 4,2 x 13 DIN 7981</Value>
+    <Value>Саморез остроконечный Zn 3,5 x 9,5 DIN 7981</Value>
+    <Value>Заклепка вытяжн. нерж. 4 x 8</Value>
+    <Value>Заклепка вытяжн. нерж. 4,8 x 8</Value>
+    <Value>Заклепка вытяжн. Al/St 4 x 8</Value>
+    <Value>Заклепка вытяжн. Al/St 4,8 x 8</Value>
+    <Value>Гайка  M8 оцинк. ГОСТ 5915-70</Value>
+    <Value>Гайка  M6 оцинк. ГОСТ 5915-70</Value>
+    <Value>Гайка  M5 оцинк. ГОСТ 5915-70</Value>
+    <Value>Гайка  M4 оцинк. ГОСТ 5915-70</Value>
+    <Value>Закл. / гайка M4 потай</Value>
+    <Value>Закл. / гайка M6 потай</Value>
+    <Value>Закл. / гайка M8 потай</Value>
+    <Value>Закл. / гайка M4 с буртом</Value>
+    <Value>Закл. / гайка M6 с буртом</Value>
+    <Value>Закл. / гайка M8 с буртом</Value>
+    <Value>Винт DIN 7985 M4x60</Value>
+    <Value>Винт DIN 7985 M4x12</Value>
+    <Value>Винт DIN 7985 M4x8</Value>
+    <Value>Винт DIN 7985 M4x6</Value>
+    <Value>Винт DIN 7985 M5x6</Value>
+    <Value>Винт DIN 7985 M6x30</Value>
+    <Value>Винт DIN 7985 M6x16</Value>
+    <Value>Болт  M8-6gx25  ГОСТ 7798-70</Value>
+    <Value>Болт  M8-6gx20  ГОСТ 7798-70</Value>
+    <Value>Болт  M6-6gx25  ГОСТ 7798-70</Value>
+    <Value>Болт  M6-6gx20  ГОСТ 7798-70</Value>
+  </StandartElements>
+</head>

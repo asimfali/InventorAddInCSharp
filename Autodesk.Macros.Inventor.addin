@@ -1,0 +1,14 @@
+<Addin Type="Standard">
+  <!--Created for Autodesk Inventor Version 18.0-->
+  <ClassId>{c09e4c46-e69b-478a-a2c1-ad4b52e62879}</ClassId>
+  <ClientId>{c09e4c46-e69b-478a-a2c1-ad4b52e62879}</ClientId>
+  <DisplayName>Macros</DisplayName>
+  <Description>Macros</Description>
+  <Assembly>Macros.dll</Assembly>
+  <LoadOnStartUp>1</LoadOnStartUp>
+  <UserUnloadable>1</UserUnloadable>
+  <Hidden>0</Hidden>
+  <SupportedSoftwareVersionGreaterThan>17..</SupportedSoftwareVersionGreaterThan>
+  <DataVersion>1</DataVersion>
+  <UserInterfaceVersion>1</UserInterfaceVersion>
+</Addin>

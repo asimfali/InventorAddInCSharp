@@ -1,0 +1,6 @@
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Release\Macros.dll
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Release\InvAddIn.Table.resources
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Release\Macros.csproj.GenerateResource.Cache
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Release\Macros.dll
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Release\Macros.csprojResolveAssemblyReference.cache
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Release\InvAddIn.Properties.Resources.resources

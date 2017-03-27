@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<head>
+  <Material id = "Оцинкованная сталь">
+    <MaterialCenter></MaterialCenter>
+    <MaterialLine>ОЦ</MaterialLine>
+    <MaterialUpLine>Б-ПН-t ГОСТ 19904-90</MaterialUpLine>
+    <MaterialDownLine>ХШ-МТ-1 ГОСТ 14918-80</MaterialDownLine>
+  </Material>
+
+  <Material id = "Нержавеющая сталь">
+    <MaterialCenter></MaterialCenter>
+    <MaterialLine>Лист</MaterialLine>
+    <MaterialUpLine>Б-ПН-t ГОСТ 19904-90</MaterialUpLine>
+    <MaterialDownLine>AISI 304 (№4)+PE</MaterialDownLine>
+  </Material>
+
+  <Material id = "Сталь нержавеющая аустенитная">
+    <MaterialCenter></MaterialCenter>
+    <MaterialLine>Лист</MaterialLine>
+    <MaterialUpLine>Б-ПН-t ГОСТ 19904-90</MaterialUpLine>
+    <MaterialDownLine>AISI 430 (BA)+PE</MaterialDownLine>
+  </Material>
+
+  <Material id = "Сталь">
+    <MaterialCenter></MaterialCenter>
+    <MaterialLine>Лист</MaterialLine>
+    <MaterialUpLine>Б-ПН-t ГОСТ 19904-90</MaterialUpLine>
+    <MaterialDownLine>Сталь 08пс ГОСТ 16523-97</MaterialDownLine>
+  </Material>
+
+  <Material id = "Легированная сталь">
+    <MaterialCenter></MaterialCenter>
+    <MaterialLine>ЛКПОЦ</MaterialLine>
+    <MaterialUpLine>Б-ПН-t ГОСТ 19904-90</MaterialUpLine>
+    <MaterialDownLine>ВГ-08Ю ГОСТ 9045-93, ГОСТР 52146-03</MaterialDownLine>
+  </Material>
+</head>
