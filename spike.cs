@@ -810,6 +810,7 @@ namespace InvAddIn
                 //addSpike(smcd, invApp.TransientGeometry.CreatePoint2d(), invApp.TransientGeometry.CreateVector2d(1, 0), R, R*2, H);
                 //addSpike(smcd, invApp.TransientGeometry.CreatePoint2d(), invApp.TransientGeometry.CreateVector2d(1, 0), R, L, H, "Капелька");
                 return;
+
                 double lineLength = length;
                 length = length - startL - endL - R * 2; l1 = length / (count - 1); sum = 0;
                 UnitVector2d dir = line.Geometry.Direction; 

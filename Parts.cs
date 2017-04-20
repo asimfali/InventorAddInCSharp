@@ -5044,17 +5044,12 @@ namespace InvAddIn
         }
 
         #region "Methods"
-        public PartsBtn(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, System.Drawing.Icon standardIcon, System.Drawing.Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
+        public PartsBtn(string displayName, string internalName, string clientId, string description, string tooltip, System.Drawing.Icon standardIcon, System.Drawing.Icon largeIcon)
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon)
         {
             string file = @"C:\ProgramData\Autodesk\Inventor Addins\Parameters.xml";
             if (System.IO.File.Exists(file))
             param = new XMLDoc(file, "head");
-        }
-        public PartsBtn(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType)
-        {
-
         }
 
         protected override void ButtonDefinition_OnExecute(NameValueMap context)

@@ -555,13 +555,8 @@ namespace InvAddIn
         }
 
         #region "Methods"
-        public OffsetBtn(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
-        {
-
-        }
-        public OffsetBtn(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType)
+        public OffsetBtn(string displayName, string internalName, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon)
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon)
         {
 
         }

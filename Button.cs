@@ -3,8 +3,9 @@ using System.Runtime.InteropServices;
 using Inventor;
 using System.Text;
 using System.Drawing;
-using Microsoft.VisualBasic.Compatibility.VB6;
+//using Microsoft.VisualBasic.Compatibility.VB6;
 using System.Windows.Forms;
+using InvDoc;
 
 namespace InvAddIn
 {                        
@@ -36,19 +37,26 @@ namespace InvAddIn
         }
 #endregion
 #region "Methods"
-        public Button(string DisplayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, Icon standarticon, Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
+        public Button(string DisplayName, string internalName, string clientId, string description, string tooltip, Icon standarticon, Icon largeIcon, string catName = "CSharp")
         {
             try
             {
                 stdole.IPictureDisp standartIconIPictureDisp;
-                standartIconIPictureDisp = (stdole.IPictureDisp)Support.IconToIPicture(standarticon);
+                standartIconIPictureDisp = OleCreateConverter.ImageToPictureDisp(standarticon.ToBitmap());
                 stdole.IPictureDisp largeIconIPictureDisp;
-                largeIconIPictureDisp = (stdole.IPictureDisp)Support.IconToIPicture(largeIcon);
+                largeIconIPictureDisp = OleCreateConverter.ImageToPictureDisp(largeIcon.ToBitmap());
                 m_buttonDefinition = m_inventorApplication.CommandManager.ControlDefinitions.AddButtonDefinition(DisplayName,
-                    internalName, commandType, clientId, description, tooltip, standartIconIPictureDisp, largeIconIPictureDisp, buttonDisplayType);
+                    "Autodesk:Macros:" + internalName, CommandTypesEnum.kNonShapeEditCmdType, clientId, description, tooltip, standartIconIPictureDisp,
+                    largeIconIPictureDisp, ButtonDisplayEnum.kDisplayTextInLearningMode);
                 m_buttonDefinition.Enabled = true; 
                 ButtonDefinition_OnExecuteEventDelegate = new ButtonDefinitionSink_OnExecuteEventHandler(ButtonDefinition_OnExecute);
                 m_buttonDefinition.OnExecute += ButtonDefinition_OnExecuteEventDelegate;
+                if (catName != "")
+                {
+                    CommandCategory cat = u.get<CommandCategory>(m_inventorApplication.CommandManager.CommandCategories, c => c.DisplayName == catName) ??
+                        m_inventorApplication.CommandManager.CommandCategories.Add(catName, "Autodesk:Macros:" + catName);
+                    cat.Add(m_buttonDefinition);
+                }
             }
             catch (System.Exception ex)
             {
@@ -60,7 +68,9 @@ namespace InvAddIn
         {
             try
             {
-                m_buttonDefinition = m_inventorApplication.CommandManager.ControlDefinitions.AddButtonDefinition(displayName,internalName,commandType,clientId,description,tooltip,Type.Missing,Type.Missing,buttonDisplayType);
+                m_buttonDefinition = m_inventorApplication.CommandManager.ControlDefinitions.AddButtonDefinition(displayName, "Autodesk:Macros:" + internalName,
+                    commandType, clientId, description, tooltip,
+                    Type.Missing,Type.Missing,buttonDisplayType);
                 m_buttonDefinition.Enabled = true;
                 ButtonDefinition_OnExecuteEventDelegate = new ButtonDefinitionSink_OnExecuteEventHandler(ButtonDefinition_OnExecute);
                 m_buttonDefinition.OnExecute += ButtonDefinition_OnExecuteEventDelegate;
@@ -69,12 +79,148 @@ namespace InvAddIn
             {
 	            MessageBox.Show(ex.ToString());
             }
-                    }
+        }
+
+        public void addShortCut(string s)
+        {
+            if (m_buttonDefinition.IsShortcutOverridden == false)
+                m_buttonDefinition.OverrideShortcut = s;
+        }
 
         abstract protected void ButtonDefinition_OnExecute(NameValueMap context);
 
 #endregion
     }
+// 
+//     internal class AxHostConverter : AxHost
+// 
+// {
+// 
+//     private AxHostConverter() : base("") { }
+// 
+//  
+// 
+//     static public stdole.IPictureDisp ImageToPictureDisp(Image image)
+// 
+//     {
+// 
+//         return (stdole.IPictureDisp)GetIPictureDispFromPicture(image);
+// 
+//     }
+// 
+//  
+// 
+//     static public Image PictureDispToImage(stdole.IPictureDisp pictureDisp)
+// 
+//     {
+// 
+//         return GetPictureFromIPicture(pictureDisp);
+// 
+//     }
+// 
+// }
+
+    internal class OleCreateConverter
+
+{
+
+    [DllImport("oleaut32.dll", EntryPoint = "OleCreatePictureIndirect",
+
+        CharSet = CharSet.Ansi, ExactSpelling = true, PreserveSig = true)]
+
+    private static extern int OleCreatePictureIndirect(
+
+        [In] PictDescBitmap pictdesc, ref Guid iid, bool fOwn,
+
+        [MarshalAs(UnmanagedType.Interface)] out object ppVoid);
+
+ 
+
+    const short _PictureTypeBitmap = 1;
+
+    [StructLayout(LayoutKind.Sequential)]
+
+    internal class PictDescBitmap
+
+    {
+
+        internal int cbSizeOfStruct = Marshal.SizeOf(typeof(PictDescBitmap));
+
+        internal int pictureType = _PictureTypeBitmap;
+
+        internal IntPtr hBitmap = IntPtr.Zero;
+
+        internal IntPtr hPalette = IntPtr.Zero;
+
+        internal int unused = 0;
+
+ 
+
+        internal PictDescBitmap(Bitmap bitmap)
+
+        {
+
+            this.hBitmap = bitmap.GetHbitmap();
+
+        }
+
+    }
+
+ 
+
+    public static stdole.IPictureDisp ImageToPictureDisp(Image image)
+
+    {
+
+        if (image == null || !(image is Bitmap))
+
+        {
+
+            return null;
+
+        }
+
+ 
+
+        PictDescBitmap pictDescBitmap = new PictDescBitmap((Bitmap)image);
+
+        object ppVoid = null;
+
+        Guid iPictureDispGuid = typeof(stdole.IPictureDisp).GUID;
+
+        OleCreatePictureIndirect(pictDescBitmap, ref iPictureDispGuid, true, out ppVoid);
+
+        stdole.IPictureDisp picture = (stdole.IPictureDisp)ppVoid;
+
+        return picture;
+
+    }
+
+ 
+
+    public static Image PictureDispToImage(stdole.IPictureDisp pictureDisp)
+
+    {
+
+        Image image = null;
+
+        if (pictureDisp != null && pictureDisp.Type == _PictureTypeBitmap)
+
+        {
+
+            IntPtr paletteHandle = new IntPtr(pictureDisp.hPal);
+
+            IntPtr bitmapHandle = new IntPtr(pictureDisp.Handle);
+
+            image = Image.FromHbitmap(bitmapHandle, paletteHandle);
+
+        }
+
+        return image;
+
+    }
+
+}
 
     internal abstract class InvComboBox
     {

@@ -37,6 +37,8 @@ namespace InvAddIn
 
         public Tables(Inventor.Document pDoc, Inventor.Application m_InvApp, string name)
         {
+            try
+            {
             if (pDoc.DocumentType == DocumentTypeEnum.kDrawingDocumentObject)
             {
                 m_Drw = (DrawingDocument)pDoc;
@@ -88,6 +90,11 @@ namespace InvAddIn
                         }
                     }
                 }
+            }
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
             }
         }
 
@@ -2254,13 +2261,8 @@ namespace InvAddIn
         }
 
         #region "Methods"
-        public TablesButton(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
-        {
-
-        }
-        public TablesButton(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType)
+        public TablesButton(string displayName, string internalName, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon)
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon)
         {
 
         }

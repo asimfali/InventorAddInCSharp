@@ -87,13 +87,18 @@ namespace InvAddIn
 
         public Property get(string name)
         {
-            foreach (PropertySet item in doc.PropertySets)
-            {
-                pr = item.OfType<Property>().FirstOrDefault(p => p.Name.ToLower() == name.ToLower());
-                if (pr != null) { props.Add(pr); return pr; }
-            }
-            props.Add(null);
-            return null;
+
+            pr = u.getProp(doc, name);
+            if (pr != null) props.Add(pr);
+            else u.addProp(doc, name, "");
+            return pr;
+//             foreach (PropertySet item in doc.PropertySets)
+//             {
+//                 pr = item.OfType<Property>().FirstOrDefault(p => p.Name.ToLower() == name.ToLower());
+//                 if (pr != null) { props.Add(pr); return pr; }
+//             }
+//             props.Add(null);
+//             return null;
         }
 
         public List<Property> gets(string[] names)

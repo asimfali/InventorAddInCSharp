@@ -19,9 +19,10 @@ namespace InvAddIn
     {
         public static SketchOp so;
 
-        public SketchBtn(Icon standardIcon, Icon largeIcon, string displayName = "Центр массива", string internalName = "Autodesk:Macros:ArrayCenter", CommandTypesEnum commandType = CommandTypesEnum.kShapeEditCmdType, string clientId = "{3FF41256-8915-4D38-A76C-01C80A3A709A}",
-            string description = "Начало массива", string tooltip = "Начало массива",  ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
+        public SketchBtn(Icon standardIcon, Icon largeIcon, string displayName = "Центр массива", string internalName = "ArrayCenter", 
+            string clientId = "{3FF41256-8915-4D38-A76C-01C80A3A709A}",
+            string description = "Начало массива", string tooltip = "Начало массива")
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon)
         {
         }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
@@ -29,39 +30,6 @@ namespace InvAddIn
             if (Macros.StandardAddInServer.m_inventorApplication.ActiveDocument.DocumentType == DocumentTypeEnum.kPartDocumentObject)
             {
                 so = new SketchOp(Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as PartDocument);
-            }
-        }
-    }
-
-    internal class UpdateBtn : Button
-    {
-        public static UpdateOp uo;
-
-        public UpdateBtn(Icon standardIcon, Icon largeIcon, string displayName = "Обновить", string internalName = "Autodesk:Macros:Update", CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType, string clientId = "{69952C06-27CD-4E89-B216-BAE9F318FB45}",
-            string description = "Обновить", string tooltip = "Обновить", ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
-        {
-        }
-        protected override void ButtonDefinition_OnExecute(NameValueMap context)
-        {
-            if (Macros.StandardAddInServer.m_inventorApplication.ActiveDocument.DocumentType == DocumentTypeEnum.kPartDocumentObject)
-            {
-                uo = new UpdateOp();
-            }
-        }
-    }
-
-
-    public class UpdateOp
-    {
-        public UpdateOp()
-        {
-            Document DocumentObject = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
-            if (DocumentObject.DocumentType == DocumentTypeEnum.kPartDocumentObject)
-            {
-                ComboBoxDefinition cbd = Macros.StandardAddInServer.m_inventorApplication.CommandManager.ControlDefinitions.OfType<ComboBoxDefinition>().FirstOrDefault(b => b.InternalName == "Autodesk:Macros:CB");
-                if (cbd == null) return;
-                Macros.StandardAddInServer.data = new InvAddIn.DataToArray(DocumentObject as PartDocument, cbd);
             }
         }
     }

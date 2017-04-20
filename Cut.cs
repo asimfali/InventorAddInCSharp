@@ -22,13 +22,8 @@ namespace InvAddIn
         }
 
         #region "Methods"
-        public CutButton(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType)
-        {
-
-        }
-        public CutButton(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description, string tooltip, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType)
+        public CutButton(string displayName, string internalName, string clientId, string description, string tooltip, Icon standardIcon, Icon largeIcon)
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon)
         {
 
         }
@@ -69,7 +64,13 @@ namespace InvAddIn
         {
             CommandManager cmdMgr = ((Inventor.Application)m_PartDoc.Parent).CommandManager;
             PlanarSketch ps = (PlanarSketch)cmdMgr.Pick(SelectionFilterEnum.kAllPlanarEntities, "Выберите эскиз:");
-            return ps.Profiles.AddForSolid(false);
+//             ObjectCollection col = I.app.TransientObjects.CreateObjectCollection();
+//             int count = ps.SketchEntities.Count;
+//             for (int i = 0; i < count/2; i++)
+//             {
+//                 col.Add(ps.SketchEntities[i + 1]);
+//             }
+            return ps.Profiles.AddForSolid(false/*, col*/);
         }
     }
 

@@ -57,7 +57,6 @@ namespace Macros
         private InvAddIn.BreakButton m_xmlBreak;
         private InvAddIn.SplineButton m_spline;
         private InvAddIn.ComboBoxBtn m_ComboBox;
-        private InvAddIn.UpdateBtn m_Update;
         private InvAddIn.Assembly m_Asm;
         //private InvAddIn.Sketches m_Sketches;
         RibbonPanel m_partSketchRibbonPanel;
@@ -110,8 +109,8 @@ namespace Macros
             // The FirstTime flag indicates if the addin is loaded for the first time.
 
             // Initialize AddIn members.
-//             try
-//             {
+//              try
+//              {
             m_inventorApplication = addInSiteObject.Application;
             //m_tg = m_inventorApplication.TransientGeometry;
             //m_objs = m_inventorApplication.TransientObjects;
@@ -148,72 +147,100 @@ namespace Macros
             Icon standartbreakIcon = new Icon(breakIcon, 16, 16);
             Icon largebreakIcon = new Icon(breakIcon, 32, 32);
 
-            m_SpecButton = new InvAddIn.Spec("Спецификация", "Autodesk:Macros:Spec", CommandTypesEnum.kNonShapeEditCmdType,
-                "{ED6E59F8-E475-4C14-A5BA-1DDBD041CD82}", "Спецификация", "Спецификация с переменными данными", specIcon, specIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-                m_SpecButton._ButtonDefinition.OverrideShortcut = "Alt+S";
-            m_Break = new InvAddIn.MyBreakOperation("ГР", "Autodesk:Macros:BreakHor", CommandTypesEnum.kNonShapeEditCmdType, 
-                "{77F3E204-1071-4B17-914F-799E51B292FD}", "Добавить горизонтальный разрыв", "Горизонтальный разрыв с определенными параметрами", standartbreakIcon, largebreakIcon, ButtonDisplayEnum.kNoTextWithIcon);
-            m_BreakVert = new InvAddIn.MyBreakOperationVert("ВР", "Autodesk:Macros:BreakVert", CommandTypesEnum.kNonShapeEditCmdType, 
-                "{57B15465-B68E-42F0-8CEC-B3FBC5B509AB}", "Добавить вертикальный разрыв", "Вертикальный разрыв с определенными параметрами", breakVertIcon, breakVertIcon, ButtonDisplayEnum.kNoTextWithIcon);
-            m_Balloon = new InvAddIn.BalloonOp("Позиция", "Autodesk:Macros:Balloon", CommandTypesEnum.kNonShapeEditCmdType, 
-                "{E641CEF1-A4CB-4C69-9AA8-DCFA6CBB9D4F}", "Вынести номер позиции", "Групповой номер позиции", BalloonIcon, BalloonIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_Cut = new InvAddIn.CutButton("Вырез", "Autodesk:Macros:Cut", CommandTypesEnum.kNonShapeEditCmdType,
-                "{C88EAB8B-7C31-4BF3-A5AA-B6B2073DABF1}", "Вырез", "Вырез", CutIcon, CutIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
+            m_SpecButton = new InvAddIn.Spec("Спецификация", "Spec","{ED6E59F8-E475-4C14-A5BA-1DDBD041CD82}", "Спецификация",
+                "Спецификация с переменными данными", specIcon, specIcon);
+            m_SpecButton.addShortCut("Alt+S");
+
+            m_Break = new InvAddIn.MyBreakOperation("ГР", "BreakHor", "{77F3E204-1071-4B17-914F-799E51B292FD}", "Добавить горизонтальный разрыв", 
+                "Горизонтальный разрыв с определенными параметрами", standartbreakIcon, largebreakIcon);
+
+            m_BreakVert = new InvAddIn.MyBreakOperationVert("ВР", "BreakVert" ,"{57B15465-B68E-42F0-8CEC-B3FBC5B509AB}", "Добавить вертикальный разрыв",
+                "Вертикальный разрыв с определенными параметрами", breakVertIcon, breakVertIcon);
+
+            m_Balloon = new InvAddIn.BalloonOp("Позиция", "Balloon", "{E641CEF1-A4CB-4C69-9AA8-DCFA6CBB9D4F}", "Вынести номер позиции", 
+                "Групповой номер позиции", BalloonIcon, BalloonIcon);
+
+            m_Cut = new InvAddIn.CutButton("Вырез", "Cut", "{C88EAB8B-7C31-4BF3-A5AA-B6B2073DABF1}", "Вырез",
+                "Вырез", CutIcon, CutIcon);
+
             //m_set = new InvAddIn.SetButton("Настройки", "Autodesk:Macros:Set", CommandTypesEnum.kNonShapeEditCmdType,
             //    "{E7AB7D8E-A972-451B-B6CF-46927D1469B8}", "Используемые модули", "Используемые модули", SetIcon, SetIconLarge, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_cc = new InvAddIn.ContentBtn("Вставка крепежа", "Autodesk:Macros:CC", CommandTypesEnum.kNonShapeEditCmdType,
-                "{60DBC787-F747-43BD-9F6E-6B4F2B85FCF3}", "Вставка крепежа", "Вставка крепежа",FastenersIcon,FastenersIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
+
+            m_cc = new InvAddIn.ContentBtn("Вставка крепежа", "CC", "{60DBC787-F747-43BD-9F6E-6B4F2B85FCF3}", "Вставка крепежа",
+                "Вставка крепежа",FastenersIcon,FastenersIcon);
             InvAddIn.ContentBtn.getCC = cc;
-            m_PDF = new InvAddIn.PDFButton("PDF\\DXF", "Autodesk:Macros:PDF", CommandTypesEnum.kNonShapeEditCmdType,
-            "{078FB534-4264-4159-9AA7-1D64A8629C7D}", "Создание PDF\\DXF", "Создание PDF\\DXF", PDFIcon, PDFIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-             m_Print = new InvAddIn.Print("Печать", "Autodesk:Macros:Print", CommandTypesEnum.kNonShapeEditCmdType,
-            "{29A0A185-CAE8-4EC7-94D6-2CE0A2DAB064}", "Печать", "Печать",printIcon,printIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-             m_FP = new InvAddIn.FP("Развернуть", "Autodesk:Macros:FP", CommandTypesEnum.kNonShapeEditCmdType,
-            "{F51893B9-5E6B-4484-8B0A-72E8B27CEAA4}", "Развернуть", "Развернуть", FPIcon, FPIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_Tbl = new InvAddIn.TablesButton("Таблица", "Autodesk:Macros:Table", CommandTypesEnum.kNonShapeEditCmdType,
-            "{0483E272-C3EF-479E-A654-F5CF9E165642}", "Создание таблиц", "Создание таблиц", TblIcon, TblIconLarge, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_Tbl._ButtonDefinition.OverrideShortcut = "Alt+G";
-            m_Offset = new InvAddIn.OffsetBtn("Шип", "Autodesk:Macros:Offset", CommandTypesEnum.kNonShapeEditCmdType,
-            "{7FF6407E-6193-4D27-9C34-BCA7E2F85435}", "Вырез под шип", "Вырез под шип", OffsetIcon, OffsetIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_Sticker = new InvAddIn.StickerBtn("Наклейки", "Autodesk:Macros:Sticker", CommandTypesEnum.kNonShapeEditCmdType,
-            "{8D0C4823-6192-4923-9BB5-61D8984AFBE0}", "Наклейки", "Наклейки", StickerIcon, StickerIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_Passport = new InvAddIn.PassportBtn("Паспорт", "Autodesk:Macros:Passport", CommandTypesEnum.kNonShapeEditCmdType,
-            "{02A3630E-9118-4B5A-B1F2-FC8F3B64D10A}", "Паспорт", "Паспорт", PassportIcon, PassportIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_IMate = new InvAddIn.IMateBtn("Конструктивная пара", "Autodesk:Macros:IMate", CommandTypesEnum.kNonShapeEditCmdType,
-            "{9845CF95-4D8A-4E24-B27B-79908DF23CF3}", "Конструктивная пара", "Конструктиваная пара", IMateIcon, IMateIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_IMate._ButtonDefinition.OverrideShortcut = "Alt+Q";
-            m_PropBtn = new InvAddIn.PropBtn("Свойства проекта", "Autodesk:Macros:Prop", CommandTypesEnum.kNonShapeEditCmdType,
-            "{FF99F993-5248-4834-BD56-EC1AF0023A7C}", "Свойства проекта", "Свойства проекта", PropIcon, PropIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_PropBtn._ButtonDefinition.OverrideShortcut = "Alt+C";
-            m_RecBtn = new InvAddIn.RecoverBtn("Восстановить", "Autodesk:Macros:Recover", CommandTypesEnum.kNonShapeEditCmdType,
-            "{168BFABD-D59E-410A-A30A-83EF48A469E4}", "восстановить зависимости", "Восстановить зависимости", RecoverIcon, RecoverIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_parts = new InvAddIn.PartsBtn("Создать детали", "Autodesk:Macros:Parts", CommandTypesEnum.kNonShapeEditCmdType,
-            "{246BF5BA-872C-4792-9F6A-27FE9FC45C96}", "Создать детали", "Создать детали", PartsIcon, PartsIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
-            m_parts._ButtonDefinition.OverrideShortcut = "Alt+D"; 
-            m_DrwBtn = new InvAddIn.DrawingBtn("Размеры", "Autodesk:Macros:Dimensions", CommandTypesEnum.kNonShapeEditCmdType,
-                "{EEF8F8DA-EBE1-417D-BCFC-B3344AF6698C}", "Размеры", "Размеры", DrwIcon, DrwIcon, ButtonDisplayEnum.kDisplayTextInLearningMode);
+
+            m_PDF = new InvAddIn.PDFButton("PDF\\DXF", "PDF", "{078FB534-4264-4159-9AA7-1D64A8629C7D}", "Создание PDF\\DXF",
+                "Создание PDF\\DXF", PDFIcon, PDFIcon);
+
+            m_Print = new InvAddIn.Print("Печать", "Print",
+           "{29A0A185-CAE8-4EC7-94D6-2CE0A2DAB064}", "Печать", "Печать", printIcon, printIcon);
+
+            m_FP = new InvAddIn.FP("Развернуть", "FP",
+           "{F51893B9-5E6B-4484-8B0A-72E8B27CEAA4}", "Развернуть", "Развернуть", FPIcon, FPIcon);
+
+
+            m_Tbl = new InvAddIn.TablesButton("Таблица", "Table",
+            "{0483E272-C3EF-479E-A654-F5CF9E165642}", "Создание таблиц", "Создание таблиц", TblIcon, TblIconLarge);
+            m_Tbl.addShortCut("Alt+G");
+
+
+            m_Offset = new InvAddIn.OffsetBtn("Шип", "Offset",
+            "{7FF6407E-6193-4D27-9C34-BCA7E2F85435}", "Вырез под шип", "Вырез под шип", OffsetIcon, OffsetIcon);
+
+            m_Sticker = new InvAddIn.StickerBtn("Наклейки", "Sticker",
+            "{8D0C4823-6192-4923-9BB5-61D8984AFBE0}", "Наклейки", "Наклейки", StickerIcon, StickerIcon);
+
+            m_Passport = new InvAddIn.PassportBtn("Паспорт", "Passport",
+             "{02A3630E-9118-4B5A-B1F2-FC8F3B64D10A}", "Паспорт", "Паспорт", PassportIcon, PassportIcon);
+
+            m_IMate = new InvAddIn.IMateBtn("Конструктивная пара", "IMate",
+            "{9845CF95-4D8A-4E24-B27B-79908DF23CF3}", "Конструктивная пара", "Конструктиваная пара", IMateIcon, IMateIcon);
+            m_IMate.addShortCut("Alt+Q");
+
+
+            m_PropBtn = new InvAddIn.PropBtn("Свойства проекта", "Prop",
+            "{FF99F993-5248-4834-BD56-EC1AF0023A7C}", "Свойства проекта", "Свойства проекта", PropIcon, PropIcon);
+            m_PropBtn.addShortCut("Alt+C");
+
+            m_RecBtn = new InvAddIn.RecoverBtn("Восстановить", "Recover",
+            "{168BFABD-D59E-410A-A30A-83EF48A469E4}", "восстановить зависимости", "Восстановить зависимости", RecoverIcon, RecoverIcon);
+
+             m_parts = new InvAddIn.PartsBtn("Создать детали", "Parts",
+            "{246BF5BA-872C-4792-9F6A-27FE9FC45C96}", "Создать детали", "Создать детали", PartsIcon, PartsIcon);
+            m_parts.addShortCut("Alt+D");
+
+            m_DrwBtn = new InvAddIn.DrawingBtn("Размеры", "Dimensions",
+                "{EEF8F8DA-EBE1-417D-BCFC-B3344AF6698C}", "Размеры", "Размеры", DrwIcon, DrwIcon);
+
             m_ListBtn = new InvAddIn.ListBtn("Лист", "Autodesk:Macros:List", "{D18615A7-F27A-4A15-B18E-FACBAC3BE295}", "Работа с листом чертежа",
                 "Работа с листом чертежа");
+
             m_surfBtn = new InvAddIn.SurfaceBtn("Шероховатость поверхности", "Autodesk:Macros:surf", "{E5E9F634-54BD-48B5-9BF1-D2114433ADA9}",
                 "Добавление символов шероховатости необрабатвыемой поверхности", "Добавление символов шероховатости необрабатвыемой поверхности");
+
             m_VarBtn = new InvAddIn.VarBtn("Вставить параметрический элемент", "Autodesk:Macros:var", "{F6CCEBE3-0409-4083-9BF2-A33C107AA625}",
                 "Добавление параметрического элемента по точкам и направлению в эскизе", "Добавление параметрического элемента по точкам и направлению в эскизе");
+
             m_Gab = new InvAddIn.GabButton("Размеры", "Autodesk:Macros:gab", "{2591E510-DDA0-49CD-B42E-78C55DEFCCBF}",
             "Добавление размеров на вид", "Добавление размеров на вид");
+
             m_Asm = new InvAddIn.Assembly("Разнести", "Autodesk:Macros:asm", "{B47B41A2-A984-4326-A275-321C7D663C72}", "Изменить расстояние", "Изменить расстояние");
-            m_Asm._ButtonDefinition.OverrideShortcut = "Alt+R";
+            m_Asm.addShortCut("Alt+R");
+
             //m_Sketches = new InvAddIn.Sketches("Эскизы", "Autodesk:Macros:sketches", "{0B21CAD3-D1B4-4776-BF07-8BC9F60DAAF1}", "Копировать эскиз", "Копировать эскиз");
             m_DrwArrBtn = new InvAddIn.DrwArrBtn("Массив", "Autodesk:Macros:DrwArr", "{BC16CA31-2D3F-4F2C-93AF-ED4BE5CA0E5A}",
              "Добавление размера массива отверстий", "Добавление размера массива отверстий");
+
             m_xmlBreak = new InvAddIn.BreakButton("Разрыв", "Autodesk:Macros:xmlBreak", "{13CE307F-73E2-411D-9662-BAEFE0D8F961}",
                 "Добавить разрывы", "Добавить разрывы");
+
             m_spline = new InvAddIn.SplineButton("Вырыв", "Autodesk:Macros:spline", "{394B0B7D-B034-4F76-B02D-C37F31C8028F}", "Добавить вырыв", "добавить вырыв");
+
             m_Sketch = new InvAddIn.SketchBtn(SketchIcon, SketchIcon);
             m_sketchInModel = new InvAddIn.SketchInModel("Отверстия", "Autodesk:Macros:sim", "{D4BDD51E-B174-487C-857E-FC592089CBCB}",
                 "Создать из базового эскиза", "Создать из базового эскиза");
             m_ComboBox = new InvAddIn.ComboBoxBtn(ComboBoxIcon, ComboBoxIcon, "Данные для Массива");
-            m_Update = new InvAddIn.UpdateBtn(UpdateIcon, UpdateIcon);
-            //m_Update._ButtonDefinition.OverrideShortcut = "Ctrl+Shift+U";
 
             if (firstTime == true)
             {
@@ -233,18 +260,19 @@ namespace Macros
                 m_specPanel.CmdControl.UseLargeIcon = true;
                 InvAddIn.Panel m_PartPanel = new InvAddIn.Panel(m_inventorApplication, m_Cut._ButtonDefinition, 
                     "Part", "id_TabSheetMetal", "Элементы", "Autodesk:Macros:SMF", "{BDB0D42F-8E9E-4EF7-A84C-0655C17E0071}");
-                m_PartPanel.addControl(m_Offset._ButtonDefinition); m_PartPanel.addControl(m_PDF._ButtonDefinition);
-                m_PartPanel.addControl(m_FP._ButtonDefinition);
+                 m_PartPanel.addControl(m_Offset._ButtonDefinition);
+                m_PartPanel.addControl(m_PDF._ButtonDefinition);
+                 m_PartPanel.addControl(m_FP._ButtonDefinition);
                 m_PartPanel.addControl(m_IMate._ButtonDefinition);
                 m_PartPanel.addControl(m_parts._ButtonDefinition);
                 InvAddIn.Panel m_AssemblyPanel = new InvAddIn.Panel(m_inventorApplication, m_cc._ButtonDefinition,
-                    "Assembly", "id_TabAssemble", "Крепеж", "Autodesk:Macros:CC", "{9664E6B8-74A6-432D-BAB1-1ADFFDB7CBB9}");
-                m_AssemblyPanel.addControl(m_Sticker._ButtonDefinition);
+                     "Assembly", "id_TabAssemble", "Крепеж", "Autodesk:Macros:CC", "{9664E6B8-74A6-432D-BAB1-1ADFFDB7CBB9}");
+                 m_AssemblyPanel.addControl(m_Sticker._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_IMate._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_PropBtn._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_RecBtn._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_parts._ButtonDefinition);
-                m_AssemblyPanel.addControl(m_PDF._ButtonDefinition);
+                 m_AssemblyPanel.addControl(m_PDF._ButtonDefinition);
                 InvAddIn.Panel m_SketchPanel = new InvAddIn.Panel("Part", "id_TabSketch", "id_PanelP_2DSketchFormat");
                 m_SketchPanel.addControl(m_Sketch._ButtonDefinition);
                 m_SketchPanel.addControl(m_ComboBox._ComboBoxDef,"SketchCenterlineCmd");
@@ -267,6 +295,8 @@ namespace Macros
             m_InputEvts.OnActivateCommand += new UserInputEventsSink_OnActivateCommandEventHandler(UserInputEventsSink_OnActivateCommand);
             //m_modEvents.OnGenerateMember += new ModelingEventsSink_OnGenerateMemberEventHandler(ModelingEventsSink_OnGenerateMember);
             m_asmbllEvts.OnNewOccurrence += new AssemblyEventsSink_OnNewOccurrenceEventHandler(AssemblyEventsSink_OnNewOccurrence);
+
+
 //             }
 // 			catch(Exception e)
 // 			{

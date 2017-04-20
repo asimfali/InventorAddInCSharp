@@ -16,9 +16,9 @@ namespace InvAddIn
     {
         public static Drawings m_Drw;
         public static Drawings getDrw { get { return m_Drw; } }
-        public DrawingBtn(string displayName, string internalName, CommandTypesEnum commandType, string clientId, string description,
-            string tooltip, System.Drawing.Icon standardIcon, System.Drawing.Icon largeIcon, ButtonDisplayEnum buttonDisplayType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, standardIcon, largeIcon, buttonDisplayType) { }
+        public DrawingBtn(string displayName, string internalName, string clientId, string description,
+            string tooltip, System.Drawing.Icon standardIcon, System.Drawing.Icon largeIcon)
+            : base(displayName, internalName, clientId, description, tooltip, standardIcon, largeIcon) { }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
             if (I.getSS().Count == 0)
