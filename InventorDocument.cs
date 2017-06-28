@@ -138,7 +138,7 @@ namespace InvDoc
             return (Document)invApp.Documents.OpenWithOptions(name, nvmOptions, visible);
         }
 
-        public PartDocument derivedDoc(string name, string nameFind = "", PartDocument doc = null, string parNames = "")
+        public PartDocument derivedDoc(string name, string nameFind = "", PartDocument doc = null, string parNames = "", DerivedPartMirrorPlaneEnum pln = DerivedPartMirrorPlaneEnum.kDerivedPartNoMirrorPlane)
         {
             if (doc == null) doc = addPrtDoc();
             SheetMetalComponentDefinition partDef = null;
@@ -156,6 +156,8 @@ namespace InvDoc
                 derDef.IncludeAlliMateDefinitions = DerivedComponentOptionEnum.kDerivedIncludeAll;
                 derDef.UseColorOverridesFromSource = true;
                 derDef.DeriveStyle = DerivedComponentStyleEnum.kDeriveAsSingleBodyWithSeams;
+                if (pln != DerivedPartMirrorPlaneEnum.kDerivedPartNoMirrorPlane)
+                    derDef.MirrorPlane = pln;
                 if (parNames != "")
                 {
                     derDef.IncludeAllParameters = false;
@@ -383,8 +385,11 @@ namespace InvDoc
                     //doc.Update();
                     if (nvm.Count == 0)
                     {
-                        dv.Camera.ViewOrientationType = viewEnum;
-                        dv.Camera.Apply();
+                        if (viewEnum != ViewOrientationTypeEnum.kCurrentViewOrientation)
+                        {
+                            dv.Camera.ViewOrientationType = viewEnum;
+                            dv.Camera.Apply();
+                        }
                     }
                     break;
                 case TypeViews.DetailView:
@@ -778,8 +783,8 @@ namespace InvDoc
         {
             Property p = null;
             //p = ;
-            p = get<Property>(doc.PropertySets[3], f => f.Name == name) ?? get<Property>(doc.PropertySets[4], f => f.Name == name)
-                ?? get<Property>(doc.PropertySets[1], f => f.Name == name) ?? get<Property>(doc.PropertySets[2], f => f.Name == name);
+            p = get<Property>(doc.PropertySets[3], f => f.Name.ToLower() == name.ToLower()) ?? get<Property>(doc.PropertySets[4], f => f.Name.ToLower() == name.ToLower())
+                ?? get<Property>(doc.PropertySets[1], f => f.Name.ToLower() == name.ToLower()) ?? get<Property>(doc.PropertySets[2], f => f.Name.ToLower() == name.ToLower());
             //             try { p = doc.PropertySets[2][name]; }
             //             catch
             //             {
@@ -892,6 +897,25 @@ namespace InvDoc
             return (Math.Round(vec.X, 3) == 0 && Math.Round(vec.Y, 3) == 0) ? true : false;
         }
 
+        static public bool eq(Point pt1, UnitVector v1, Point pt2, UnitVector v2)
+        {
+            set(v1, ref pt1); set(v2, ref pt2);
+            return eq(pt1, pt2);
+        }
+
+        static public void set(UnitVector v, ref Point pt)
+        {
+            double [] coords = new double [3], vcoords = new double [3];
+            pt.GetPointData(ref coords);
+            v.GetUnitVectorData(ref vcoords);
+            for (int i = 0; i < coords.Length; i++)
+            {
+                if(eq(vcoords[i],0)) continue;
+                coords[i] = 0;
+            }
+            pt.PutPointData(coords);
+        }
+
         static public object findAtPoint(PartComponentDefinition compDef, Point pt, SelectionFilterEnum[] filter, double tol = 15, bool axis = false)
         {
             ObjectsEnumerator en = compDef.FindUsingPoint(pt, ref filter, tol);
@@ -912,6 +936,21 @@ namespace InvDoc
             if (en.Count == 0) return default(T);
             T ax = en.OfType<T>().OrderBy(e => meas.GetMinimumDistance(pt, e)).ElementAt(ind);
             return ax;
+        }
+
+        static public void regex(ref string f, string reg, string repl)
+        {
+            Regex r = new Regex(reg, RegexOptions.IgnoreCase);
+            if (r.IsMatch(f))
+            {
+                f = Regex.Replace(f, reg, repl);
+            }
+        }
+
+        static public bool regex(string f, string reg)
+        {
+            Regex r = new Regex(reg, RegexOptions.IgnoreCase);
+            return r.IsMatch(f);
         }
 
         static public string getDate(string s)
@@ -1438,6 +1477,11 @@ namespace InvDoc
             return ie != null ? ie.Concat<T>(add<T>(ob)) : add<T>(ob);
         }
 
+        static public IEnumerable<T> add<T>(IEnumerable<T> ie1, IEnumerable<T> ie2)
+        {
+            return (ie1 != null && ie2 != null) ? ie1.Concat<T>(ie2): ie2;
+        }
+
         static public void action<T>(IEnumerable<T> ie, Action<T> a, Func<T, bool> f = null)
         {
             foreach (T item in ie)
@@ -1564,6 +1608,11 @@ namespace InvDoc
         static public double scalar(UnitVector2d v1, UnitVector2d v2)
         {
             return v1.X * v2.X + v1.Y * v2.Y;
+        }
+
+        static public double scalar(Point pt1, UnitVector dir)
+        {
+            return pt1.X * Math.Abs(dir.X) + pt1.Y * Math.Abs(dir.Y) + pt1.Z * Math.Abs(dir.Z);
         }
 
         static public bool isFirstSheet(DrawingView dv, int num)
@@ -2266,11 +2315,11 @@ namespace InvDoc
         {
             FileDialog fd;
             I.app.CreateFileDialog(out fd);
+            fd.InitialDirectory = iniDir;
             fd.Filter = filter;
             fd.FilterIndex = 1;
             fd.MultiSelectEnabled = multi;
             fd.CancelError = true;
-            fd.InitialDirectory = iniDir;
             try
             {
                 fd.ShowOpen();
@@ -2283,9 +2332,17 @@ namespace InvDoc
             return fd.FileName;
         }
 
-        static public string WOFD(string iniDir, string filter = "XML Files|*.xml")
+        static public string WOFD(string iniDir, string filter = "XML Files|*.xml", string [] custom = null)
         {
             System.Windows.Forms.OpenFileDialog ofd = new System.Windows.Forms.OpenFileDialog();
+            System.Windows.Forms.FileDialogCustomPlacesCollection col = ofd.CustomPlaces;
+            if (custom != null)
+            {
+                foreach (var item in custom)
+                {
+                    col.Add(item);
+                }
+            }
             ofd.InitialDirectory = iniDir;
             ofd.Filter = filter;
             try
@@ -2603,12 +2660,13 @@ namespace InvDoc
             }
         }
 
-        public static void findParameter(Document doc, string name)
+        public static bool findParameter(Document doc, string name, bool add = false, XElement el = null)
         {
+            bool fl = false;
             if (doc.DocumentType == DocumentTypeEnum.kPartDocumentObject)
             {
                 PartComponentDefinition compDef = ((PartDocument)doc).ComponentDefinition;
-                if (compDef.ReferenceComponents.DerivedPartComponents.Count == 0) return;
+                if (compDef.ReferenceComponents.DerivedPartComponents.Count == 0) return fl;
                 DerivedPartDefinition def = compDef.ReferenceComponents.DerivedPartComponents[1].Definition;
                 foreach (DerivedPartEntity par in def.Parameters)
                 {
@@ -2617,13 +2675,18 @@ namespace InvDoc
                         UserParameter p = par.ReferencedEntity as UserParameter;
                         if (p.Name == name)
                         {
-                            par.IncludeEntity = true;
+                            par.IncludeEntity = true; fl = true;
                             break;
                         }
                     }
                 }
+                if (add && !fl && el != null) 
+                {
+                    addParameter(compDef.ReferenceComponents.DerivedPartComponents[1].ReferencedDocumentDescriptor.ReferencedDocument as Document, el);
+                }
                 compDef.ReferenceComponents.DerivedPartComponents[1].Definition = def;
             }
+            return fl;
         }
 
         public static void findParameter(Document doc, HashSet<string> names)
@@ -2789,11 +2852,12 @@ namespace InvDoc
 
         static public void transactStart(Document doc, string name)
         {
+            if (tr != null) tr.Abort();
             tr = I.app.TransactionManager.StartTransaction(doc as _Document, name);
         }
         static public void transactEnd()
         {
-            if (tr != null) tr.End();
+            if (tr != null) { tr.End(); tr = null; }
         }
         static public void transactUndo()
         {

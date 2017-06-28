@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using System.Linq;
 using System.Globalization;
 using System.Drawing;
+using InterfaceDll;
 
 namespace Macros
 {
@@ -91,6 +92,7 @@ namespace Macros
         static public System.Collections.Generic.List<Inventor.ComponentOccurrence> lstco;
         static public System.Collections.Generic.List<string> lstSort;
         string[] attr;
+        public static MyXML xml;
         //private Inventor.NameValueMap NVM;
 
         #endregion
@@ -565,16 +567,25 @@ namespace Macros
             }
             if (Alp == "1" && CommandName == "AppDeleteCmd")
             {
-                Inventor.DrawingDocument m_drw = (Inventor.DrawingDocument)m_inventorApplication.ActiveDocument;
-                SelectSet ss = m_drw.SelectSet;
-                if (ss.Count != 0)
+                try
                 {
-                    try
+                    Inventor.DrawingDocument m_drw = (Inventor.DrawingDocument)m_inventorApplication.ActiveDocument;
+                    SelectSet ss = m_drw.SelectSet;
+                    if (ss.Count != 0)
                     {
-                        DrawingView view = (DrawingView)ss[1];
-                        deleteView = true;
+                        try
+                        {
+                            DrawingView view = (DrawingView)ss[1];
+                            deleteView = true;
+                        }
+                        catch { }
                     }
-                    catch {}
+
+                }
+                catch (Exception)
+                {
+
+                    throw;
                 }
             }
         }

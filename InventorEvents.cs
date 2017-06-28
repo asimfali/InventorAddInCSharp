@@ -231,6 +231,7 @@ namespace InvAddIn
             if (BeforeOrAfter != EventTimingEnum.kBefore) return;
             mat = materials[DocumentObject];
             Mass m = new Mass(DocumentObject);
+            if (mat == null) return;
             mat.check(mat.smcd);
             //if (mat.changed) { DocumentObject.Save2(); mat.changed = false; }
             //materials.remove(mat);
@@ -247,6 +248,7 @@ namespace InvAddIn
         bool check(SheetMetalComponentDefinition smcd1)
         {
             if (xDoc == null) return false;
+            if (smcd1 == null) return false;
             double t = u.convToDouble(smcd1.Thickness.Value.ToString(),10, 3);
             string matName = smcd1.Material.Name;
             XElement el = xDoc.Root.Descendants("Material").FirstOrDefault(e => e.FirstAttribute.Value == matName);

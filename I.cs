@@ -59,11 +59,60 @@ namespace InvAddIn
         {
             return getSMCD(aDoc());
         }
+        static public SheetMetalFeatures getSMF()
+        {
+            return getSMCD().Features as SheetMetalFeatures;
+        }
         static public FlatPattern getFP(Document doc)
         {
             SheetMetalComponentDefinition smcd = getSMCD(doc);
             if (smcd != null && smcd.HasFlatPattern) return smcd.FlatPattern;
             return null;
+        }
+        static public void createPunch(string name, PlanarSketch ps, Dictionary<string,double> dic, double ang = 0)
+        {
+            string path = app.iFeatureOptions.RootPath;
+            SheetMetalFeatures smf = getSMF();
+            iFeatureDefinition ifd = smf.PunchToolFeatures.CreateiFeatureDefinition(path + name);
+            foreach (iFeatureInput input in ifd.iFeatureInputs)
+            {
+                if (dic.ContainsKey(input.Name))
+                {
+                    ((iFeatureParameterInput)input).Value = dic[input.Name] / 10;
+                }
+            }
+            smf.PunchToolFeatures.Add(getPoints(ps), ifd, ang);
+        }
+        static public void createSlot(Point2d insPt, PlanarSketch ps, Vector2d dir, double a, double b)
+        {
+            dir.ScaleBy(a);
+            Point2d ep = insPt.Copy();
+            Point2d sp = insPt.Copy();
+            ep.TranslateBy(dir);
+            dir.ScaleBy(-1);
+            sp.TranslateBy(dir);
+            ps.AddStraightSlotByCenterToCenter(sp, ep, b);
+        }
+        static public void createCut(PlanarSketch ps)
+        {
+            SheetMetalFeatures smf = getSMF();
+            CutDefinition cd = smf.CutFeatures.CreateCutDefinition(ps.Profiles.AddForSolid(false));
+            try
+            { cd.SetCutAcrossBendsExtent("Толщина"); }
+            catch (Exception)
+            {
+                cd.SetCutAcrossBendsExtent("Thickness");
+            }
+            smf.CutFeatures.Add(cd);
+        }
+        static public ObjectCollection getPoints(PlanarSketch ps)
+        {
+            ObjectCollection col = I.COC();
+            foreach (SketchPoint item in ps.SketchPoints)
+            {
+                col.Add(item); 
+            }
+            return col;
         }
         static public Vector CV(double x=0, double y=0, double z=0)
         {
@@ -72,6 +121,14 @@ namespace InvAddIn
         static public Vector2d CV2d(double x = 0, double y = 0)
         {
             return tg.CreateVector2d(x, y);
+        }
+        static public UnitVector2d CUV2d(double x, double y)
+        {
+            return tg.CreateUnitVector2d(x,y);
+        }
+        static public UnitVector CUV(double x, double y, double z)
+        {
+            return tg.CreateUnitVector(x, y, z);
         }
         static public Point CP(double x = 0, double y = 0, double z = 0)
         {
@@ -87,6 +144,10 @@ namespace InvAddIn
             b.MinPoint = CP2d(sx, sy);
             b.MaxPoint = CP2d(ex, ey);
             return b;
+        }
+        static public object Pick(SelectionFilterEnum f, string prompt)
+        {
+            return I.app.CommandManager.Pick(f, prompt);
         }
         static public ObjectCollection COC()
         {
@@ -169,6 +230,6 @@ namespace InvAddIn
         static public BOMView getBOMView(int ind = 1)
         {
             return getBOMView(aDoc(), ind);
-        }
+        } 
     }
 }

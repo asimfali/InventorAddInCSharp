@@ -414,7 +414,7 @@ namespace InvAddIn
             psOut = def.Sketches.OfType<PlanarSketch>().FirstOrDefault(s => s.Name == sketchName);
             if (psOut == null)
             {
-                psOut = def.Sketches.Add(def.SurfaceBodies[1].Faces.OfType<Face>().Where(f => f.CreatedByFeature is FaceFeature).OrderByDescending(o => o.Edges.Count).ElementAt(1));
+                psOut = def.Sketches.Add(def.SurfaceBodies[1].Faces.OfType<Face>().Where(f => f.CreatedByFeature is FaceFeature).OrderByDescending(o => o.Evaluator.Area).ElementAt(1));
             }
             occ2.CreateGeometryProxy(psOut, out psp);
             plsP = (PlanarSketchProxy)psp;

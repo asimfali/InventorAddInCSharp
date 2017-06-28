@@ -1133,7 +1133,7 @@ namespace InvAddIn
                     string v = item.PropertySets[3][2].Value.ToString();
 		            string fn = names.FirstOrDefault(el => el.IndexOf(v) != -1);
                     if (fn != null)
-                    drws.Add(pr.open(fn));
+                    drws.Add(pr.open(fn,false,true));
 	            }
             }
             docs.AddRange(drws);
@@ -1361,9 +1361,14 @@ namespace InvAddIn
                 xdoc.Name = oldPath;
             }
         }
-        public Document open(string fname, bool vis = false)
+        public Document open(string fname, bool vis = false, bool upd = false)
         {
-            return docs.OpenWithOptions(fname, nvm, vis);
+            Document doc = docs.OpenWithOptions(fname, nvm, vis);
+            if (upd)
+            {
+               CreateComponent.update(doc);
+            }
+            return doc;
         }
         public XMLDoc addSelectedRow(DataGridView dgv)
         {
@@ -1582,7 +1587,7 @@ namespace InvAddIn
                 PDFOp pdf = new PDFOp();
                 string tmp;// = pdf.translit(data[2] ?? "");
                 string namePDF = (data[0] ?? "") + (data[1] ?? "") + "_EKD_" + (data[2] ?? "");
-                if (namePDF.EndsWith("0") || (namePDF[namePDF.Length - 3] == '_' && namePDF[namePDF.Length - 4] == '0')) namePDF += "_SB";
+                if (namePDF.EndsWith("0") || (namePDF[namePDF.Length - 3] == '-' && namePDF[namePDF.Length - 4] == '0')) namePDF += "_SB";
                 tmp = data[3] ?? "";
                 if (tmp != "")
                     namePDF += "_" + pdf.forDxf(tmp);
@@ -1591,6 +1596,7 @@ namespace InvAddIn
                 namePDF = namePDF.TrimStart(new char[] { '_' });
                 if ((data[6] ?? "") != "") namePDF = data[6];
                 el.SetAttributeValue("PDF", namePDF);
+                //u.regex(ref data[5], @"\^\d\d", "");
                 bool fPDF = copy(System.IO.Path.GetDirectoryName(data[5]) + "\\PDF\\", namePDF, pathPDF), fDXF;
                 if (!fPDF)
                     mydgv.setColors("ffn", data[5], System.Drawing.Color.Red, false);
@@ -1602,7 +1608,7 @@ namespace InvAddIn
                 {
                     fDXF = copy(System.IO.Path.GetDirectoryName(data[5]) + "\\DXF\\", nameDXF, pathDXF);
                     if (!fDXF) mydgv.setColors("ffn", data[5], System.Drawing.Color.Blue, false);
-                    if (!(fDXF && fPDF)) mydgv.setColors("ffn", data[5], System.Drawing.Color.Violet, false);
+                    else if (!(fDXF && fPDF)) mydgv.setColors("ffn", data[5], System.Drawing.Color.Violet, false);
                 }
             }
             string nCont = "Содержание.xml";
@@ -1619,6 +1625,12 @@ namespace InvAddIn
             foreach (Document item in doc.ReferencedDocuments)
             {
                 string pn = item.PropertySets[3][2].Value.ToString().Trim();
+                if (item.DocumentType == DocumentTypeEnum.kPartDocumentObject)
+                {
+                    PartComponentDefinition cd = (item as PartDocument).ComponentDefinition;
+                    if (cd.SurfaceBodies.Count == 0)
+                        continue;
+                }
                 if (pn == "") continue;
                 pr = new InventorPRoperties(item, props);
                 XElement row = new XElement("row");
@@ -1637,8 +1649,8 @@ namespace InvAddIn
         }
         public void show()
         {
-            path = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam");
-            if (path.EndsWith(".iam"))
+            path = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt");
+            if (path.EndsWith(".iam") || path.EndsWith(".ipt"))
             {
                 string path1 = InvDoc.u.pathUtil(I.aDoc());
                 projectPr = new XMLDoc(path1 + "\\Pathes.xml", "row");

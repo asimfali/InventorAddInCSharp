@@ -557,7 +557,8 @@ namespace InvAddIn
                     SketchLine l;
                     vec.ScaleBy(-le/2);
                     newPt.TranslateBy(vec);
-                    l = addLine(newPt, getPoint(insPt, newLin, true), 0, 2);
+                    vec.Normalize();
+                    l = addLine(newPt, getPoint(insPt, newLin, true), 0, 2*(vec.X+vec.Y));
                     ps.GeometricConstraints.AddParallel((SketchEntity)l, (SketchEntity)newLin);
                     ps.GeometricConstraints.AddTangent((SketchEntity)ps.SketchArcs[1], (SketchEntity) projectSL);
                     ps.GeometricConstraints.AddParallel((SketchEntity)newLin, (SketchEntity)projectSL);

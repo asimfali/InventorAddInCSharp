@@ -101,6 +101,10 @@ namespace InvAddIn
             }
             catch 
             {
+                
+            }
+            finally
+            {
                 tr.End();
             }
         }

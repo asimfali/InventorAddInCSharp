@@ -244,8 +244,8 @@ namespace InvAddIn
                 try
                 {
                     dec = refDoc.PropertySets[3][2].Value.ToString();
-                    if (dec.Length > 3 && dec[dec.Length - 3] == '-') 
-                        dec = dec.Remove(dec.LastIndexOf('-'));
+                    //if (dec.Length > 3 && dec[dec.Length - 3] == '-') 
+                    //    dec = dec.Remove(dec.LastIndexOf('-'));
                 }
                 catch
                 {

@@ -9,6 +9,7 @@ using Inventor;
 using InvDoc;
 using System.Windows.Forms;
 using TableDll;
+using InterfaceDll;
 
 namespace InvAddIn
 {
@@ -103,16 +104,23 @@ namespace InvAddIn
             cbs = new InterfaceDll.CB(offsetX, offsetY, 200, 15, insPt, f);
             cbs.position(lbs.last(), true);
             ComboBox cb = cbs[0];
-            foreach (UserParameter p in doc.ComponentDefinition.Parameters.UserParameters)
+            MyXML xml = new MyXML("Parameters.xml");
+            foreach (var item in xml.elem.Elements())
             {
-                cb.Items.Add(p.Name);  
+                if (item.Attribute("Name") != null)
+                    cb.Items.Add(item.Attribute("Name").Value); 
             }
+//             foreach (UserParameter p in doc.ComponentDefinition.Parameters.UserParameters)
+//             {
+//                 cb.Items.Add(p.Name);  
+//             }
             if (doc.ReferencedDocuments.Count == 1 && doc.ReferencedDocuments[1] is PartDocument)
             {
-                foreach (UserParameter p in (refDoc = doc.ReferencedDocuments[1] as PartDocument).ComponentDefinition.Parameters.UserParameters)
-                {
-                    cb.Items.Add(p.Name);
-                }
+                refDoc = doc.ReferencedDocuments[1] as PartDocument;
+//                 foreach (UserParameter p in (refDoc = doc.ReferencedDocuments[1] as PartDocument).ComponentDefinition.Parameters.UserParameters)
+//                 {
+//                     cb.Items.Add(p.Name);
+//                 }
             }
 
             InterfaceDll.Btn btns = new InterfaceDll.Btn(offsetX, offsetY, 100, 20, insPt, f, spike_Click, "Добавить");
@@ -123,12 +131,21 @@ namespace InvAddIn
         private void spike_Click(object arg1, EventArgs arg2)
         {
             Form f = (arg1 as System.Windows.Forms.Button).Parent as Form;
-            string s = f.Controls[1].Text; 
+            string s = f.Controls[1].Text;
+            MyXML xml = new MyXML("Parameters.xml");
+            XElement el = xml.find("Name", s, 1);
             if (doc != null && refDoc != null)
             {
-                InvDoc.u.findParameter(doc as Document, s);
+                if (!InvDoc.u.findParameter(doc as Document, s, true, el))
+                {
+                    InvDoc.u.findParameter(doc as Document, s);
+                }
                 //CreateComponent.addLinkParam(s, doc as Document);
                 //CreateComponent.addLinkParam(doc as Document, refDoc as Document, new string[] {s});
+            }
+            else if (doc != null && el != null)
+            {
+                u.addParameter(doc as Document, el);
             }
             if (hf != null)
             {
@@ -1430,7 +1447,7 @@ namespace InvAddIn
         DimensionStyle st1, st2;
         public Dimensions(DrawingView drwView)
         {
-            u.transAct(drwView.Parent.Parent, "Размеры");
+            u.transactStart(drwView.Parent.Parent as _Document, "Размеры");
             dv = drwView;
 
             if (u.isFirstSheet(dv, 1) && u.isTDoc<PartDocument>(dv.ReferencedDocumentDescriptor.ReferencedDocument) != null)
@@ -1461,6 +1478,7 @@ namespace InvAddIn
             getCurves();
             //getPoints();
             addDims();
+            //tr.End();
             u.transactEnd();
         }
 

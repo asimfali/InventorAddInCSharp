@@ -287,12 +287,22 @@ namespace InvAddIn
             if (ind != -1)
             {
                 var spl = iname.Split('$');
-                ind = int.Parse(spl[1]);
+                string indS = spl[1];
                 iname = spl[0];
                 var occspl = name.Split(':');
-                int indooc = int.Parse(occspl[1]);
-                if (ind != indooc)
+                string indooc = occspl[1];
+                if (indS != indooc)
                     return true;
+//                 var spl = iname.Split('$');
+// 
+// 
+// 
+//                 ind = int.Parse(spl[1]);
+//                 iname = spl[0];
+//                 var occspl = name.Split(':');
+//                 int indooc = int.Parse(occspl[1]);
+//                 if (ind != indooc)
+//                     return true;
             }
             return false;
         }
@@ -1025,6 +1035,7 @@ namespace InvAddIn
             System.Collections.Generic.List<string> result = new System.Collections.Generic.List<string>();
             folders = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Folders.xml");
             folders.ReadXML("Folders", ref match, ref result);
+            //if ()
 
             foreach (ComponentOccurrence occ in compDef.Occurrences)
             {

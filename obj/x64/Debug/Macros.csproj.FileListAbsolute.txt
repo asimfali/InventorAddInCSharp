@@ -19,7 +19,6 @@ C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Debug\InvA
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\InterfaceDll.pdb
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Debug\InvAddIn.sheet.resources
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\TableDll.dll
-C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Debug\Macros.csprojResolveAssemblyReference.cache
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\InterfaceDll.dll
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\Excel.pdb
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\dxf.dll
@@ -31,3 +30,4 @@ C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\cust
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\custom.pdb
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Debug\InvDoc.Settings.resources
 C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\bin\x64\Debug\Macros.tlb
+C:\Users\Simanov\Documents\Visual Studio 2012\Projects\Macros\obj\x64\Debug\Macros.csprojResolveAssemblyReference.cache
