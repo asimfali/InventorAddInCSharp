@@ -1447,7 +1447,8 @@ namespace InvAddIn
         DimensionStyle st1, st2;
         public Dimensions(DrawingView drwView)
         {
-            u.transactStart(drwView.Parent.Parent as _Document, "Размеры");
+            Transaction tr = I.app.TransactionManager.StartTransaction(drwView.Parent.Parent as _Document, "Размеры");
+            //u.transactStart(drwView.Parent.Parent as _Document, "Размеры");
             dv = drwView;
 
             if (u.isFirstSheet(dv, 1) && u.isTDoc<PartDocument>(dv.ReferencedDocumentDescriptor.ReferencedDocument) != null)
@@ -1456,12 +1457,14 @@ namespace InvAddIn
                 st2 = u.getStyle<DimensionStyle>(dv, "Текст**");
                 if (st1 != null && st2 != null)
                 {
-                    u.setSilence();
-                    u.setUpdate();
+                    //I.screenSilent(true);
+                    //u.setSilence();
+                    //u.setUpdate();
                     tangent();
                     radius();
-                    u.setSilence();
-                    u.setUpdate();
+                    //I.screenSilent(false);
+                    //u.setSilence();
+                    //u.setUpdate();
                 }
             }
             uvecV = tg.CreateUnitVector2d(0, 1);
@@ -1478,8 +1481,8 @@ namespace InvAddIn
             getCurves();
             //getPoints();
             addDims();
-            //tr.End();
-            u.transactEnd();
+            tr.End();
+            //u.transactEnd();
         }
 
         public void radius()
@@ -1591,7 +1594,8 @@ namespace InvAddIn
 
         public bool check(DrawingCurve dc, Point2d pt)
         {
-           return ((dc.StartPoint.IsEqualTo(pt) || dc.EndPoint.IsEqualTo(pt)) && dc.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
+            if (dc == null || dc.StartPoint == null || dc.EndPoint == null) return false;
+            return ((dc.StartPoint.IsEqualTo(pt) || dc.EndPoint.IsEqualTo(pt)) && dc.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
         }
 
         public bool check(DrawingCurve dc, Func<Arc3d,bool>f)

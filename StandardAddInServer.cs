@@ -655,6 +655,7 @@ namespace Macros
                 }
             }
             findToBalloon(DefaultCO);
+            lstco = lstco.Distinct().ToList();
             if (lstco.Count >= 1)
                 for (int i = lstco.Count-1; i >= 0; i--)
                 {
@@ -722,19 +723,21 @@ namespace Macros
                 {
                     foreach (AssemblyConstraint item in co.Constraints)
                     {
-                        if (item.AffectedOccurrenceOne != null && item.AffectedOccurrenceOne.Name != co.Name)
+                        if (item is MateConstraint)
                         {
-                            ComponentOccurrence tmpOcc = item.AffectedOccurrenceOne;
-                            if (!oldval.Contains(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName))
-                            {
-                                string name1 = ((Document)tmpOcc.Definition.Document).PropertySets[3][14].Value.ToString();
-                                if (lst.Contains(name1))
-                                {
-                                    oldval.Add(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName);
-                                    lstco.Add(tmpOcc);
-                                    findToBalloon(tmpOcc);
-                                }
-                            }
+                            MateConstraint m = item as MateConstraint;
+                            if (m.EntityOneInferredType == InferredTypeEnum.kInferredLine) continue;
+                        }
+                        if (item.AffectedOccurrenceOne != null)
+                        {
+                            oldval.Add(co.ReferencedDocumentDescriptor.FullDocumentName);
+                            //ComponentOccurrence tmpOcc = item.AffectedOccurrenceOne;
+//                             if (tmpOcc.Equals(co) && item.AffectedOccurrenceTwo != null)
+//                             {
+//                                 tmpOcc = item.AffectedOccurrenceTwo;
+//                             }
+                            add(item.AffectedOccurrenceOne);
+                            add(item.AffectedOccurrenceTwo);
                         }
                     }
                 }
@@ -742,6 +745,20 @@ namespace Macros
                 return null;
             }
                 return null;
+        }
+
+        public static void add(ComponentOccurrence tmpOcc)
+        {
+             if (!oldval.Contains(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName))
+             {
+                string name1 = ((Document)tmpOcc.Definition.Document).PropertySets[3][14].Value.ToString().Trim();
+                if (lst.Contains(name1))
+                {
+                    oldval.Add(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName);
+                    lstco.Add(tmpOcc);
+                    findToBalloon(tmpOcc);
+                }
+            }
         }
 
         public void Deactivate()

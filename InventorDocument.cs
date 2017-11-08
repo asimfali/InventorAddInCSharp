@@ -903,6 +903,15 @@ namespace InvDoc
             return eq(pt1, pt2);
         }
 
+        static public bool eq(Point pt1, UnitVector v1, Point pt2, double l = 1.5)
+        {
+            Vector v = pt1.VectorTo(pt2);
+            double d = Math.Abs(scalar(v, v1.AsVector()));
+            if (d > l) return false;
+            if (isNullVector(v)) return false;
+            return eq(v.AsUnitVector(), v1, true);
+        }
+
         static public void set(UnitVector v, ref Point pt)
         {
             double [] coords = new double [3], vcoords = new double [3];
@@ -1391,6 +1400,24 @@ namespace InvDoc
             return Math.Round(rb.MaxPoint.DistanceTo(rb.MinPoint), tol);
         }
 
+        static public double getSquareLenght(Box rb, bool max = false, int tol = 3)
+        {
+            Vector v = rb.MaxPoint.VectorTo(rb.MinPoint);
+            if (max)
+            {
+                double[] data = new double[3]; v.GetVectorData(ref data);
+                return Math.Round(data.Max(), tol);
+            }
+            else
+                return Math.Round(scalar(v, v), tol);
+        }
+
+        static public bool checkSquareLenght(Box rb, double val)
+        {
+            double v = val * val;
+            return getSquareLenght(rb, true) < val;
+        }
+
         static public double getLenght(DrawingCurve e, int tol = 3)
         {
             double minParam, maxParam, length;
@@ -1608,6 +1635,11 @@ namespace InvDoc
         static public double scalar(UnitVector2d v1, UnitVector2d v2)
         {
             return v1.X * v2.X + v1.Y * v2.Y;
+        }
+
+        static public double scalar(Vector v1, Vector v2)
+        {
+            return v1.X * v2.X + v1.Y * v2.Y + v1.Z * v2.Z;
         }
 
         static public double scalar(Point pt1, UnitVector dir)
@@ -2137,6 +2169,11 @@ namespace InvDoc
         {
             if (val == "") return 0;
             return Math.Round(double.Parse(val.Replace('.', ',')) * scale, tol);
+        }
+
+        public static string convToString(double val, int tol, string format)
+        {
+            return Math.Round(val, tol).ToString(format);
         }
 
         public static double convToInt(string val)

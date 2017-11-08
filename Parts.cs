@@ -95,20 +95,32 @@ namespace InvAddIn
         private void InitializeComponent()
         {
             this.menuStrip1 = new System.Windows.Forms.MenuStrip();
-            this.создатьФайлыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.общиеРазмерыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.размерыДоГибовToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.позицииToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.крепежToolStripMenuItem2 = new System.Windows.Forms.ToolStripMenuItem();
+            this.детальToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.кластерToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.скругленияToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.ручнаяГибкаToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.сборкаToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.спецToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.крепежToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.обновитьКрепежToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.крепежToolStripMenuItem3 = new System.Windows.Forms.ToolStripMenuItem();
+            this.переименоватьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.чертежToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.текущийДокументToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.переназватьToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.пересобратьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.переименоватьСборкуСЧертежамиToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.регионToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.обновитьПозицииToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.addTRToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.copyAttrToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.получитьТекстToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.перевестиТекстToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.обновитьСтилиToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.пересобратьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.переназватьToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.параметрыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.добавитьПараметрыToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.данныеДляМассиваToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.загрузитьXMLToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.данныеДляМассиваToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.массивToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.копироватьВXMLToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.структураВXMLToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -118,45 +130,33 @@ namespace InvAddIn
             this.обновитьContentCenterToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.сортировкаToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.тестToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.шипыИПазыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.шипToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.пазToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.выдавитьToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.добавитьВСборкуToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.крепежToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.перенаправитьToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.редкоеToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.добавитьСвойствоToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.добавитьИсполнениеToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.stepToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.комплектФайловToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
             this.комплектФайловСЧертежамиToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.stepToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.центрыОтверстийToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.сплайнToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.создатьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.артикулToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.заменитьИмяКПToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.детальToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.сборкаToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.copyAttrToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.addTRToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.кластерToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.обновитьПозицииToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.регионToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.обновитьToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.спецToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.крепежToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.получитьТекстToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.перевестиТекстToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.обновитьКрепежToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.обновитьСтилиToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.крепежToolStripMenuItem3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.скругленияToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.ручнаяГибкаToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.удалитьЭлементToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.переименоватьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.добавитьСвойствоToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.добавитьИсполнениеToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.сплайнToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.артикулToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.центрыОтверстийToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.создатьСборкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.заменитьИмяКПToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.габаритыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.открытьПапкуToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.шипыИПазыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.шипToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.выдавитьToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.добавитьВСборкуToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.пазToolStripMenuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.создатьФайлыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.удалитьЭлементToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.общиеРазмерыToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.размерыДоГибовToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.позицииToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.крепежToolStripMenuItem2 = new System.Windows.Forms.ToolStripMenuItem();
+            this.перенаправитьToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.крепежToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -175,51 +175,88 @@ namespace InvAddIn
             this.крепежToolStripMenuItem});
             this.menuStrip1.Location = new System.Drawing.Point(0, 0);
             this.menuStrip1.Name = "menuStrip1";
-            this.menuStrip1.Size = new System.Drawing.Size(675, 24);
+            this.menuStrip1.Size = new System.Drawing.Size(712, 24);
             this.menuStrip1.TabIndex = 0;
             this.menuStrip1.Text = "menuStrip1";
             this.menuStrip1.ItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.menuStrip1_ItemClicked);
             // 
-            // создатьФайлыToolStripMenuItem
+            // детальToolStripMenuItem
             // 
-            this.создатьФайлыToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.удалитьЭлементToolStripMenuItem,
-            this.общиеРазмерыToolStripMenuItem,
-            this.размерыДоГибовToolStripMenuItem,
-            this.позицииToolStripMenuItem,
-            this.крепежToolStripMenuItem2});
-            this.создатьФайлыToolStripMenuItem.Name = "создатьФайлыToolStripMenuItem";
-            this.создатьФайлыToolStripMenuItem.Size = new System.Drawing.Size(63, 20);
-            this.создатьФайлыToolStripMenuItem.Text = "Удалить";
-            this.создатьФайлыToolStripMenuItem.Click += new System.EventHandler(this.создатьФайлыToolStripMenuItem_Click);
+            this.детальToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.кластерToolStripMenuItem,
+            this.скругленияToolStripMenuItem,
+            this.ручнаяГибкаToolStripMenuItem});
+            this.детальToolStripMenuItem.Name = "детальToolStripMenuItem";
+            this.детальToolStripMenuItem.Size = new System.Drawing.Size(57, 20);
+            this.детальToolStripMenuItem.Text = "Деталь";
             // 
-            // общиеРазмерыToolStripMenuItem
+            // кластерToolStripMenuItem
             // 
-            this.общиеРазмерыToolStripMenuItem.Name = "общиеРазмерыToolStripMenuItem";
-            this.общиеРазмерыToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
-            this.общиеРазмерыToolStripMenuItem.Text = "Общие размеры";
-            this.общиеРазмерыToolStripMenuItem.Click += new System.EventHandler(this.общиеРазмерыToolStripMenuItem_Click);
+            this.кластерToolStripMenuItem.Name = "кластерToolStripMenuItem";
+            this.кластерToolStripMenuItem.Size = new System.Drawing.Size(142, 22);
+            this.кластерToolStripMenuItem.Text = "Кластер";
+            this.кластерToolStripMenuItem.Click += new System.EventHandler(this.кластерToolStripMenuItem_Click_1);
             // 
-            // размерыДоГибовToolStripMenuItem
+            // скругленияToolStripMenuItem
             // 
-            this.размерыДоГибовToolStripMenuItem.Name = "размерыДоГибовToolStripMenuItem";
-            this.размерыДоГибовToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
-            this.размерыДоГибовToolStripMenuItem.Text = "Размеры до гибов";
-            this.размерыДоГибовToolStripMenuItem.Click += new System.EventHandler(this.размерыДоГибовToolStripMenuItem_Click);
+            this.скругленияToolStripMenuItem.Name = "скругленияToolStripMenuItem";
+            this.скругленияToolStripMenuItem.Size = new System.Drawing.Size(142, 22);
+            this.скругленияToolStripMenuItem.Text = "Скругления";
+            this.скругленияToolStripMenuItem.Click += new System.EventHandler(this.скругленияToolStripMenuItem_Click_1);
             // 
-            // позицииToolStripMenuItem
+            // ручнаяГибкаToolStripMenuItem
             // 
-            this.позицииToolStripMenuItem.Name = "позицииToolStripMenuItem";
-            this.позицииToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
-            this.позицииToolStripMenuItem.Text = "Позиции";
-            this.позицииToolStripMenuItem.Click += new System.EventHandler(this.позицииToolStripMenuItem_Click);
+            this.ручнаяГибкаToolStripMenuItem.Name = "ручнаяГибкаToolStripMenuItem";
+            this.ручнаяГибкаToolStripMenuItem.Size = new System.Drawing.Size(142, 22);
+            this.ручнаяГибкаToolStripMenuItem.Text = "Ручная гибка";
+            this.ручнаяГибкаToolStripMenuItem.Click += new System.EventHandler(this.ручнаяГибкаToolStripMenuItem_Click_1);
             // 
-            // крепежToolStripMenuItem2
+            // сборкаToolStripMenuItem
             // 
-            this.крепежToolStripMenuItem2.Name = "крепежToolStripMenuItem2";
-            this.крепежToolStripMenuItem2.Size = new System.Drawing.Size(165, 22);
-            this.крепежToolStripMenuItem2.Text = "Крепеж";
-            this.крепежToolStripMenuItem2.Click += new System.EventHandler(this.крепежToolStripMenuItem2_Click);
+            this.сборкаToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.спецToolStripMenuItem,
+            this.крепежToolStripMenuItem1,
+            this.обновитьКрепежToolStripMenuItem,
+            this.крепежToolStripMenuItem3,
+            this.переименоватьСборкуToolStripMenuItem});
+            this.сборкаToolStripMenuItem.Name = "сборкаToolStripMenuItem";
+            this.сборкаToolStripMenuItem.Size = new System.Drawing.Size(56, 20);
+            this.сборкаToolStripMenuItem.Text = "Сборка";
+            // 
+            // спецToolStripMenuItem
+            // 
+            this.спецToolStripMenuItem.Name = "спецToolStripMenuItem";
+            this.спецToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
+            this.спецToolStripMenuItem.Text = "Данные для автокрепежа";
+            this.спецToolStripMenuItem.Click += new System.EventHandler(this.спецToolStripMenuItem_Click_1);
+            // 
+            // крепежToolStripMenuItem1
+            // 
+            this.крепежToolStripMenuItem1.Name = "крепежToolStripMenuItem1";
+            this.крепежToolStripMenuItem1.Size = new System.Drawing.Size(248, 22);
+            this.крепежToolStripMenuItem1.Text = "Автокрепеж";
+            this.крепежToolStripMenuItem1.Click += new System.EventHandler(this.крепежToolStripMenuItem1_Click_1);
+            // 
+            // обновитьКрепежToolStripMenuItem
+            // 
+            this.обновитьКрепежToolStripMenuItem.Name = "обновитьКрепежToolStripMenuItem";
+            this.обновитьКрепежToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
+            this.обновитьКрепежToolStripMenuItem.Text = "Обновить крепеж (Все открытые)";
+            this.обновитьКрепежToolStripMenuItem.Click += new System.EventHandler(this.обновитьКрепежToolStripMenuItem_Click_1);
+            // 
+            // крепежToolStripMenuItem3
+            // 
+            this.крепежToolStripMenuItem3.Name = "крепежToolStripMenuItem3";
+            this.крепежToolStripMenuItem3.Size = new System.Drawing.Size(248, 22);
+            this.крепежToolStripMenuItem3.Text = "Крепеж (Все открытые)";
+            this.крепежToolStripMenuItem3.Click += new System.EventHandler(this.крепежToolStripMenuItem3_Click_1);
+            // 
+            // переименоватьСборкуToolStripMenuItem
+            // 
+            this.переименоватьСборкуToolStripMenuItem.Name = "переименоватьСборкуToolStripMenuItem";
+            this.переименоватьСборкуToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
+            this.переименоватьСборкуToolStripMenuItem.Text = "Переименовать сборку";
+            this.переименоватьСборкуToolStripMenuItem.Click += new System.EventHandler(this.переименоватьСборкуToolStripMenuItem_Click_1);
             // 
             // чертежToolStripMenuItem
             // 
@@ -246,12 +283,61 @@ namespace InvAddIn
             this.текущийДокументToolStripMenuItem.Text = "Создать чертежи";
             this.текущийДокументToolStripMenuItem.Click += new System.EventHandler(this.текущийДокументToolStripMenuItem_Click);
             // 
-            // переназватьToolStripMenuItem
+            // переименоватьСборкуСЧертежамиToolStripMenuItem
             // 
-            this.переназватьToolStripMenuItem.Name = "переназватьToolStripMenuItem";
-            this.переназватьToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.переназватьToolStripMenuItem.Text = "Переименовать";
-            this.переназватьToolStripMenuItem.Click += new System.EventHandler(this.переназватьToolStripMenuItem_Click);
+            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Name = "переименоватьСборкуСЧертежамиToolStripMenuItem";
+            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Text = "Переименовать сборку с чертежами";
+            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Click += new System.EventHandler(this.переименоватьСборкуСЧертежамиToolStripMenuItem_Click);
+            // 
+            // регионToolStripMenuItem
+            // 
+            this.регионToolStripMenuItem.Name = "регионToolStripMenuItem";
+            this.регионToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.регионToolStripMenuItem.Text = "Выровнять позиции";
+            this.регионToolStripMenuItem.Click += new System.EventHandler(this.регионToolStripMenuItem_Click_1);
+            // 
+            // обновитьПозицииToolStripMenuItem
+            // 
+            this.обновитьПозицииToolStripMenuItem.Name = "обновитьПозицииToolStripMenuItem";
+            this.обновитьПозицииToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.обновитьПозицииToolStripMenuItem.Text = "Обновить позиции";
+            this.обновитьПозицииToolStripMenuItem.Click += new System.EventHandler(this.обновитьПозицииToolStripMenuItem_Click_1);
+            // 
+            // addTRToolStripMenuItem1
+            // 
+            this.addTRToolStripMenuItem1.Name = "addTRToolStripMenuItem1";
+            this.addTRToolStripMenuItem1.Size = new System.Drawing.Size(266, 22);
+            this.addTRToolStripMenuItem1.Text = "Добавить технические требования";
+            this.addTRToolStripMenuItem1.Click += new System.EventHandler(this.addTRToolStripMenuItem1_Click_1);
+            // 
+            // copyAttrToolStripMenuItem1
+            // 
+            this.copyAttrToolStripMenuItem1.Name = "copyAttrToolStripMenuItem1";
+            this.copyAttrToolStripMenuItem1.Size = new System.Drawing.Size(266, 22);
+            this.copyAttrToolStripMenuItem1.Text = "Копировать технические требования";
+            this.copyAttrToolStripMenuItem1.Click += new System.EventHandler(this.copyAttrToolStripMenuItem1_Click_1);
+            // 
+            // получитьТекстToolStripMenuItem
+            // 
+            this.получитьТекстToolStripMenuItem.Name = "получитьТекстToolStripMenuItem";
+            this.получитьТекстToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.получитьТекстToolStripMenuItem.Text = "Получить текст";
+            this.получитьТекстToolStripMenuItem.Click += new System.EventHandler(this.получитьТекстToolStripMenuItem_Click_1);
+            // 
+            // перевестиТекстToolStripMenuItem
+            // 
+            this.перевестиТекстToolStripMenuItem.Name = "перевестиТекстToolStripMenuItem";
+            this.перевестиТекстToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.перевестиТекстToolStripMenuItem.Text = "Перевести текст";
+            this.перевестиТекстToolStripMenuItem.Click += new System.EventHandler(this.перевестиТекстToolStripMenuItem_Click_1);
+            // 
+            // обновитьСтилиToolStripMenuItem
+            // 
+            this.обновитьСтилиToolStripMenuItem.Name = "обновитьСтилиToolStripMenuItem";
+            this.обновитьСтилиToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.обновитьСтилиToolStripMenuItem.Text = "Обновить стили";
+            this.обновитьСтилиToolStripMenuItem.Click += new System.EventHandler(this.обновитьСтилиToolStripMenuItem_Click_1);
             // 
             // пересобратьСборкуToolStripMenuItem
             // 
@@ -260,12 +346,12 @@ namespace InvAddIn
             this.пересобратьСборкуToolStripMenuItem.Text = "Пересобрать сборку";
             this.пересобратьСборкуToolStripMenuItem.Click += new System.EventHandler(this.пересобратьСборкуToolStripMenuItem_Click);
             // 
-            // переименоватьСборкуСЧертежамиToolStripMenuItem
+            // переназватьToolStripMenuItem
             // 
-            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Name = "переименоватьСборкуСЧертежамиToolStripMenuItem";
-            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Text = "Переименовать сборку с чертежами";
-            this.переименоватьСборкуСЧертежамиToolStripMenuItem.Click += new System.EventHandler(this.переименоватьСборкуСЧертежамиToolStripMenuItem_Click);
+            this.переназватьToolStripMenuItem.Name = "переназватьToolStripMenuItem";
+            this.переназватьToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
+            this.переназватьToolStripMenuItem.Text = "Переименовать";
+            this.переназватьToolStripMenuItem.Click += new System.EventHandler(this.переназватьToolStripMenuItem_Click);
             // 
             // параметрыToolStripMenuItem
             // 
@@ -288,19 +374,19 @@ namespace InvAddIn
             this.добавитьПараметрыToolStripMenuItem1.Text = "Добавить параметры";
             this.добавитьПараметрыToolStripMenuItem1.Click += new System.EventHandler(this.добавитьПараметрыToolStripMenuItem_Click);
             // 
-            // данныеДляМассиваToolStripMenuItem
-            // 
-            this.данныеДляМассиваToolStripMenuItem.Name = "данныеДляМассиваToolStripMenuItem";
-            this.данныеДляМассиваToolStripMenuItem.Size = new System.Drawing.Size(183, 22);
-            this.данныеДляМассиваToolStripMenuItem.Text = "Данные для массива";
-            this.данныеДляМассиваToolStripMenuItem.Click += new System.EventHandler(this.добавитьДанныеДляМассиваToolStripMenuItem_Click);
-            // 
             // загрузитьXMLToolStripMenuItem
             // 
             this.загрузитьXMLToolStripMenuItem.Name = "загрузитьXMLToolStripMenuItem";
             this.загрузитьXMLToolStripMenuItem.Size = new System.Drawing.Size(183, 22);
             this.загрузитьXMLToolStripMenuItem.Text = "Загрузить XML";
             this.загрузитьXMLToolStripMenuItem.Click += new System.EventHandler(this.загрузитьXMLToolStripMenuItem_Click);
+            // 
+            // данныеДляМассиваToolStripMenuItem
+            // 
+            this.данныеДляМассиваToolStripMenuItem.Name = "данныеДляМассиваToolStripMenuItem";
+            this.данныеДляМассиваToolStripMenuItem.Size = new System.Drawing.Size(183, 22);
+            this.данныеДляМассиваToolStripMenuItem.Text = "Данные для массива";
+            this.данныеДляМассиваToolStripMenuItem.Click += new System.EventHandler(this.добавитьДанныеДляМассиваToolStripMenuItem_Click);
             // 
             // массивToolStripMenuItem1
             // 
@@ -370,59 +456,6 @@ namespace InvAddIn
             this.тестToolStripMenuItem.Text = "Тест";
             this.тестToolStripMenuItem.Click += new System.EventHandler(this.тестToolStripMenuItem_Click);
             // 
-            // шипыИПазыToolStripMenuItem
-            // 
-            this.шипыИПазыToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.шипToolStripMenuItem1,
-            this.выдавитьToolStripMenuItem1,
-            this.добавитьВСборкуToolStripMenuItem1,
-            this.пазToolStripMenuItem1});
-            this.шипыИПазыToolStripMenuItem.Name = "шипыИПазыToolStripMenuItem";
-            this.шипыИПазыToolStripMenuItem.Size = new System.Drawing.Size(86, 20);
-            this.шипыИПазыToolStripMenuItem.Text = "Шипы и пазы";
-            // 
-            // шипToolStripMenuItem1
-            // 
-            this.шипToolStripMenuItem1.Name = "шипToolStripMenuItem1";
-            this.шипToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
-            this.шипToolStripMenuItem1.Text = "Шип";
-            this.шипToolStripMenuItem1.Click += new System.EventHandler(this.шипToolStripMenuItem1_Click);
-            // 
-            // пазToolStripMenuItem1
-            // 
-            this.пазToolStripMenuItem1.Name = "пазToolStripMenuItem1";
-            this.пазToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
-            this.пазToolStripMenuItem1.Text = "Паз";
-            this.пазToolStripMenuItem1.Click += new System.EventHandler(this.пазToolStripMenuItem1_Click);
-            // 
-            // выдавитьToolStripMenuItem1
-            // 
-            this.выдавитьToolStripMenuItem1.Name = "выдавитьToolStripMenuItem1";
-            this.выдавитьToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
-            this.выдавитьToolStripMenuItem1.Text = "Выдавить";
-            this.выдавитьToolStripMenuItem1.Click += new System.EventHandler(this.выдавитьToolStripMenuItem1_Click);
-            // 
-            // добавитьВСборкуToolStripMenuItem1
-            // 
-            this.добавитьВСборкуToolStripMenuItem1.Name = "добавитьВСборкуToolStripMenuItem1";
-            this.добавитьВСборкуToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
-            this.добавитьВСборкуToolStripMenuItem1.Text = "Добавить в сборку";
-            this.добавитьВСборкуToolStripMenuItem1.Click += new System.EventHandler(this.добавитьВСборкуToolStripMenuItem1_Click);
-            // 
-            // крепежToolStripMenuItem
-            // 
-            this.крепежToolStripMenuItem.Name = "крепежToolStripMenuItem";
-            this.крепежToolStripMenuItem.Size = new System.Drawing.Size(58, 20);
-            this.крепежToolStripMenuItem.Text = "Крепеж";
-            this.крепежToolStripMenuItem.Click += new System.EventHandler(this.крепежToolStripMenuItem_Click);
-            // 
-            // перенаправитьToolStripMenuItem
-            // 
-            this.перенаправитьToolStripMenuItem.Name = "перенаправитьToolStripMenuItem";
-            this.перенаправитьToolStripMenuItem.Size = new System.Drawing.Size(98, 20);
-            this.перенаправитьToolStripMenuItem.Text = "Перенаправить";
-            this.перенаправитьToolStripMenuItem.Click += new System.EventHandler(this.перенаправитьToolStripMenuItem_Click);
-            // 
             // редкоеToolStripMenuItem
             // 
             this.редкоеToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -443,19 +476,12 @@ namespace InvAddIn
             this.редкоеToolStripMenuItem.Size = new System.Drawing.Size(54, 20);
             this.редкоеToolStripMenuItem.Text = "Общее";
             // 
-            // добавитьСвойствоToolStripMenuItem1
+            // stepToolStripMenuItem
             // 
-            this.добавитьСвойствоToolStripMenuItem1.Name = "добавитьСвойствоToolStripMenuItem1";
-            this.добавитьСвойствоToolStripMenuItem1.Size = new System.Drawing.Size(231, 22);
-            this.добавитьСвойствоToolStripMenuItem1.Text = "Добавить свойство";
-            this.добавитьСвойствоToolStripMenuItem1.Click += new System.EventHandler(this.добавитьСвойствоToolStripMenuItem1_Click);
-            // 
-            // добавитьИсполнениеToolStripMenuItem
-            // 
-            this.добавитьИсполнениеToolStripMenuItem.Name = "добавитьИсполнениеToolStripMenuItem";
-            this.добавитьИсполнениеToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
-            this.добавитьИсполнениеToolStripMenuItem.Text = "Добавить исполнение";
-            this.добавитьИсполнениеToolStripMenuItem.Click += new System.EventHandler(this.добавитьИсполнениеToolStripMenuItem_Click);
+            this.stepToolStripMenuItem.Name = "stepToolStripMenuItem";
+            this.stepToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
+            this.stepToolStripMenuItem.Text = "3DPDF";
+            this.stepToolStripMenuItem.Click += new System.EventHandler(this.stepToolStripMenuItem_Click);
             // 
             // комплектФайловToolStripMenuItem1
             // 
@@ -471,19 +497,26 @@ namespace InvAddIn
             this.комплектФайловСЧертежамиToolStripMenuItem.Text = "Комплект файлов с чертежами";
             this.комплектФайловСЧертежамиToolStripMenuItem.Click += new System.EventHandler(this.комплектФайловСЧертежамиToolStripMenuItem_Click);
             // 
-            // stepToolStripMenuItem
+            // обновитьToolStripMenuItem
             // 
-            this.stepToolStripMenuItem.Name = "stepToolStripMenuItem";
-            this.stepToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
-            this.stepToolStripMenuItem.Text = "3DPDF";
-            this.stepToolStripMenuItem.Click += new System.EventHandler(this.stepToolStripMenuItem_Click);
+            this.обновитьToolStripMenuItem.Name = "обновитьToolStripMenuItem";
+            this.обновитьToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
+            this.обновитьToolStripMenuItem.Text = "Обновить";
+            this.обновитьToolStripMenuItem.Click += new System.EventHandler(this.обновитьToolStripMenuItem_Click_1);
             // 
-            // центрыОтверстийToolStripMenuItem
+            // добавитьСвойствоToolStripMenuItem1
             // 
-            this.центрыОтверстийToolStripMenuItem.Name = "центрыОтверстийToolStripMenuItem";
-            this.центрыОтверстийToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
-            this.центрыОтверстийToolStripMenuItem.Text = "Центры отверстий";
-            this.центрыОтверстийToolStripMenuItem.Click += new System.EventHandler(this.центрыОтверстийToolStripMenuItem_Click);
+            this.добавитьСвойствоToolStripMenuItem1.Name = "добавитьСвойствоToolStripMenuItem1";
+            this.добавитьСвойствоToolStripMenuItem1.Size = new System.Drawing.Size(231, 22);
+            this.добавитьСвойствоToolStripMenuItem1.Text = "Добавить свойство";
+            this.добавитьСвойствоToolStripMenuItem1.Click += new System.EventHandler(this.добавитьСвойствоToolStripMenuItem1_Click);
+            // 
+            // добавитьИсполнениеToolStripMenuItem
+            // 
+            this.добавитьИсполнениеToolStripMenuItem.Name = "добавитьИсполнениеToolStripMenuItem";
+            this.добавитьИсполнениеToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
+            this.добавитьИсполнениеToolStripMenuItem.Text = "Добавить исполнение";
+            this.добавитьИсполнениеToolStripMenuItem.Click += new System.EventHandler(this.добавитьИсполнениеToolStripMenuItem_Click);
             // 
             // сплайнToolStripMenuItem
             // 
@@ -492,19 +525,26 @@ namespace InvAddIn
             this.сплайнToolStripMenuItem.Text = "Сплайн";
             this.сплайнToolStripMenuItem.Click += new System.EventHandler(this.сплайнToolStripMenuItem_Click);
             // 
-            // создатьСборкуToolStripMenuItem
-            // 
-            this.создатьСборкуToolStripMenuItem.Name = "создатьСборкуToolStripMenuItem";
-            this.создатьСборкуToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
-            this.создатьСборкуToolStripMenuItem.Text = "Создать сборку";
-            this.создатьСборкуToolStripMenuItem.Click += new System.EventHandler(this.создатьСборкуToolStripMenuItem_Click);
-            // 
             // артикулToolStripMenuItem
             // 
             this.артикулToolStripMenuItem.Name = "артикулToolStripMenuItem";
             this.артикулToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
             this.артикулToolStripMenuItem.Text = "Артикул";
             this.артикулToolStripMenuItem.Click += new System.EventHandler(this.артикулToolStripMenuItem_Click);
+            // 
+            // центрыОтверстийToolStripMenuItem
+            // 
+            this.центрыОтверстийToolStripMenuItem.Name = "центрыОтверстийToolStripMenuItem";
+            this.центрыОтверстийToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
+            this.центрыОтверстийToolStripMenuItem.Text = "Центры отверстий";
+            this.центрыОтверстийToolStripMenuItem.Click += new System.EventHandler(this.центрыОтверстийToolStripMenuItem_Click);
+            // 
+            // создатьСборкуToolStripMenuItem
+            // 
+            this.создатьСборкуToolStripMenuItem.Name = "создатьСборкуToolStripMenuItem";
+            this.создатьСборкуToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
+            this.создатьСборкуToolStripMenuItem.Text = "Создать сборку";
+            this.создатьСборкуToolStripMenuItem.Click += new System.EventHandler(this.создатьСборкуToolStripMenuItem_Click);
             // 
             // заменитьИмяКПToolStripMenuItem
             // 
@@ -513,146 +553,125 @@ namespace InvAddIn
             this.заменитьИмяКПToolStripMenuItem.Text = "Заменить имя КП";
             this.заменитьИмяКПToolStripMenuItem.Click += new System.EventHandler(this.заменитьИмяКПToolStripMenuItem_Click);
             // 
-            // детальToolStripMenuItem
-            // 
-            this.детальToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.кластерToolStripMenuItem,
-            this.скругленияToolStripMenuItem,
-            this.ручнаяГибкаToolStripMenuItem});
-            this.детальToolStripMenuItem.Name = "детальToolStripMenuItem";
-            this.детальToolStripMenuItem.Size = new System.Drawing.Size(57, 20);
-            this.детальToolStripMenuItem.Text = "Деталь";
-            // 
-            // сборкаToolStripMenuItem
-            // 
-            this.сборкаToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.спецToolStripMenuItem,
-            this.крепежToolStripMenuItem1,
-            this.обновитьКрепежToolStripMenuItem,
-            this.крепежToolStripMenuItem3,
-            this.переименоватьСборкуToolStripMenuItem});
-            this.сборкаToolStripMenuItem.Name = "сборкаToolStripMenuItem";
-            this.сборкаToolStripMenuItem.Size = new System.Drawing.Size(56, 20);
-            this.сборкаToolStripMenuItem.Text = "Сборка";
-            // 
-            // copyAttrToolStripMenuItem1
-            // 
-            this.copyAttrToolStripMenuItem1.Name = "copyAttrToolStripMenuItem1";
-            this.copyAttrToolStripMenuItem1.Size = new System.Drawing.Size(266, 22);
-            this.copyAttrToolStripMenuItem1.Text = "Копировать технические требования";
-            // 
-            // addTRToolStripMenuItem1
-            // 
-            this.addTRToolStripMenuItem1.Name = "addTRToolStripMenuItem1";
-            this.addTRToolStripMenuItem1.Size = new System.Drawing.Size(266, 22);
-            this.addTRToolStripMenuItem1.Text = "Добавить технические требования";
-            // 
-            // кластерToolStripMenuItem
-            // 
-            this.кластерToolStripMenuItem.Name = "кластерToolStripMenuItem";
-            this.кластерToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.кластерToolStripMenuItem.Text = "Кластер";
-            // 
-            // обновитьПозицииToolStripMenuItem
-            // 
-            this.обновитьПозицииToolStripMenuItem.Name = "обновитьПозицииToolStripMenuItem";
-            this.обновитьПозицииToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.обновитьПозицииToolStripMenuItem.Text = "Обновить позиции";
-            // 
-            // регионToolStripMenuItem
-            // 
-            this.регионToolStripMenuItem.Name = "регионToolStripMenuItem";
-            this.регионToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.регионToolStripMenuItem.Text = "Выровнять позиции";
-            // 
-            // обновитьToolStripMenuItem
-            // 
-            this.обновитьToolStripMenuItem.Name = "обновитьToolStripMenuItem";
-            this.обновитьToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
-            this.обновитьToolStripMenuItem.Text = "Обновить";
-            // 
-            // спецToolStripMenuItem
-            // 
-            this.спецToolStripMenuItem.Name = "спецToolStripMenuItem";
-            this.спецToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
-            this.спецToolStripMenuItem.Text = "Данные для автокрепежа";
-            // 
-            // крепежToolStripMenuItem1
-            // 
-            this.крепежToolStripMenuItem1.Name = "крепежToolStripMenuItem1";
-            this.крепежToolStripMenuItem1.Size = new System.Drawing.Size(248, 22);
-            this.крепежToolStripMenuItem1.Text = "Автокрепеж";
-            // 
-            // получитьТекстToolStripMenuItem
-            // 
-            this.получитьТекстToolStripMenuItem.Name = "получитьТекстToolStripMenuItem";
-            this.получитьТекстToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.получитьТекстToolStripMenuItem.Text = "Получить текст";
-            // 
-            // перевестиТекстToolStripMenuItem
-            // 
-            this.перевестиТекстToolStripMenuItem.Name = "перевестиТекстToolStripMenuItem";
-            this.перевестиТекстToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.перевестиТекстToolStripMenuItem.Text = "Перевести текст";
-            // 
-            // обновитьКрепежToolStripMenuItem
-            // 
-            this.обновитьКрепежToolStripMenuItem.Name = "обновитьКрепежToolStripMenuItem";
-            this.обновитьКрепежToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
-            this.обновитьКрепежToolStripMenuItem.Text = "Обновить крепеж (Все открытые)";
-            // 
-            // обновитьСтилиToolStripMenuItem
-            // 
-            this.обновитьСтилиToolStripMenuItem.Name = "обновитьСтилиToolStripMenuItem";
-            this.обновитьСтилиToolStripMenuItem.Size = new System.Drawing.Size(266, 22);
-            this.обновитьСтилиToolStripMenuItem.Text = "Обновить стили";
-            // 
-            // крепежToolStripMenuItem3
-            // 
-            this.крепежToolStripMenuItem3.Name = "крепежToolStripMenuItem3";
-            this.крепежToolStripMenuItem3.Size = new System.Drawing.Size(248, 22);
-            this.крепежToolStripMenuItem3.Text = "Крепеж (Все открытые)";
-            // 
-            // скругленияToolStripMenuItem
-            // 
-            this.скругленияToolStripMenuItem.Name = "скругленияToolStripMenuItem";
-            this.скругленияToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.скругленияToolStripMenuItem.Text = "Скругления";
-            // 
-            // ручнаяГибкаToolStripMenuItem
-            // 
-            this.ручнаяГибкаToolStripMenuItem.Name = "ручнаяГибкаToolStripMenuItem";
-            this.ручнаяГибкаToolStripMenuItem.Size = new System.Drawing.Size(152, 22);
-            this.ручнаяГибкаToolStripMenuItem.Text = "Ручная гибка";
-            // 
-            // удалитьЭлементToolStripMenuItem
-            // 
-            this.удалитьЭлементToolStripMenuItem.Name = "удалитьЭлементToolStripMenuItem";
-            this.удалитьЭлементToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
-            this.удалитьЭлементToolStripMenuItem.Text = "Удалить элемент";
-            // 
-            // переименоватьСборкуToolStripMenuItem
-            // 
-            this.переименоватьСборкуToolStripMenuItem.Name = "переименоватьСборкуToolStripMenuItem";
-            this.переименоватьСборкуToolStripMenuItem.Size = new System.Drawing.Size(248, 22);
-            this.переименоватьСборкуToolStripMenuItem.Text = "Переименовать сборку";
-            // 
             // габаритыToolStripMenuItem
             // 
             this.габаритыToolStripMenuItem.Name = "габаритыToolStripMenuItem";
             this.габаритыToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
             this.габаритыToolStripMenuItem.Text = "Габариты";
+            this.габаритыToolStripMenuItem.Click += new System.EventHandler(this.габаритыToolStripMenuItem_Click_1);
             // 
             // открытьПапкуToolStripMenuItem
             // 
             this.открытьПапкуToolStripMenuItem.Name = "открытьПапкуToolStripMenuItem";
             this.открытьПапкуToolStripMenuItem.Size = new System.Drawing.Size(231, 22);
             this.открытьПапкуToolStripMenuItem.Text = "Открыть папку";
+            this.открытьПапкуToolStripMenuItem.Click += new System.EventHandler(this.открытьПапкуToolStripMenuItem_Click_1);
+            // 
+            // шипыИПазыToolStripMenuItem
+            // 
+            this.шипыИПазыToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.шипToolStripMenuItem1,
+            this.выдавитьToolStripMenuItem1,
+            this.добавитьВСборкуToolStripMenuItem1,
+            this.пазToolStripMenuItem1});
+            this.шипыИПазыToolStripMenuItem.Name = "шипыИПазыToolStripMenuItem";
+            this.шипыИПазыToolStripMenuItem.Size = new System.Drawing.Size(86, 20);
+            this.шипыИПазыToolStripMenuItem.Text = "Шипы и пазы";
+            // 
+            // шипToolStripMenuItem1
+            // 
+            this.шипToolStripMenuItem1.Name = "шипToolStripMenuItem1";
+            this.шипToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
+            this.шипToolStripMenuItem1.Text = "Шип";
+            this.шипToolStripMenuItem1.Click += new System.EventHandler(this.шипToolStripMenuItem1_Click);
+            // 
+            // выдавитьToolStripMenuItem1
+            // 
+            this.выдавитьToolStripMenuItem1.Name = "выдавитьToolStripMenuItem1";
+            this.выдавитьToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
+            this.выдавитьToolStripMenuItem1.Text = "Выдавить";
+            this.выдавитьToolStripMenuItem1.Click += new System.EventHandler(this.выдавитьToolStripMenuItem1_Click);
+            // 
+            // добавитьВСборкуToolStripMenuItem1
+            // 
+            this.добавитьВСборкуToolStripMenuItem1.Name = "добавитьВСборкуToolStripMenuItem1";
+            this.добавитьВСборкуToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
+            this.добавитьВСборкуToolStripMenuItem1.Text = "Добавить в сборку";
+            this.добавитьВСборкуToolStripMenuItem1.Click += new System.EventHandler(this.добавитьВСборкуToolStripMenuItem1_Click);
+            // 
+            // пазToolStripMenuItem1
+            // 
+            this.пазToolStripMenuItem1.Name = "пазToolStripMenuItem1";
+            this.пазToolStripMenuItem1.Size = new System.Drawing.Size(171, 22);
+            this.пазToolStripMenuItem1.Text = "Паз";
+            this.пазToolStripMenuItem1.Click += new System.EventHandler(this.пазToolStripMenuItem1_Click);
+            // 
+            // создатьФайлыToolStripMenuItem
+            // 
+            this.создатьФайлыToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.удалитьЭлементToolStripMenuItem,
+            this.общиеРазмерыToolStripMenuItem,
+            this.размерыДоГибовToolStripMenuItem,
+            this.позицииToolStripMenuItem,
+            this.крепежToolStripMenuItem2});
+            this.создатьФайлыToolStripMenuItem.Name = "создатьФайлыToolStripMenuItem";
+            this.создатьФайлыToolStripMenuItem.Size = new System.Drawing.Size(63, 20);
+            this.создатьФайлыToolStripMenuItem.Text = "Удалить";
+            this.создатьФайлыToolStripMenuItem.Click += new System.EventHandler(this.создатьФайлыToolStripMenuItem_Click);
+            // 
+            // удалитьЭлементToolStripMenuItem
+            // 
+            this.удалитьЭлементToolStripMenuItem.Name = "удалитьЭлементToolStripMenuItem";
+            this.удалитьЭлементToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
+            this.удалитьЭлементToolStripMenuItem.Text = "Удалить элемент";
+            this.удалитьЭлементToolStripMenuItem.Click += new System.EventHandler(this.удалитьЭлементToolStripMenuItem_Click_1);
+            // 
+            // общиеРазмерыToolStripMenuItem
+            // 
+            this.общиеРазмерыToolStripMenuItem.Name = "общиеРазмерыToolStripMenuItem";
+            this.общиеРазмерыToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
+            this.общиеРазмерыToolStripMenuItem.Text = "Общие размеры";
+            this.общиеРазмерыToolStripMenuItem.Click += new System.EventHandler(this.общиеРазмерыToolStripMenuItem_Click);
+            // 
+            // размерыДоГибовToolStripMenuItem
+            // 
+            this.размерыДоГибовToolStripMenuItem.Name = "размерыДоГибовToolStripMenuItem";
+            this.размерыДоГибовToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
+            this.размерыДоГибовToolStripMenuItem.Text = "Размеры до гибов";
+            this.размерыДоГибовToolStripMenuItem.Click += new System.EventHandler(this.размерыДоГибовToolStripMenuItem_Click);
+            // 
+            // позицииToolStripMenuItem
+            // 
+            this.позицииToolStripMenuItem.Name = "позицииToolStripMenuItem";
+            this.позицииToolStripMenuItem.Size = new System.Drawing.Size(165, 22);
+            this.позицииToolStripMenuItem.Text = "Позиции";
+            this.позицииToolStripMenuItem.Click += new System.EventHandler(this.позицииToolStripMenuItem_Click);
+            // 
+            // крепежToolStripMenuItem2
+            // 
+            this.крепежToolStripMenuItem2.Name = "крепежToolStripMenuItem2";
+            this.крепежToolStripMenuItem2.Size = new System.Drawing.Size(165, 22);
+            this.крепежToolStripMenuItem2.Text = "Крепеж";
+            this.крепежToolStripMenuItem2.Click += new System.EventHandler(this.крепежToolStripMenuItem2_Click);
+            // 
+            // перенаправитьToolStripMenuItem
+            // 
+            this.перенаправитьToolStripMenuItem.Name = "перенаправитьToolStripMenuItem";
+            this.перенаправитьToolStripMenuItem.Size = new System.Drawing.Size(98, 20);
+            this.перенаправитьToolStripMenuItem.Text = "Перенаправить";
+            this.перенаправитьToolStripMenuItem.Click += new System.EventHandler(this.перенаправитьToolStripMenuItem_Click);
+            // 
+            // крепежToolStripMenuItem
+            // 
+            this.крепежToolStripMenuItem.Name = "крепежToolStripMenuItem";
+            this.крепежToolStripMenuItem.Size = new System.Drawing.Size(58, 20);
+            this.крепежToolStripMenuItem.Text = "Крепеж";
+            this.крепежToolStripMenuItem.Click += new System.EventHandler(this.крепежToolStripMenuItem_Click);
             // 
             // CreateComponent
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Inherit;
-            this.ClientSize = new System.Drawing.Size(675, 24);
+            this.ClientSize = new System.Drawing.Size(712, 24);
             this.Controls.Add(this.menuStrip1);
             this.Location = new System.Drawing.Point(300, 130);
             this.MainMenuStrip = this.menuStrip1;
@@ -1277,18 +1296,18 @@ namespace InvAddIn
             this.Show();
         }
 
-        private void удалитьЭлементToolStripMenuItem_Click(object sender, EventArgs e)
+        private void удалитьЭлементToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
-            this.Hide();
-            Document doc = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
-            CommandManager cmd = Macros.StandardAddInServer.m_inventorApplication.CommandManager;
+            Document doc = I.aDoc();
             if (doc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
             {
-            ComponentOccurrence occ = (ComponentOccurrence)cmd.Pick(SelectionFilterEnum.kAssemblyOccurrenceFilter, "Выберите компонент для удаления");
-            AssemblyComponentDefinition acd = ((AssemblyDocument)doc).ComponentDefinition;
-            Parts.removeOcc(acd, occ);
+                SelectSet ss = I.getSS(doc);
+                foreach (ComponentOccurrence occ in ss)
+	            {
+		            AssemblyComponentDefinition acd = ((AssemblyDocument)doc).ComponentDefinition;
+                    Parts.removeOcc(acd, occ);
+	            }
             }
-            this.Show();
         }
 
         private void addToAsm(AssemblyComponentDefinition compDef, string name)
@@ -2177,7 +2196,7 @@ namespace InvAddIn
             m_Parts.createContentXML();
         }
 
-        private void copyAttrToolStripMenuItem1_Click(object sender, EventArgs e)
+        private void copyAttrToolStripMenuItem1_Click_1(object sender, EventArgs e)
         {
             InvDoc.InvDocument<DrawingDocument> doc = new InvDocument<DrawingDocument>((DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument);
             Sheet sh = doc.GetDoc.Sheets[1];
@@ -2205,7 +2224,7 @@ namespace InvAddIn
             xdoc.save();
         }
 
-        private void addTRToolStripMenuItem1_Click(object sender, EventArgs e)
+        private void addTRToolStripMenuItem1_Click_1(object sender, EventArgs e)
         {
             InvDoc.InvDocument<DrawingDocument> doc = new InvDocument<DrawingDocument>((DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument);
             Sheet sh = doc.GetDoc.Sheets[1];
@@ -3288,7 +3307,7 @@ namespace InvAddIn
             //this.Close();
         }
 
-        private void крепежToolStripMenuItem1_Click(object sender, EventArgs e)
+        private void крепежToolStripMenuItem1_Click_1(object sender, EventArgs e)
         {
 //             XMLDoc xDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\AutoFastener.xml", "Fasteners");
 //             List<string> except = new List<string> { "name", "Direction", "Offset"};
@@ -3303,9 +3322,12 @@ namespace InvAddIn
 //                 }
 //             }
 //             xDoc.save();
-
-             Fastener f = new Fastener(I.aDoc());
-             f.add();
+            u.transactStart(I.aDoc(), "АвтоКрепеж");
+            I.screenSilent(true);
+            Fastener f = new Fastener(I.aDoc());
+            f.add();
+            I.screenSilent(false);
+            u.transactEnd();
         }
 
         private void добавитьДанныеДляМассиваToolStripMenuItem_Click(object sender, EventArgs e)
@@ -3615,7 +3637,7 @@ namespace InvAddIn
             Macros.StandardAddInServer.m_inventorApplication.SilentOperation = false;
         }
 
-        private void скругленияToolStripMenuItem_Click(object sender, EventArgs e)
+        private void скругленияToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             MyForm F = new MyForm("KPSInterface.xml", "Тест");
             //F.bnts[0].Click += fillet_Click;
@@ -4023,7 +4045,7 @@ namespace InvAddIn
             }
         }
 
-        private void регионToolStripMenuItem_Click(object sender, EventArgs e)
+        private void регионToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             DrawingDocument drw = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as DrawingDocument;
             Sheet sh = drw.ActiveSheet;
@@ -4257,7 +4279,7 @@ namespace InvAddIn
                 PartsBtn.xDoc = new XMLDoc(name, "head");
         }
 
-        private void ручнаяГибкаToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ручнаяГибкаToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             int offsetY = 30, offsetX = 10; Label lbl;
             Form f = new Form();
@@ -4359,7 +4381,7 @@ namespace InvAddIn
 
         }
 
-        private void спецToolStripMenuItem_Click(object sender, EventArgs e)
+        private void спецToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             string fn = u.WOFD(@"C:\ProgramData\Autodesk\Inventor Addins\", "XML (*.xml)|*.xml", new string[]{file.p(I.aDoc().FullFileName)});
             if (fn == "") { Macros.StandardAddInServer.xml = null; return; }
@@ -4507,7 +4529,7 @@ namespace InvAddIn
             f.Close();
         }
 
-        private void обновитьToolStripMenuItem_Click(object sender, EventArgs e)
+        private void обновитьToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             //Document doc = .ActiveDocument;
             foreach (Document doc in Macros.StandardAddInServer.m_inventorApplication.Documents.VisibleDocuments)
@@ -4719,7 +4741,7 @@ namespace InvAddIn
             }
         }
 
-        private void обновитьПозицииToolStripMenuItem_Click(object sender, EventArgs e)
+        private void обновитьПозицииToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             DrawingDocument m_Drw = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as DrawingDocument;
             AssemblyDocument m_AsmDoc = InvDoc.u.referendedDoc(m_Drw as Document) as AssemblyDocument;
@@ -4763,7 +4785,7 @@ namespace InvAddIn
             }
         }
 
-        private void получитьТекстToolStripMenuItem_Click(object sender, EventArgs e)
+        private void получитьТекстToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             InvDoc.InvDocument<AssemblyDocument> doc = new InvDoc.InvDocument<AssemblyDocument>(Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as AssemblyDocument);
             BOMView view = doc.getBOMView(false,false,"Только детали",true,false);
@@ -4786,7 +4808,7 @@ namespace InvAddIn
             xml.save();
         }
 
-        private void обновитьСтилиToolStripMenuItem_Click(object sender, EventArgs e)
+        private void обновитьСтилиToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             foreach (DrawingDocument dwg in Macros.StandardAddInServer.m_inventorApplication.Documents.VisibleDocuments)
             {
@@ -4830,7 +4852,7 @@ namespace InvAddIn
             }
         }
 
-        private void перевестиТекстToolStripMenuItem_Click(object sender, EventArgs e)
+        private void перевестиТекстToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             string n = u.OFD(Macros.StandardAddInServer.m_inventorApplication.ActiveDocument.path(),"xml|*.xml");
             if (n == "")
@@ -4885,7 +4907,7 @@ namespace InvAddIn
 
         static public bool check(ComponentOccurrence co)
         {
-            return co.ReferencedDocumentDescriptor.FullDocumentName.IndexOf(@"\Content Center Files\") != -1 && ut.getLenght(co.RangeBox) < 2.5;
+            return co.ReferencedDocumentDescriptor.FullDocumentName.IndexOf(@"\Content Center Files\") != -1 && ut.checkSquareLenght(co.RangeBox, 4); /*ut.getLenght(co.RangeBox) < 2.5;*/
         }
 
         static public void delete<T>(T f)
@@ -4918,7 +4940,7 @@ namespace InvAddIn
             else del.Add(pat);
         }
 
-        private void переименоватьСборкуToolStripMenuItem_Click(object sender, EventArgs e)
+        private void переименоватьСборкуToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             renameAsm(I.app.ActiveDocument);
         }
@@ -4956,7 +4978,7 @@ namespace InvAddIn
 
         }
 
-        private void обновитьКрепежToolStripMenuItem_Click(object sender, EventArgs e)
+        private void обновитьКрепежToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             ut.action<AssemblyDocument>(I.app.Documents.VisibleDocuments, d => updateFasteners(d), f => f.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject);
         }
@@ -4968,26 +4990,26 @@ namespace InvAddIn
             addFasteners(asm, new ContentOp());
         }
 
-        private void крепежToolStripMenuItem3_Click(object sender, EventArgs e)
+        private void крепежToolStripMenuItem3_Click_1(object sender, EventArgs e)
         {
             ut.action<AssemblyDocument>(I.app.Documents.VisibleDocuments, d => addFasteners(d, new ContentOp()), f => f.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject);
         }
 
-        private void открытьПапкуToolStripMenuItem_Click(object sender, EventArgs e)
+        private void открытьПапкуToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             string p = I.aDoc().FullFileName;
             file.open(p);
             this.Close();
         }
 
-        private void кластерToolStripMenuItem_Click(object sender, EventArgs e)
+        private void кластерToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             Cluster cl = new Cluster();
             cl.draw();
             cl.txt();
         }
 
-        private void габаритыToolStripMenuItem_Click(object sender, EventArgs e)
+        private void габаритыToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
             string fn = I.aDoc().FullFileName;
             fn = fn.Replace(".ipt", ".txt");
@@ -5010,6 +5032,7 @@ namespace InvAddIn
                 sw.Write("Габариты: \t" + (v.X*10).ToString("##.##") + " мм\n\t\t\t" + (v.Y*10).ToString("##.##") + " мм\n\t\t\t" + (v.Z*10).ToString("##.##") + " мм.\n");
             }
         }
+
 
         //private void добавитьШероховатостьToolStripMenuItem_Click(object sender, EventArgs e)
         //{

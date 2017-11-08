@@ -54,7 +54,8 @@ namespace InvAddIn
             if (ps.Consumed) return;
             psOut = compDef.Sketches.Add(ps.PlanarEntity);
             psOut.OriginPoint = ps.OriginPoint;
-            psOut.AxisEntity = ps.AxisEntity;
+            if (ps.AxisEntity != null)
+                psOut.AxisEntity = ps.AxisEntity;
             psOut.AxisIsX = ps.AxisIsX;
             psOut.NaturalAxisDirection = ps.NaturalAxisDirection;
             get();
@@ -197,8 +198,8 @@ namespace InvAddIn
             fn = fn.Replace(".ipt", "(Кластер).txt");
             using (System.IO.StreamWriter sw = System.IO.File.CreateText(fn))
             {
-                int cx = (countX*ClusterData.countX) *data.Count;
-                int cy = (countY*ClusterData.countY) *data.Count;
+                int cx = (countX*ClusterData.countX) *data.Count/2;
+                int cy = (countY*ClusterData.countY) *data.Count/2;
                 if (data.Count == 2) cy = countY * ClusterData.countY;
                 double a = 0;
                 xml.getDouble("area", ref a, 1);

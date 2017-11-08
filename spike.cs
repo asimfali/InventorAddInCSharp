@@ -119,12 +119,13 @@ namespace InvAddIn
             }
         }
 
-        public Edge findEdge(SheetMetalComponentDefinition smcd, ref UnitVector vec)
+        public Edge findEdge(SheetMetalComponentDefinition smcd, ref UnitVector vec, ref UnitVector dir)
         {
             SurfaceBody body = smcd.SurfaceBodies[1];
             Face face = body.Faces.OfType<Face>().FirstOrDefault(f => f.SurfaceType == SurfaceTypeEnum.kCylinderSurface && f.TangentiallyConnectedFaces.Count != 0);
             if (face == null) return null;
             Cylinder cyl = face.Geometry as Cylinder;
+            dir = cyl.AxisVector;
             UnitVector vec1 = cyl.AxisVector;
             InvDoc.u.abs(ref vec1);
             vec = vec1;
@@ -205,11 +206,26 @@ namespace InvAddIn
             return ret;
         }
 
+        public WorkAxis wa(SheetMetalComponentDefinition smcd, UnitVector v)
+        {
+            foreach (WorkAxis item in smcd.WorkAxes)
+            {
+                if (item.Line.Direction.DotProduct(v) != 0) return item;
+            }
+            return null;
+        }
+
         public void addSketch(SheetMetalComponentDefinition smcd, double H, double R, double L)
         {
-            edge = findEdge(smcd, ref vec);
+            UnitVector vect = null;
+            edge = findEdge(smcd, ref vec, ref vect);
             Face face = edge.Faces.OfType<Face>().OrderBy(f => f.Evaluator.Area).Last();
             ps = smcd.Sketches.Add(face);
+            WorkAxis w = wa(smcd, vect);
+            if (w != null)
+            {
+                ps.AxisEntity = w;
+            }
             ps.Name = "Шип";
             lengths = new double[edge.TangentiallyConnectedEdges.Count];
             addLenght(edge, ref lengths);
@@ -271,16 +287,19 @@ namespace InvAddIn
 
         public void start()
         {
-            Inventor.Point fpt = edge.StopVertex.Point;
+            //Inventor.Point fpt = edge.StopVertex.Point;
             Vector2d dir = null;
             SketchLine projectSL = (SketchLine)ps.AddByProjectingEntity(edge);
-            SketchLine arc = (SketchLine)ps.AddByProjectingEntity(edge.TangentiallyConnectedEdges[2]);
+            Edge edg = edge.TangentiallyConnectedEdges[2] as Edge;
+            SketchLine arc = (SketchLine)ps.AddByProjectingEntity(edg);
             projectSL.Construction = true;
             arc.Construction = true;
             dir = projectSL.StartSketchPoint.Geometry.VectorTo(arc.EndSketchPoint.Geometry);
+            //dir = projectSL.EndSketchPoint.Geometry.VectorTo(arc.EndSketchPoint.Geometry);
             //dir.ScaleBy(-1);
             if (dir.Length == 0) dir = projectSL.EndSketchPoint.Geometry.VectorTo(arc.EndSketchPoint.Geometry);
-            if (dir.Y > 0 || dir.X > 0) norm = true;
+            if (!(dir.Y > 0 || dir.X > 0)) norm = true;
+            //norm = false;
             Vector2d normal;// = getNormal(centr).AsVector();
             Point2d pt = I.tg.CreatePoint2d();// = centr.Geometry.MidPoint;
             double le = 0;
@@ -526,7 +545,7 @@ namespace InvAddIn
                     }
                     else
                     {
-                        rotateVector(dir, newLin, 0, ps);
+                        rotateVector(dir, newLin, Math.PI, ps);
                         spt = getPoint(insPt, newLin, true);
                     }
                 }
@@ -558,11 +577,19 @@ namespace InvAddIn
                     vec.ScaleBy(-le/2);
                     newPt.TranslateBy(vec);
                     vec.Normalize();
-                    l = addLine(newPt, getPoint(insPt, newLin, true), 0, 2*(vec.X+vec.Y));
+                    double ang = 0;
+                    if (norm) ang = Math.PI;
+                    l = addLine(newPt, getPoint(insPt, newLin, true), ang, 2*(vec.X+vec.Y));
                     ps.GeometricConstraints.AddParallel((SketchEntity)l, (SketchEntity)newLin);
                     ps.GeometricConstraints.AddTangent((SketchEntity)ps.SketchArcs[1], (SketchEntity) projectSL);
                     ps.GeometricConstraints.AddParallel((SketchEntity)newLin, (SketchEntity)projectSL);
-                    startLin = addLine(l.EndSketchPoint, l.EndSketchPoint, n, H + 1);
+                    if (norm)
+                    {
+                        //n.ScaleBy(-1);
+                        startLin = addLine(l.EndSketchPoint, l.EndSketchPoint, n, H + 1);
+                    }
+                    else
+                        startLin = addLine(l.EndSketchPoint, l.EndSketchPoint, n, H + 1);
 //                     if (dir.X > 0 || dir.Y > 0)
 //                     startLin = addLine(getPoint(insPt, l, true), getPoint(insPt, l), Math.PI / 2, H + 1);
 //                     else

@@ -39,6 +39,15 @@ namespace InvAddIn
         {
             app.SilentOperation = f;
         }
+        static public void screenUpdate(bool f)
+        {
+            app.ScreenUpdating = f;
+        }
+        static public void screenSilent(bool f)
+        {
+            silent(f);
+            screenUpdate(!f);
+        }
         static public SelectSet getSS(Document doc)
         {
             return doc.SelectSet;
