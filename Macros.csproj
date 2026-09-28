@@ -27,7 +27,7 @@
     <UpgradeBackupLocation>
     </UpgradeBackupLocation>
     <OldToolsVersion>4.0</OldToolsVersion>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -53,6 +53,7 @@
     <DebugType>full</DebugType>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <OutputPath>bin\Release\</OutputPath>
@@ -77,6 +78,7 @@
     <DebugType>none</DebugType>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <DebugSymbols>true</DebugSymbols>
@@ -91,8 +93,9 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <DocumentationFile>
     </DocumentationFile>
-    <Optimize>true</Optimize>
-    <RegisterForComInterop>true</RegisterForComInterop>
+    <Optimize>false</Optimize>
+    <RegisterForComInterop>false</RegisterForComInterop>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutputPath>bin\x64\Release\</OutputPath>
@@ -103,6 +106,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
     <DebugSymbols>true</DebugSymbols>
@@ -114,6 +118,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
     <OutputPath>bin\x86\Release\</OutputPath>
@@ -124,22 +129,29 @@
     <PlatformTarget>x86</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Autodesk.Inventor.interop, Version=17.0.0.0, Culture=neutral, PublicKeyToken=d84147f8b4276564, processorArchitecture=MSIL">
+    <Reference Include="autodesk.inventor.interop, Version=25.0.0.0, Culture=neutral, PublicKeyToken=d84147f8b4276564, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <EmbedInteropTypes>False</EmbedInteropTypes>
-      <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Autodesk.Inventor.Interop\v4.0_18.0.0.0__d84147f8b4276564\Autodesk.Inventor.interop.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\Autodesk.Inventor.Interop\v4.0_25.0.0.0__d84147f8b4276564\autodesk.inventor.interop.dll</HintPath>
+      <Private>False</Private>
     </Reference>
-    <Reference Include="Autodesk.PackAndGo.Interop">
-      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Inventor 2014\Bin\Autodesk.PackAndGo.Interop.dll</HintPath>
+    <Reference Include="Autodesk.PackAndGo.Interop, Version=18.0.0.0, Culture=neutral, PublicKeyToken=d84147f8b4276564, processorArchitecture=MSIL">
+      <HintPath>..\..\..\..\..\..\Program Files\Autodesk\Inventor 2021\Bin\Autodesk.PackAndGo.Interop.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </Reference>
     <Reference Include="InterfaceDll">
       <HintPath>..\InterfaceDll\bin\Debug\InterfaceDll.dll</HintPath>
     </Reference>
+    <Reference Include="itextsharp, Version=5.5.13.1, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+      <HintPath>packages\iTextSharp.5.5.13.1\lib\itextsharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="stdole, Version=7.0.3300.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <SpecificVersion>False</SpecificVersion>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System">
       <Name>System</Name>
@@ -152,6 +164,9 @@
     <Reference Include="TableDll">
       <HintPath>..\TableDll\bin\Debug\TableDll.dll</HintPath>
     </Reference>
+    <Reference Include="XmpCore, Version=6.1.10.1, Culture=neutral, PublicKeyToken=961f4f366277b80e, processorArchitecture=MSIL">
+      <HintPath>packages\XmpCore.6.1.10.1\lib\net35\XmpCore.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assembly.cs" />
@@ -159,11 +174,22 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="BalloonOp.cs" />
-    <Compile Include="BreakOperation.cs" />
+    <Compile Include="block.cs" />
+    <Compile Include="HandBend.cs" />
+    <Compile Include="Properties\BreakOperation.cs" />
     <Compile Include="Button.cs" />
     <Compile Include="Cluster.cs" />
     <Compile Include="ContentCenter.cs" />
+    <Compile Include="CopyPaste.cs" />
+    <Compile Include="Draw.cs" />
+    <Compile Include="EditProp.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="EditProp.Designer.cs">
+      <DependentUpon>EditProp.cs</DependentUpon>
+    </Compile>
     <Compile Include="Fastener.cs" />
+    <Compile Include="GlbExport.cs" />
     <Compile Include="I.cs" />
     <Compile Include="Cut.cs" />
     <Compile Include="Drawing.cs" />
@@ -172,6 +198,10 @@
     </Compile>
     <Compile Include="IMate.Designer.cs">
       <DependentUpon>IMate.cs</DependentUpon>
+    </Compile>
+    <Compile Include="IMates.cs" />
+    <Compile Include="Interactive.cs">
+      <SubType>Form</SubType>
     </Compile>
     <Compile Include="InventorDocument.cs" />
     <Compile Include="InventorEvents.cs" />
@@ -222,8 +252,13 @@
     <Compile Include="sheet.Designer.cs">
       <DependentUpon>sheet.cs</DependentUpon>
     </Compile>
+    <Compile Include="Site.cs" />
+    <Compile Include="Site.Designer.cs">
+      <DependentUpon>Site.cs</DependentUpon>
+    </Compile>
     <Compile Include="Sketch.cs" />
     <Compile Include="Sketches.cs" />
+    <Compile Include="Slice.cs" />
     <Compile Include="Spec.cs" />
     <Compile Include="spike.cs">
       <SubType>Form</SubType>
@@ -240,6 +275,7 @@
     <Compile Include="Sticker.Designer.cs">
       <DependentUpon>Sticker.cs</DependentUpon>
     </Compile>
+    <Compile Include="System\Collections\IComparer.cs" />
     <Compile Include="Table.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -253,7 +289,9 @@
       <DependentUpon>Tables.cs</DependentUpon>
     </Compile>
     <Compile Include="Translate.cs" />
+    <Compile Include="unmanaged.cs" />
     <Compile Include="Utility.cs" />
+    <Compile Include="Variable.cs" />
     <Compile Include="VariableData.cs" />
     <Compile Include="Recover.cs" />
   </ItemGroup>
@@ -268,11 +306,18 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="Readme.txt" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="EditProp.resx">
+      <DependentUpon>EditProp.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="IMate.resx">
       <DependentUpon>IMate.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Interactive.resx">
+      <DependentUpon>Interactive.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Parts.resx">
       <DependentUpon>Parts.cs</DependentUpon>
@@ -317,6 +362,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="BreakHor.ico" />
+    <None Include="Resources\interactive.ico" />
     <None Include="Resources\update.ico" />
     <None Include="Resources\ComboBox.ico" />
     <None Include="Resources\Sketch.ico" />
@@ -350,6 +396,10 @@
       <Project>{4fb8d545-fc46-46c9-b168-18277e919166}</Project>
       <Name>Excel</Name>
     </ProjectReference>
+    <ProjectReference Include="..\printLib\printLib.csproj">
+      <Project>{4e6b35bb-4cae-4e47-bac0-0871367db79a}</Project>
+      <Name>printLib</Name>
+    </ProjectReference>
     <ProjectReference Include="..\WithDXF\dxf\dxf.csproj">
       <Project>{07e060a1-f6c9-415c-ad47-cfe9ef5ad496}</Project>
       <Name>dxf</Name>
@@ -359,7 +409,22 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>call "%25VS110COMNTOOLS%25vsvars32"
-			mt.exe -manifest "$(ProjectDir)Macros.X.manifest" -outputresource:"$(TargetPath)";#2</PostBuildEvent>
+    <PostBuildEvent>
+        if exist "%25ProgramFiles%25\Microsoft SDKs\Windows\v6.0\bin\mt.exe" set var="%25ProgramFiles%25\Microsoft SDKs\Windows\v6.0\bin\mt.exe"
+		if exist "%25ProgramFiles%25\Microsoft SDKs\Windows\v7.0\bin\mt.exe" set var="%25ProgramFiles%25\Microsoft SDKs\Windows\v7.0\bin\mt.exe"
+		if exist "%25ProgramFiles%25\Microsoft SDKs\Windows\v6.0A\bin\mt.exe" set var="%25ProgramFiles%25\Microsoft SDKs\Windows\v6.0A\bin\mt.exe"
+		if exist "%25ProgramFiles%25\Microsoft SDKs\Windows\v7.0A\bin\mt.exe" set var="%25ProgramFiles%25\Microsoft SDKs\Windows\v7.0A\bin\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Microsoft SDKs\Windows\v6.0A\bin\mt.exe" set var=%25PROGRAMFILES(x86)%25\Microsoft SDKs\Windows\v6.0A\bin\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Microsoft SDKs\Windows\v7.0A\bin\mt.exe" set var="%25PROGRAMFILES(x86)%25\Microsoft SDKs\Windows\v7.0A\bin\mt.exe" 
+		if exist "%25PROGRAMFILES%25\Windows Kits\8.0\bin\x64\mt.exe" set var="%25PROGRAMFILES%25\Windows Kits\8.0\bin\x64\mt.exe"
+		if exist "%25PROGRAMFILES%25\Windows Kits\8.0\bin\x86\mt.exe" set var="%25PROGRAMFILES%25\Windows Kits\8.0\bin\x86\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Windows Kits\8.0\bin\x64\mt.exe" set var="%25PROGRAMFILES(x86)%25\Windows Kits\8.0\bin\x64\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Windows Kits\8.0\bin\x86\mt.exe" set var="%25PROGRAMFILES(x86)%25\Windows Kits\8.0\bin\x86\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Windows Kits\10\bin\x64\mt.exe" set var="%25PROGRAMFILES(x86)%25\Windows Kits\10\bin\x64\mt.exe"
+		if exist "%25PROGRAMFILES(x86)%25\Windows Kits\10\bin\x86\mt.exe" set var="%25PROGRAMFILES(x86)%25\Windows Kits\10\bin\x86\mt.exe"
+        call %25var%25 -manifest "$(ProjectDir)Macros.X.manifest" -outputresource:"$(TargetPath)";#2
+			XCopy "$(TargetPath)" "%25AppData%25\Autodesk\ApplicationPlugins\$(TargetName)\" /Y /R
+		    XCopy "$(ProjectDir)Autodesk.Macros.Inventor.addin" "%25AppData%25\Autodesk\ApplicationPlugins\$(TargetName)\" /Y /R   
+	</PostBuildEvent>
   </PropertyGroup>
 </Project>

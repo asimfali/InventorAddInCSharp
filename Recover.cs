@@ -84,7 +84,7 @@ namespace InvAddIn
                 pathFile = pathFile.Substring(0, pathFile.LastIndexOf('\\'));
                 foreach (Document doc in invApp.Documents.VisibleDocuments)
                 {
-                    XMLDoc xdoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\rename.xml", "head");
+                    XMLDoc xdoc = new XMLDoc(I.p() + @"\rename.xml", "head");
                     recoverReference(doc, xdoc); 
                 }
                 if (newDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)

@@ -8,6 +8,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Inventor;
+using InterfaceDll;
+using System.Xml.Linq;
 
 
 namespace InvAddIn
@@ -70,13 +72,13 @@ namespace InvAddIn
             if (name != null)
             {
                 this.textBox2.Text = name;
-                open(_dgv);
+                open(_dgv, '~');
             }
             valXML = new List<string>();
             attrXML = new List<string>();
-            if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\Tables.xml"))
+            if (System.IO.File.Exists(I.p() + @"\Tables.xml"))
                 {
-                    tbl = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Tables.xml");
+                    tbl = new InvDoc.XML(I.p() + @"\Tables.xml");
                     tbl.ReadXML("Table", ref valXML, ref attrXML);
                     if (attrXML.Count != 0)
                     {
@@ -856,7 +858,7 @@ namespace InvAddIn
 
                 //}
                 //lst.Add(start); lst.Add(end);
-                    AttribAdd(this._dgv, this.textBox2.Text);
+                    AttribAdd(this._dgv, this.textBox2.Text, '~');
                     Inventor.Point2d pt = m_TG.CreatePoint2d();
                     if (comboBox1.Text == "Исполнения" || comboBox1.Text == "Исполнения_AC")
                     {
@@ -992,7 +994,7 @@ namespace InvAddIn
            }
         }
 
-        private void AttribAdd(DataGridView _dgv, string name)
+        private void AttribAdd(DataGridView _dgv, string name, char sep)
         {
             //Inventor.AttributeSets attSets;
             AttribDelete(name);
@@ -1017,7 +1019,9 @@ namespace InvAddIn
                     break;
                 foreach (DataGridViewCell cel in row.Cells)
                 {
-                    val = val + (string)cel.FormattedValue + ';';
+                    string fv = (string)cel.FormattedValue;
+                    fv = fv.Replace(';', sep);
+                    val = val + fv + ';';
                     if (cel.Style.Font != null)   
                     {
                         stl += cel.ColumnIndex.ToString() + ';' + cel.RowIndex.ToString() + ';'
@@ -1091,6 +1095,7 @@ namespace InvAddIn
                 AttribDelete("Padding" + this.textBox2.Text);
                 AttribDelete("Style" + this.textBox2.Text);
                 AttribDelete("MyParam" + this.textBox2.Text);
+                m_Drw.Save2();
             }
             catch (Exception ex)
             {
@@ -1131,11 +1136,11 @@ namespace InvAddIn
         {
             DrawingDocument m_DrwOld = m_Drw;
             m_Drw = (DrawingDocument)invApp.ActiveDocument;
-            AttribAdd(this._dgv, this.textBox2.Text);
+            AttribAdd(this._dgv, this.textBox2.Text, '~');
             m_Drw = m_DrwOld;
         }
 
-        private void open(DataGridView _dgv)
+        private void open(DataGridView _dgv, char sep)
         {
             int i = 0; bool flag = true; DataGridViewContentAlignment align;
             try
@@ -1156,6 +1161,10 @@ namespace InvAddIn
                         string[] str = attrset[1].Value.ToString().Split(';');
                         if (flag) { flag = false; _dgv.ColumnCount = str.Count() - 1; this.CountColumn.Text = (str.Count() - 1).ToString(); }
                         //Array.Resize(ref str, str.Length - 1);
+                        for (int k = 0; k < str.Length; k++)
+                        {
+                            str[k] = str[k].Replace(sep, ';'); 
+                        }
                         _dgv.Rows.Add(str);
                     }
                     if (attrset.Name.StartsWith("Name" + this.textBox2.Text) && attrset.Count != 0)
@@ -1242,7 +1251,7 @@ namespace InvAddIn
 
         private void открытьToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            open(this._dgv);
+            open(this._dgv, '~');
         }
 
         private void _dgv_KeyDown(object sender, KeyEventArgs e)
@@ -1256,7 +1265,7 @@ namespace InvAddIn
             }
             if (e.Control && e.KeyCode == Keys.S)
             {
-                AttribAdd(this._dgv, this.textBox2.Text);
+                AttribAdd(this._dgv, this.textBox2.Text, '~');
             }
             if (e.Control && e.KeyCode == Keys.C)
             {
@@ -1471,12 +1480,22 @@ namespace InvAddIn
 
         public static bool eq(Edge edgeModel, DrawingCurve dc)
         {
-            bool start, end;
-            start = InvDoc.u.comparePoint2d(edgeModel.StartVertex, ((Edge)dc.ModelGeometry).StartVertex, 1000);
-            if (!start) start = InvDoc.u.comparePoint2d(edgeModel.StopVertex, ((Edge)dc.ModelGeometry).StartVertex, 1000);
-            end = InvDoc.u.comparePoint2d(edgeModel.StopVertex, ((Edge)dc.ModelGeometry).StopVertex, 1000);
-            if (!end) end = InvDoc.u.comparePoint2d(edgeModel.StartVertex, ((Edge)dc.ModelGeometry).StopVertex, 1000);
-            return (start && end);
+            double tol = 0.7;
+            Edge em = dc.ModelGeometry as Edge;
+            var empt = InvDoc.u.midPt(em.StartVertex.Point, em.StopVertex.Point);
+            var pt = InvDoc.u.midPt(edgeModel.StartVertex.Point, edgeModel.StopVertex.Point);
+            var vec = empt.VectorTo(pt);
+            if (vec.Length < tol) return true;
+            return false;
+            //if (em.Equals(edgeModel)) return true;
+
+
+            //bool start, end;
+            //start = InvDoc.u.comparePoint2d(edgeModel.StartVertex, ((Edge)dc.ModelGeometry).StartVertex, 1000);
+            //if (!start) start = InvDoc.u.comparePoint2d(edgeModel.StopVertex, ((Edge)dc.ModelGeometry).StartVertex, 1000);
+            //end = InvDoc.u.comparePoint2d(edgeModel.StopVertex, ((Edge)dc.ModelGeometry).StopVertex, 1000);
+            //if (!end) end = InvDoc.u.comparePoint2d(edgeModel.StartVertex, ((Edge)dc.ModelGeometry).StopVertex, 1000);
+            //return (start && end);
         }
 
         static public string findDim(DrawingCurve dc)
@@ -1490,25 +1509,21 @@ namespace InvAddIn
                     if (dim.Type == ObjectTypeEnum.kLinearGeneralDimensionObject)
                     {
                         LinearGeneralDimension ldim = (LinearGeneralDimension)dim;
-
+                        //InvDoc.u.addText(dc.Parent, "pt", dc.StartPoint);
                         if (/*eq(ldim, dc)*/ldim.IntentOne.Geometry.Equals(dc) || ldim.IntentTwo.Geometry.Equals(dc))
                         {
                             string str = ldim.Text.Text;
                             if (str.IndexOf('*') != -1) str = str.Remove(str.IndexOf('*'));
 
-                            if ((((DrawingCurve)ldim.IntentOne.Geometry).EdgeType == DrawingEdgeTypeEnum.kBendUpEdge ||
-                                ((DrawingCurve)ldim.IntentOne.Geometry).EdgeType == DrawingEdgeTypeEnum.kBendDownEdge) &&
-                                (((DrawingCurve)ldim.IntentTwo.Geometry).EdgeType == DrawingEdgeTypeEnum.kBendUpEdge ||
-                                ((DrawingCurve)ldim.IntentTwo.Geometry).EdgeType == DrawingEdgeTypeEnum.kBendDownEdge)
-                                )
+                            if (InvDoc.u.checkDimBend(ldim.IntentOne) && InvDoc.u.checkDimBend(ldim.IntentTwo))
                             {
-                                Func<string, double> conv = s =>
-                                {
-                                    char rep = (separator == ',') ? '.' : ',';
-                                    return (s.IndexOf(separator) != -1) ? Convert.ToDouble(s) : Convert.ToDouble(s.Replace(rep, separator));
-                                };
+                                //Func<string, double> conv = s =>
+                                //{
+                                //    char rep = (separator == ',') ? '.' : ',';
+                                //    return (s.IndexOf(separator) != -1) ? Convert.ToDouble(s) : Convert.ToDouble(s.Replace(rep, separator));
+                                //};
 
-                                double val = conv(str) + 0.8;
+                                double val = InvDoc.u.convToDouble(str);
                                 return "Упор=" + val.ToString() + " мм";
                             }
 
@@ -1544,7 +1559,7 @@ namespace InvAddIn
                 if (smcd.HasFlatPattern)
                 {
                     FlatPattern fp = smcd.FlatPattern;
-                    for (int i = 1; i < fp.FlatBendResults.Count; i++)
+                    for (int i = 1; i <= fp.FlatBendResults.Count; i++)
                     {
                         if (fp.FlatBendResults[i].IsOnBottomFace)
                         {
@@ -1772,6 +1787,19 @@ namespace InvAddIn
             return dc.Segments[1];
         }
 
+        static public DrawingCurveSegment findNear(DrawingCurve dc)
+        {
+            var pt = I.CP2d();
+            double d = 10000;
+            DrawingCurveSegment dcs = dc.Segments[1];
+            foreach (DrawingCurveSegment item in dc.Segments)
+            {
+                var l = item.StartPoint.VectorTo(pt).Length;
+                if (l < d) { d = l;  dcs = item; }
+            }
+            return dcs;
+        }
+
         static public void addLeader(DrawingCurve dc ,string txt ,bool flag, ref List<Point2d> ptsExc, ref DrawingView dv, double x = 0.4, double y = 0.4)
         {
             Inventor.DrawingCurveSegment dcs;
@@ -1796,11 +1824,15 @@ namespace InvAddIn
 //                         if (dc.Segments.Count % 2 == 0) count = dc.Segments.Count / 2;
 //                         else count = dc.Segments.Count / 2 + 1;
 //                         dcs = dc.Segments[count];
-                        dcs = findCenter(dc);
+                        //dcs = findCenter(dc);
+                        dcs = findNear(dc);
                     }
+                double offset = 5;
+                var v = I.CP2d();
+                if (dcs.StartPoint.VectorTo(v).Length > dcs.EndPoint.VectorTo(v).Length) offset = 1.25;
                 if (dcs.StartPoint.VectorTo(dcs.EndPoint).X > 0)
-                    midPt = invApp.TransientGeometry.CreatePoint2d((dcs.EndPoint.X - dcs.StartPoint.X) / 1.9 + dcs.StartPoint.X, (dcs.EndPoint.Y - dcs.StartPoint.Y) / 1.9 + dcs.StartPoint.Y);
-                else midPt = invApp.TransientGeometry.CreatePoint2d((dcs.EndPoint.X - dcs.StartPoint.X) / 2.1 + dcs.StartPoint.X, (dcs.EndPoint.Y - dcs.StartPoint.Y) / 2.1 + dcs.StartPoint.Y);
+                    midPt = invApp.TransientGeometry.CreatePoint2d((dcs.EndPoint.X - dcs.StartPoint.X) /(offset - 0.1) + dcs.StartPoint.X, (dcs.EndPoint.Y - dcs.StartPoint.Y) / (offset - 0.1) + dcs.StartPoint.Y);
+                else midPt = invApp.TransientGeometry.CreatePoint2d((dcs.EndPoint.X - dcs.StartPoint.X) / (offset + 0.1) + dcs.StartPoint.X, (dcs.EndPoint.Y - dcs.StartPoint.Y) / (offset + 0.1) + dcs.StartPoint.Y);
 
                     if (dc.EdgeType == DrawingEdgeTypeEnum.kBendDownEdge || dc.EdgeType == DrawingEdgeTypeEnum.kBendUpEdge)
                     {
@@ -1868,17 +1900,32 @@ namespace InvAddIn
                     note = InvDoc.u.getProp(doc,"Comments").Value.ToString();
                 string type = "", decnumber = "", c = count.ToString("00"), EWA = "";
                 string tmp = CreateComponent.perf(desc, pn,ref type,ref decnumber, ref note, EWA, ref c);
-                Regex regex = new Regex(@"\b(\w*-)(\d*)(\w.*)");
-                Match m = regex.Match(type);
-//                 if (m.Groups[1].Value != "") m.Groups[1
-                tmp = m.Groups[1] + note + m.Groups[3];  
-                    //type.Insert(m.Groups[1].Index, note);
-                Regex r = new Regex(@"\b(\d.*)\b");
-                m = r.Match(desc);
-                if (m.Groups[0].Value != null && m.Groups[0].Value != "")
+                Regex regex = new Regex(@"\b(\w*-)([0-9\,\.]*)(\w.*)");
+                Regex rn = new Regex(@"\d*[\.\,]?\d*");
+                Match mn = rn.Match(note);
+                Regex rpn = new Regex(@"\b(.*)П([^\.]*)");
+                Match mpn = rpn.Match(pn);
+
+                tmp = mpn.Groups[1].Value + mn.Groups[0].Value + "П" + mpn.Groups[2].Value;
+                var model = InvDoc.u.getPropValue(doc, "model");
+                if (model != "")
                 {
-                    tmp = m.Groups[0].Value;
+                    tmp = model;
+                    Regex mod = new Regex(@"КЭВ-(\d*[\.\,]?\d*)");
+                    Match mt = mod.Match(tmp);
+                    note = mt.Groups[1].Value + " кВт";
                 }
+//                 Match m = regex.Match(type);
+// //                 if (m.Groups[1].Value != "") m.Groups[1
+//                 tmp = m.Groups[1] + note + m.Groups[3];  
+//                     //type.Insert(m.Groups[1].Index, note);
+//                 Regex r = new Regex(@"\b(\d.*)\b");
+//                 m = r.Match(desc);
+//                 if (m.Groups[0].Value != null && m.Groups[0].Value != "")
+//                 {
+//                     tmp = m.Groups[0].Value;
+//                 }
+
                 if (i == 0)
                 {
                     lst.Add(pn + "      " + ";" + tmp + ";" + note + ";");
@@ -1888,6 +1935,37 @@ namespace InvAddIn
                     lst.Add("-" + i.ToString("00") + ";" + tmp + ";" + note + ";");
                 }
                 i++;
+            }
+            return lst;
+        }
+
+        public List<string> performanceXML()
+        {
+            Document doc = I.aDoc();
+            List<string> lst = new List<string>();
+            doc = InvDoc.u.referendedDoc(doc);
+            Property prop = InvDoc.u.getProp(doc, "DecNumber");
+            if (prop == null) return null;
+            string dn = prop.Value.ToString();
+            string pn = InvDoc.u.getPropValue(doc, "Part Number");
+            string name = InvDoc.u.OFD(System.IO.Path.GetDirectoryName(doc.FullDocumentName), "XML files(*.xml)|*.xml");
+            MyXML xml = new MyXML(name);
+            XElement el = xml.find("DecNumber", dn, 1);
+            int i = 0;
+            string model = MyXML.getAtt(el, "Model"), note = MyXML.getAtt(el, "Note");
+            foreach (var item in el.Elements())
+            {
+                if (item.Name == "Isp")
+                {
+                    if (i == 0)
+                    {
+                        lst.Add(pn + "      " + ";" + model + ";" + note + ";");
+                    }
+                    model = MyXML.getAtt(item, "Model");
+                    note = MyXML.getAtt(item, "Note");
+                    i++;
+                    lst.Add("-" + i.ToString("00") + ";" + model + ";" + note + ";");
+                }
             }
             return lst;
         }
@@ -2106,9 +2184,21 @@ namespace InvAddIn
                 if (InvDoc.u.referendedDoc(m_Drw as Document).DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
                 {
                     List<string> asms = TableInv.getAsms(InvDoc.u.referendedDocDesc(m_Drw as Document).FullDocumentName);
-                    if (asms.Count > 1) perf = performanceDinamic(asms);
+                    if (asms.Count > 0) perf = performanceDinamic(asms);
                 }
                 else performance(ref perf);
+                _dgv.Columns[0].CellTemplate.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+                _dgv[0, 0].Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                foreach (string str in perf)
+                {
+                    sPL = str.Split(';');
+                    _dgv.Rows.Add(sPL);
+                    rowDim += tbl.substring(tmp[0], "RowHeight=") + ';';
+                }
+            }
+            if (name == "ИсполненияXML")
+            {
+                perf = performanceXML();
                 _dgv.Columns[0].CellTemplate.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
                 _dgv[0, 0].Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 foreach (string str in perf)
@@ -2156,6 +2246,11 @@ namespace InvAddIn
                     else c.Style.Font = fontStyle(textH: h);
                 }
             }
+        }
+
+        private void toolStripMenuItem2_Click(object sender, EventArgs e)
+        {
+
         }
 
         private void toolStripMenuItem2_Enter(object sender, EventArgs e)
@@ -2210,10 +2305,15 @@ namespace InvAddIn
                string val = "";
                foreach (DataGridViewCell c in this._dgv.SelectedCells)
                {
-                   val += c.RowIndex.ToString() + ';' + c.ColumnIndex.ToString() + ';' +  toolStripComboBox1.Text;
-               }
-               string tmp = styleParam.Find(delegate(string str) { return str == val; });
-               if (tmp == null && toolStripComboBox1.Text != "100") styleParam.Add(val);
+                   val = c.RowIndex.ToString() + ';' + c.ColumnIndex.ToString() + ';' +  toolStripComboBox1.Text;
+                    string tmp = styleParam.Find(a => a.StartsWith(c.RowIndex.ToString() + ';' + c.ColumnIndex.ToString() + ';'));
+                    if (tmp == null && toolStripComboBox1.Text != "100") styleParam.Add(val);
+                    else
+                    {
+                        var ind = styleParam.IndexOf(tmp);
+                        styleParam[ind] = val;
+                    }
+                }
             }
             
         }

@@ -222,11 +222,11 @@ namespace InvAddIn
 
 }
 
-    internal abstract class InvComboBox
+    public abstract class InvComboBox
     {
-        private static Inventor.Application m_inventorApplication;
-        private ComboBoxDefinition m_ComboBoxDef;
-        private ComboBoxDefinitionSink_OnSelectEventHandler m_cbEhDelegate;
+        public static Inventor.Application m_inventorApplication;
+        public ComboBoxDefinition m_ComboBoxDef;
+        public ComboBoxDefinitionSink_OnSelectEventHandler m_cbEhDelegate;
         public static Inventor.Application InventorApplication
         {
             set
@@ -251,6 +251,14 @@ namespace InvAddIn
         {
             m_ComboBoxDef = m_inventorApplication.CommandManager.ControlDefinitions.AddComboBoxDefinition(DisplayName, InternalName, Classification, DropDownWidth, ClientId,
                 DescriptionText, ToolTipText, StandardIcon, LargeIcon);
+            m_ComboBoxDef.Enabled = true;
+            m_cbEhDelegate = new ComboBoxDefinitionSink_OnSelectEventHandler(ComboBoxDefinition_OnSelect);
+            m_ComboBoxDef.OnSelect += m_cbEhDelegate;
+        }
+
+        public InvComboBox(string DisplayName, string InternaleName, CommandTypesEnum Class, int Drop)
+        {
+            m_ComboBoxDef = m_inventorApplication.CommandManager.ControlDefinitions.AddComboBoxDefinition(DisplayName, InternaleName, Class, Drop);
             m_ComboBoxDef.Enabled = true;
             m_cbEhDelegate = new ComboBoxDefinitionSink_OnSelectEventHandler(ComboBoxDefinition_OnSelect);
             m_ComboBoxDef.OnSelect += m_cbEhDelegate;

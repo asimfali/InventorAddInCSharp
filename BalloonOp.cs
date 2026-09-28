@@ -36,7 +36,7 @@ namespace InvAddIn
     {
         private Inventor.DrawingDocument m_DrwDoc;
         private Inventor.AssemblyDocument m_AsmDoc;
-        private BalloonOp oBalloon;
+        //private BalloonOp oBalloon;
         private Inventor.Application invApp;
         private Inventor.Point pt;
         private Inventor.Point2d pt1, pt2;
@@ -44,8 +44,8 @@ namespace InvAddIn
         private InteractionEvents interEvts;
         private Inventor.MouseEvents mouseEvts;
         private Inventor.SelectEvents selEvts;
-        private TransientGeometry m_TG;
-        private DrawingView m_View;
+        //private TransientGeometry m_TG;
+        //private DrawingView m_View;
         private Inventor.DrawingCurveSegment dcs;
         private Inventor.DrawingCurve dc;
         private object obj;
@@ -53,7 +53,7 @@ namespace InvAddIn
         private Inventor.GeometryIntent gInt;
         private Inventor.ObjectCollection objs;
         private Inventor.ComponentOccurrence compOcc;
-        private Inventor.BreakOperation oBreak;
+        //private Inventor.BreakOperation oBreak;
 
         public MyBalloon(Inventor.Document oDoc)
         {

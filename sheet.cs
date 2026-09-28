@@ -24,9 +24,9 @@ namespace InvAddIn
             invDoc = new InvDoc.InvDocument<Document>((Document)drw);
             invDoc.doc = (Document)drw;
             InitializeComponent();
-            if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\sheet.xml"))
+            if (System.IO.File.Exists(I.p() + @"\sheet.xml"))
             {
-                xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\sheet.xml", "head");
+                xmlDoc = new XMLDoc(I.p() + @"\sheet.xml", "head");
                 foreach (var item in xmlDoc.Doc.Descendants("w"))
                 {
                     comboBox1.Items.Add(item.Value);

@@ -36,6 +36,7 @@ namespace InvAddIn
         private int num;
         private int offset = 0;
         private string path = "", value = "", filePath;
+        public static string spath = "";
         public FormTreeView ftv;
         InvDoc.XML props, ex, sort;
         //private List<Inventor.Point2d> pts = new List<Point2d>();
@@ -63,17 +64,22 @@ namespace InvAddIn
             //m_BOMView.Sort("Default BOM Structure", true, "Component Type", true, "Description", true);
             m_first = true;
             InitializeComponent();
-            Rectangle bns = Screen.PrimaryScreen.Bounds;
-            this.Bounds = bns;
+            Rectangle bns = Screen.PrimaryScreen.Bounds;      
+            this.Bounds = bns;  
             this.WindowState = FormWindowState.Maximized;
             bns.Height = bns.Height - bns.Height / 12 * 2;
             bns.Y = menuStrip1.Size.Height;
-            dataGridView1.Bounds = bns;
-            //dataGridView1.Visible = false;
+            dataGridView1.Bounds = bns;         
+            //dataGridView1.Visible = false;       
             myDGV.Dgv = dataGridView1;
-            part.Location = new System.Drawing.Point(10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
-            dec.Location = new System.Drawing.Point(part.Bounds.X + part.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
-            bom.Location = new System.Drawing.Point(dec.Bounds.X + dec.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            pathCB.Width = this.Width / 3;
+            pathCB.Location = new System.Drawing.Point(10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            bom.Location = new System.Drawing.Point(pathCB.Bounds.X + pathCB.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            Litera.Location = new System.Drawing.Point(bom.Bounds.X + bom.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            Default.Location = new System.Drawing.Point(Litera.Bounds.X + Litera.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            decCB.Location = new System.Drawing.Point(Default.Bounds.X + Default.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            model.Location = new System.Drawing.Point(decCB.Bounds.X + decCB.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
+            sortCB.Location = new System.Drawing.Point(model.Bounds.X + model.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);  
             //checkBox3.Location = new System.Drawing.Point(checkBox2.Bounds.X + checkBox2.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
             //label1.Location = new System.Drawing.Point(checkBox3.Bounds.X + checkBox3.Bounds.Width + 10, dataGridView1.Bounds.Y + dataGridView1.Bounds.Height + 10);
             //textBox1.Width = 200;
@@ -82,7 +88,34 @@ namespace InvAddIn
 
             //bns.Y = 0;
             //bns.Height = menuStrip1.Size.Height;
-            //menuStrip1.Bounds = bns;
+            //menuStrip1.Bounds = bns; 
+            pathCB.DropDownHeight = this.Height * 2 / 3;
+            string _path = I.app.DesignProjectManager.ActiveDesignProject.WorkspacePath;
+            pathCB.Text = _path;
+            pathCB.Items.AddRange(dirs(_path));
+            Prop.spath = I.app.DesignProjectManager.ActiveDesignProject.WorkspacePath;
+            this.KeyPreview = true;
+            this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Prop_KeyPress);
+            this.FormClosing += Prop_FormClosing;
+        }
+
+        public static string[] dirs(string p)
+        {
+            MyXML exc = new MyXML("PathFilter.xml");
+            var ie = file.getDirs(p, "", exc.elem.Element("Filter"),false);
+            return ie.ToArray();
+        }
+
+        void Prop_KeyPress(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.O)
+            {
+                open();
+            }
+            else if (e.Control && e.KeyCode == Keys.W)
+            {
+                this.Close();
+            }
         }
 
         private void initializeProp(string filePath)
@@ -94,15 +127,15 @@ namespace InvAddIn
             if (m_first)
             {
                 props = new InvDoc.XML(filePath);
-                ex = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Exceptions.xml");
+                ex = new InvDoc.XML(I.p() + @"\Exceptions.xml");
                 props.ReadXML("Properties", ref match, ref result);
                 ex.ReadXML("Exceptions", ref ex_val, ref ex_attr);
-                sort = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Sequence.xml");
+                sort = new InvDoc.XML(I.p() + @"\Sequence.xml");
                 sort.ReadXML("Sequence", ref sort_val, ref sort_attr);
                 //Property p;
                 num = dataGridView1.Columns.Add("Имя файла", "Имя файла");
                 dataGridView1.Columns[num].Width = 300;
-                for (int i = 0; i < result.Count; i++)
+                for (int i = 0; i < result.Count; i++)            
                 {
                     string ss = props.substring(result[i], "name=");
                     string cn = props.substring(result[i], "columnName="); // cn - columnName
@@ -139,10 +172,10 @@ namespace InvAddIn
             if (m_first)
             {
                 props = new InvDoc.XML(filePath);
-                ex = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Exceptions.xml");
+                ex = new InvDoc.XML(I.p() + @"\Exceptions.xml");
                 props.ReadXML("Properties", ref match, ref result);
                 ex.ReadXML("Exceptions", ref ex_val, ref ex_attr);
-                sort = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Sequence.xml");
+                sort = new InvDoc.XML(I.p() + @"\Sequence.xml");
                 sort.ReadXML("Sequence", ref sort_val, ref sort_attr);
                 //Property p;
                 num = dataGridView1.Columns.Add("Poz", "Поз.");
@@ -379,8 +412,8 @@ namespace InvAddIn
             {
                 foreach (Inventor.BOMRow row in rows)
                 {
-                    if (part.Checked == true)
-                    { if (row.ReferencedFileDescriptor.FullFileName.IndexOf(path) == -1) goto nex; }
+//                     if (part.Checked == true)
+//                     { if (row.ReferencedFileDescriptor.FullFileName.IndexOf(path) == -1) goto nex; }
 
                     int n; string pad = "";
                     string[] tmp = row.ItemNumber.Split('.');
@@ -424,6 +457,7 @@ namespace InvAddIn
             }
         }
 
+
         private int addRow(Inventor.Document oDoc, ref List<int> ii, string pad = "")
         {
             object[] strs;
@@ -435,11 +469,20 @@ namespace InvAddIn
                 {
                     string ss = props.substring(result[i], "name=");
                     string val = props.substring(result[i], "value=");
+                    var spl = val.Split(':');
                     object valProp = getProp(oDoc, ss);
                     if (valProp.GetType() == typeof(System.DateTime)) valProp = ((System.DateTime)valProp).ToString("dd.MM.yyyy");
-                    if (val != "" && val != valProp.ToString())
-                        ii.Add(i + 1);
-                    strs[i + 1] = (val == "") ? getProp(oDoc, ss) : addProp(oDoc, ss, val);
+                    if (spl.Count() == 1)
+                    {
+                        if (val != "" && val != valProp.ToString())
+                            ii.Add(i + 1);
+                        strs[i + 1] = (val == "") ? getProp(oDoc, ss) : addProp(oDoc, ss, val);
+                    }
+                    else if (spl.Count() == 2)
+                    {
+                        string tmp = valProp.ToString();
+                        strs[i + 1] = (tmp == spl[0]) ? getProp(oDoc, ss) : addProp(oDoc, ss, spl[1]);
+                    }
                 }
             }
             else
@@ -450,19 +493,28 @@ namespace InvAddIn
                     string ss = props.substring(result[i], "name=");
                     string val = props.substring(result[i], "value=");
                     object valProp = getProp(oDoc, ss);
+                    var spl = val.Split(':');
                     if (valProp.GetType() == typeof(System.DateTime)) valProp = ((System.DateTime)valProp).ToString("dd.MM.yyyy");
-                    if (val != "" && val != valProp.ToString())
-                        ii.Add(i + n);
-                    strs[i + n] = (val == "") ? getProp(oDoc, ss) : addProp(oDoc, ss, val);
+                    if (spl.Count() == 1)
+                    {
+                        if (val != "" && val != valProp.ToString())
+                            ii.Add(i + n);
+                        strs[i + n] = (val == "") ? getProp(oDoc, ss) : addProp(oDoc, ss, val);
+                    }
+                    else if (spl.Count() == 2)
+                    {
+                        string tmp = valProp.ToString();
+                        strs[i + n] = (tmp == spl[0]) ? getProp(oDoc, ss) : addProp(oDoc, ss, spl[1]);
+                    }
                     if (i == 1) n++;
                 }
             }
             string name = oDoc.FullFileName;
-            if (!part.Checked)
-            {
-                if (findInDgv(name)) return 0;
-            }
-            else
+//             if (!part.Checked)
+//             {
+//                 if (findInDgv(name)) return 0;
+//             }
+//             else
             {
                 if (findInDgv(name))
                 {
@@ -519,7 +571,7 @@ namespace InvAddIn
 
                 //m_BOMView.Sort("Default BOM Structure", true, "Component Type", true, "Description", true);
 
-                filePath = (System.IO.File.Exists(path + "\\" + "Properties.xml")) ? path + "\\" + "Properties.xml" : @"C:\ProgramData\Autodesk\Inventor Addins\Properties.xml";
+                filePath = (System.IO.File.Exists(path + "\\" + "Properties.xml")) ? path + "\\" + "Properties.xml" : I.p() + @"\Properties.xml";
                 initializeProp(filePath);
                 //m_AsmDoc.Close(true);
                 m_first = false;
@@ -698,17 +750,17 @@ namespace InvAddIn
 
         private void децимальныеНомераToolStripMenuItem_Click_1(object sender, EventArgs e)
         {
-            List<string> lst1 = new List<string>();
-            //lst1.Add("1"); lst1.Add("    2"); lst1.Add("        3"); lst1.Add("    4"); lst1.Add("5");
-            for (int i = 0; i < dataGridView1.RowCount - 1; i++)
-            {
-                if (!part.Checked && dec.Checked && dataGridView1[dataGridView1.Columns["DecNumber"].Index, i].Value.ToString() != "")
-                    lst1.Add(dataGridView1[0, i].Value.ToString() + ":");
-                else
-                    lst1.Add(dataGridView1[0, i].Value.ToString());
-            }
-            ftv = new FormTreeView(ref lst1);
-            ftv.Show();
+//             List<string> lst1 = new List<string>();
+//             //lst1.Add("1"); lst1.Add("    2"); lst1.Add("        3"); lst1.Add("    4"); lst1.Add("5");
+//             for (int i = 0; i < dataGridView1.RowCount - 1; i++)
+//             {
+//                 if (!part.Checked && dec.Checked && dataGridView1[dataGridView1.Columns["DecNumber"].Index, i].Value.ToString() != "")
+//                     lst1.Add(dataGridView1[0, i].Value.ToString() + ":");
+//                 else
+//                     lst1.Add(dataGridView1[0, i].Value.ToString());
+//             }
+//             ftv = new FormTreeView(ref lst1);
+//             ftv.Show();
         }
 
         public DataGridView GetDGV()
@@ -825,13 +877,9 @@ namespace InvAddIn
 
         private void Prop_FormClosing(object sender, FormClosingEventArgs e)
         {
-
-            foreach (Inventor.Document doc in objs)
-            {
-                try
-                { doc.ReleaseReference(); }
-                catch { }
-            }
+            InvAddIn.PropBtn.lastPath = null;
+            InvAddIn.PropBtn.m_Prop = null;
+            InvAddIn.PropBtn.prjPr = null;
         }
 
 
@@ -952,7 +1000,7 @@ namespace InvAddIn
         {
             if (InvAddIn.PropBtn.prjPr == null)
             {
-                string path = InvDoc.u.pathUtil(I.aDoc());
+                string path = InvDoc.u.pathUtil(I.aDoc());     
                 XMLDoc xdoc = new XMLDoc(path + "\\Pathes.xml", "row");
                 string name = ""; bool first = true; string nameforsave = "";
                 while ((name = InvDoc.u.OFD(path, filter: "Assembly files(*.iam)|*.iam|Part files(*.ipt)|*.ipt")) != "")
@@ -989,6 +1037,8 @@ namespace InvAddIn
 // //                     }
 //                 }
 //                 xdoc.save();
+                pr.lit = this.Litera.Checked;
+                pr.def = this.Default.Checked;
                 pr.backColorBlock();
                 pr.projectPr.save();
                 pr.fillProps(pr.projectPr);
@@ -1012,6 +1062,9 @@ namespace InvAddIn
         private void открытьСборкуСвойствToolStripMenuItem_Click(object sender, EventArgs e)
         {
             projectProperties pr = new projectProperties(new string[] { "Part Number", "Description" });
+            pr.setParent(this);
+            pr.lit = Litera.Checked;
+            pr.def = Default.Checked;
 //             string path = InvDoc.util.OFD(InvDoc.util.pathUtil(Macros.StandardAddInServer.m_inventorApplication.ActiveDocument), "XML files(*.xml)|*.xml");
 //             XMLDoc xdocPath = new XMLDoc(path, "row");
 //             string[] names = xdocPath.Doc.Descendants("Value").Select(el => el.Value).ToArray();
@@ -1057,9 +1110,8 @@ namespace InvAddIn
 
         private void открытьПроектToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            dataGridView1.Visible = false; dec.Visible = false; bom.Visible = false; part.Visible = false;
-            InvAddIn.PropBtn.prjPr = new projectProperties(this);
-            InvAddIn.PropBtn.prjPr.show();
+            Prop.spath = this.pathCB.Text;
+            open();
 //             Form f = (sender as ToolStripMenuItem).Owner.Parent as Form;
 //             f.TopMost = true;
 //             MyDGV mydgv = new MyDGV();
@@ -1074,39 +1126,65 @@ namespace InvAddIn
 //             this.Controls.Add(dgv);
         }
 
+        public static void open(bool add = false)
+        {
+            InvAddIn.PropBtn.m_Prop.dataGridView1.Visible = false;
+//             InvAddIn.PropBtn.m_Prop.dec.Visible = false;
+//             InvAddIn.PropBtn.m_Prop.bom.Visible = false;
+//             InvAddIn.PropBtn.m_Prop.part.Visible = false;
+//             InvAddIn.PropBtn.m_Prop.Litera.Visible = false;
+//             InvAddIn.PropBtn.m_Prop.Default.Visible = false;
+            foreach (Control item in InvAddIn.PropBtn.m_Prop.Controls)
+            {
+                if (item is CheckBox) item.Visible = false;
+                if (item is ComboBox) item.Visible = false;
+            }
+            InvAddIn.PropBtn.prjPr = new projectProperties(InvAddIn.PropBtn.m_Prop);
+            InvAddIn.PropBtn.prjPr.lit = InvAddIn.PropBtn.m_Prop.Litera.Checked;
+            InvAddIn.PropBtn.prjPr.def = InvAddIn.PropBtn.m_Prop.Default.Checked;
+            InvAddIn.PropBtn.prjPr.sort = InvAddIn.PropBtn.m_Prop.sortCB.Text;
+            InvAddIn.PropBtn.prjPr.model = InvAddIn.PropBtn.m_Prop.model.Text;
+            if (InvAddIn.PropBtn.m_Prop.decCB.Text != "") InvAddIn.PropBtn.prjPr.decNum = InvAddIn.PropBtn.m_Prop.decCB.Text;
+
+            InvAddIn.PropBtn.prjPr.show(add);
+        }
+
         private void сохранитьToolStripMenuItem1_Click(object sender, EventArgs e)
+        {
+            save();
+        }
+
+        public static void save()
         {
             projectProperties pr = InvAddIn.PropBtn.prjPr;
             IEnumerable<IGrouping<int, MyDGV.changeData>> gr = pr.mydgv.changes.GroupBy(c => c.rowInd);
             foreach (IGrouping<int, MyDGV.changeData> g in gr)
             {
                 MyDGV.changeData cd = g.ElementAt(0);
-                //if (cd.oldColor.Equals(System.Drawing.Color.Indigo)) continue;
-                //XAttribute att = cd.el.Attribute("ffn");
-                string fn = cd.oldVal[cd.oldVal.Length-1];
+                string fn = cd.oldVal[cd.oldVal.Length - 1];
                 InventorPRoperties prop = pr.properties[fn];
                 for (int i = 0; i < cd.val.Length; i++)
-			    {
+                {
                     if (cd.val[i] != null)
                     {
-                        if (prop[i] == null)
+                        try
                         {
-                            prop.add<string>(prop.names[i], "");
+                            if (prop[prop.names[i]] == null)
+                            {
+                                prop.add<string>(prop.names[i], "");
+                            }
+                            if (!prop.Doc.IsModifiable) continue;
+                            prop[prop.names[i]].Value = cd.val[i];
+                            cd.val[i] = prop[prop.names[i]].Value.ToString();
+                            pr.mydgv.Dgv[i, cd.rowInd].Style.BackColor = cd.oldColor;
                         }
-                        prop[i].Value = cd.val[i];
-                        cd.val[i] = prop[i].Value.ToString();
-                        pr.mydgv.Dgv[i, cd.rowInd].Style.BackColor = cd.oldColor;
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(ex.ToString());
+                        }
                     }
-			    }
+                }
                 prop.Doc.Save2(false);
-//                 for (int i = 0; i < cd.val.Length; i++)
-//                 {
-//                     if (cd.val[i] != null)
-//                     {
-//                         cd.val[i] = prop[i].Value.ToString();
-//                         pr.mydgv.Dgv[i, cd.rowInd].Style.BackColor = cd.oldColor;
-//                     }
-//                 } 
             }
         }
 
@@ -1161,22 +1239,25 @@ namespace InvAddIn
         {
             projectProperties pr = InvAddIn.PropBtn.prjPr;
             DataGridView dgv = pr.mydgv.Dgv;
-            string path = System.IO.Path.GetDirectoryName(pr.projectPr.Name);
-            path += "\\Документация\\";
+            string path = file.p(I.aDoc().FullDocumentName) + "Документация\\";
             XElement elem = pr.projectPr.El.FirstNode as XElement;
             string ffn; Document doc; AssemblyComponentDefinition acd;
-            
+            MyForm F = new MyForm("DocumInterface.xml", "Название");
+            F.f.ShowDialog();
+            pr.docum = F.cbs[0].Text;
+
             if (dgv.SelectedRows.Count == 0)
             {
-                foreach (var el in pr.projectPr.El.Elements())
-                {
-                    ffn = el.FirstAttribute.Value;
-                    doc = I.open(ffn);
-
-                    acd = I.getACD(doc);
-                    pr.mKart(el, acd.BOM.BOMViews[1]);
-                }
-
+//                 foreach (var el in pr.projectPr.El.Elements())
+//                 {
+//                     ffn = el.FirstAttribute.Value;
+//                     doc = I.open(ffn);
+// 
+//                     acd = I.getACD(doc);
+//                     projectProperties.mKart(el, acd.BOM.BOMViews[1]);
+//                 }
+//                 pr.createDir(path);
+//                 excelRun(pr.projectPr.El, path, elem.Attribute("PartNumber").Value);
                 pr.copyFiles(pr.projectPr, path);
             }
             else
@@ -1184,21 +1265,27 @@ namespace InvAddIn
                 XMLDoc xdoc = pr.addSelectedRow(pr.mydgv.Dgv);
                 xdoc.Name = pr.projectPr.Name;
 
-                foreach (var el in pr.projectPr.El.Elements())
-                {
-                    ffn = el.FirstAttribute.Value;
-                    doc = I.open(ffn);
-
-                    acd = I.getACD(doc);
-                    pr.mKart(el, acd.BOM.BOMViews[1]);
-                }
+//                 foreach (var el in pr.projectPr.El.Elements())
+//                 {
+//                     ffn = el.FirstAttribute.Value;
+//                     doc = I.open(ffn);
+// 
+//                     acd = I.getACD(doc);
+//                     projectProperties.mKart(el, acd.BOM.BOMViews[1]);
+//                 }
+//                 pr.createDir(path);
+//                 excelRun(pr.projectPr.El, path, elem.Attribute("PartNumber").Value);
                 pr.copyFiles(xdoc, path);
             }
-            Excel.InvExcel exc = new Excel.InvExcel();
-            string title = elem.Attribute("PartNumber").Value;
-            exc.add(pr.projectPr.El, title);
-            exc.save(path + title + ".xls");
-            exc.close();
+        }
+
+        public static void excelRun(XElement el, string path, string title)
+        {
+            Excel.InvExcel exc = new Excel.InvExcel($"{path}{title}.xlsx");
+            exc.add(el);
+            //exc.add(el, title);
+            //exc.save(path + title + ".xls");
+            //exc.close();
         }
 
         private void открытьФайлыToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1209,6 +1296,56 @@ namespace InvAddIn
             {
                 pr.open(item.Attribute("ffn").Value, true);
             }
+        }
+
+        private void дляТехнологовToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            projectProperties.techMKarts();
+        }
+
+        private void Prop_KeyUp(object sender, KeyEventArgs e)
+        {
+            if (e.Control)
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.B:
+                        openCurrent();
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        public void openCurrent()
+        {
+            InvAddIn.PropBtn.m_Prop.dataGridView1.Visible = false;
+            //             InvAddIn.PropBtn.m_Prop.dec.Visible = false;
+            //             InvAddIn.PropBtn.m_Prop.bom.Visible = false;
+            //             InvAddIn.PropBtn.m_Prop.part.Visible = false;
+            //             InvAddIn.PropBtn.m_Prop.Litera.Visible = false;
+            //             InvAddIn.PropBtn.m_Prop.Default.Visible = false;
+            foreach (Control item in InvAddIn.PropBtn.m_Prop.Controls)
+            {
+                if (item is CheckBox) item.Visible = false;
+                if (item is ComboBox) item.Visible = false;
+            }
+            InvAddIn.PropBtn.prjPr = new projectProperties(InvAddIn.PropBtn.m_Prop);
+            InvAddIn.PropBtn.prjPr.lit = InvAddIn.PropBtn.m_Prop.Litera.Checked;
+            InvAddIn.PropBtn.prjPr.def = InvAddIn.PropBtn.m_Prop.Default.Checked;
+            InvAddIn.PropBtn.prjPr.sort = InvAddIn.PropBtn.m_Prop.sortCB.Text;
+            InvAddIn.PropBtn.prjPr.model = InvAddIn.PropBtn.m_Prop.model.Text;
+            if (InvAddIn.PropBtn.m_Prop.decCB.Text != "") InvAddIn.PropBtn.prjPr.decNum = InvAddIn.PropBtn.m_Prop.decCB.Text;
+
+            var p = I.aDoc().FullDocumentName;
+
+            InvAddIn.PropBtn.prjPr.show(false, p);
+        }
+
+        private void toolStripTextBox1_Click(object sender, EventArgs e)
+        {
+
         }
 
         private void децимальныеНомераToolStripMenuItem_Click(object sender, EventArgs e)
@@ -1259,11 +1396,42 @@ namespace InvAddIn
                     row.Cells[0].Style.ForeColor = System.Drawing.Color.Red;
                 }
             }
-        }     
+        }
+
+        private void заменитьToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            MyForm F = new MyForm("ReplaceInterface.xml", "Заменить");
+            //F.bnts[0].Click += fillet_Click;
+            F.f.ShowDialog();
+            string find = "", repl = "";
+            find = F.cbs[0].Text;
+            repl = F.cbs[1].Text;
+            System.Windows.Forms.Control.ControlCollection cls = InvAddIn.PropBtn.m_Prop.Controls;
+            DataGridView dgv = cls[cls.Count-1] as DataGridView;
+            if (dgv == null) return;
+            foreach (DataGridViewCell c in dgv.SelectedCells)
+            {
+                c.Value = Regex.Replace(c.Value as string, find, repl);  
+            }
+            //this.Close();
+        }
+
+        private void маршруткиToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            projectProperties.minMKarts(decCB.Text);
+            //InvAddIn.PropBtn.prjPr = new projectProperties(InvAddIn.PropBtn.m_Prop);
+            //if (decCB.Text != "") InvAddIn.PropBtn.prjPr.decNum = decCB.Text;
+            
+            //InvAddIn.PropBtn.prjPr.model = InvAddIn.PropBtn.m_Prop.model.Text;
+            //Prop.spath = this.pathCB.Text;
+            //InvAddIn.PropBtn.prjPr.createMKarts();
+        }
     }
 
     public class projectProperties
     {
+        Prop parent = null;
+        //public static string PrPath = null;
         public MyDGV mydgv;
         public string designer;
         public int countDecNumberClick = 0;
@@ -1279,17 +1447,23 @@ namespace InvAddIn
         public Dictionary<string,InventorPRoperties> properties, mProperties;
         Dictionary<string, string> dic;
         Dictionary<int, string> dgvLink;
+        List<string> columns;
         float[] weigth;
         string[] namesProps;
         public int ffnIndex;
         Form f;
+        public bool lit = false;
+        public bool def = false;
+        public string model = "";
+        public string sort = "";
+        public string decNum = "", docum;
         InterfaceDll.MyDGV.DataGridViewRowsReorderBehavior behavior;
         XElement node = null;
         System.Drawing.Rectangle bnds;
         System.Drawing.Point pt;
         public projectProperties(Form form)
         {
-            mydgv = new MyDGV();
+            mydgv = new MyDGV();  
             f = form;
             docs = I.app.Documents;
             nvm = I.objs.CreateNameValueMap();
@@ -1300,9 +1474,17 @@ namespace InvAddIn
             pt = new System.Drawing.Point(bnds.Left, ms.Bounds.Bottom);
             doc = I.aDoc();
             path = System.IO.Path.GetDirectoryName(doc.FullFileName);
-            filePath = (System.IO.File.Exists(path + "\\" + "Properties.xml")) ? path + "\\" + "Properties.xml" : @"C:\ProgramData\Autodesk\Inventor Addins\Properties.xml";
+            filePath = (System.IO.File.Exists(path + "\\" + "Properties.xml")) ? path + "\\" + "Properties.xml" : I.p() + @"\Properties.xml";
             propNames = new XMLDoc(filePath, "head");
+            string w = XMLDoc.getXAttributeValue(propNames.El.Element("Properties"), "width");
+            if (w != null)
+            bnds.Width = (int)(u.convToDouble(w)/100*bnds.Width);
             fillDic();
+        }
+
+        public void setParent(Prop p)
+        {
+            parent = p;
         }
 
         void Dgv_RowsRemoved(object sender, DataGridViewRowsRemovedEventArgs e)
@@ -1339,7 +1521,7 @@ namespace InvAddIn
         public projectProperties(string[] props)
         {
             path = InvDoc.u.OFD(file.p(I.aDoc().FullDocumentName), "XML files(*.xml)|*.xml");
-            projectPr = new XMLDoc(path, "row");
+            projectPr = new XMLDoc(path, "row");                         
             properties = new Dictionary<string, InventorPRoperties>();
             namesProps = props;
             if (!projectPr.El.HasAttributes) addStructure(projectPr);
@@ -1357,6 +1539,10 @@ namespace InvAddIn
                 xdoc.Name = path + n;
                 xdoc.El.SetAttributeValue("Path", "");
                 xdoc.El.SetAttributeValue("Docum", "");
+                if (docum != null)
+                {
+                    xdoc.El.SetAttributeValue("Docum", docum);
+                }
                 xdoc.save();
                 xdoc.Name = oldPath;
             }
@@ -1455,7 +1641,8 @@ namespace InvAddIn
                 if (n.Attribute("ffn") == null) n.Add(new XAttribute("ffn", doc.FullFileName));
                 //addPropToXML(pr, n);
                 //xdoc.El.Add(n);
-                addSortProp(props, doc, n, xdoc);
+                MyXML exc = new MyXML("Except.xml");
+                addSortProp(props, doc, n, xdoc, exc.elem.Element("Exceptions"));
             }
         }
         public void addPropToXML(InventorPRoperties pr, XElement n)
@@ -1472,7 +1659,7 @@ namespace InvAddIn
                 //n.Add(new XAttribute(name, val));
             }
         }
-        public void addToMKart(Document doc, XElement el, BOMView bView)
+        public static void addToMKart(Document doc, XElement el, BOMView bView)
         {
             SheetMetalComponentDefinition smcd = I.getSMCD(doc);
             if (smcd != null)
@@ -1483,7 +1670,8 @@ namespace InvAddIn
                 el.SetAttributeValue("l", Math.Round(fp.Length*10, 1));
                 el.SetAttributeValue("t", Math.Round((double)smcd.Thickness.Value * 10, 1));
             }
-            BOMRow row = ut.get<BOMRow>(bView.BOMRows, f => f.ReferencedFileDescriptor.FullFileName == doc.FullDocumentName);
+            BOMRow row = null;
+            row = ut.get<BOMRow>(bView.BOMRows, f => f.ReferencedFileDescriptor != null && f.ReferencedFileDescriptor.FullFileName == doc.FullDocumentName);
             if (row == null) return;
             el.SetAttributeValue("Count", row.TotalQuantity);
         }
@@ -1553,7 +1741,7 @@ namespace InvAddIn
             return System.IO.File.Exists(path);
         }
 
-        public void mKart(XElement el, BOMView bView = null)
+        public static XElement mKart(XElement el, BOMView bView = null)
         {
             if (el.Attribute("ffn") != null && el.Attribute("ffn").Value != "")
             {
@@ -1564,7 +1752,6 @@ namespace InvAddIn
                     //doc = I.open(item.Attribute("ffn").Value);
                     if (item.HasElements) 
                     {
-
                         AssemblyComponentDefinition acd = I.getACD(I.open(item.Attribute("ffn").Value)); BOMView view = acd.BOM.BOMViews[1];
                         mKart(item, view);
                     }
@@ -1572,15 +1759,21 @@ namespace InvAddIn
                 }
                 addToMKart(doc, el, bView);
             }
+            return el;
         }
 
         public void copyFiles(XMLDoc xdoc, string path)
         {
-
+            bool final = false;
             string pathPDF = path + "PDF\\",
-                pathDXF = path + "DXF\\";
+                pathDXF = path + "DXF\\",
+                pathFinal = "Не менять\\";
             createDir(path);
             createDir(pathPDF); createDir(pathDXF);
+            file.removeFiles(pathPDF, ".xml");
+            file.removeFiles(pathPDF, ".");
+            file.removeFiles(pathDXF, ".");
+            //if (System.IO.Directory.Exists(pathDXF + pathFinal)) final = true;
             foreach (var el in xdoc.El.Descendants("row"))
             {
                 string[] data = XMLDoc.getXAttributesValues(el, new string[] { "Литера1", "Литера2", "PartNumber", "CreationTime", "RevisionNumber", "ffn", "Vendor" });
@@ -1595,6 +1788,7 @@ namespace InvAddIn
                 namePDF += ".pdf";
                 namePDF = namePDF.TrimStart(new char[] { '_' });
                 if ((data[6] ?? "") != "") namePDF = data[6];
+                //string namePDF = pdf.getNameIzv(I.open(data[5]), data[3] ?? "");
                 el.SetAttributeValue("PDF", namePDF);
                 //u.regex(ref data[5], @"\^\d\d", "");
                 bool fPDF = copy(System.IO.Path.GetDirectoryName(data[5]) + "\\PDF\\", namePDF, pathPDF), fDXF;
@@ -1606,7 +1800,10 @@ namespace InvAddIn
                 if (nameDXF.IndexOf(" ") != -1) nameDXF = nameDXF.Remove(nameDXF.IndexOf(" "));
                 if (nameDXF.ToUpper().EndsWith(".dxf".ToUpper())) 
                 {
-                    fDXF = copy(System.IO.Path.GetDirectoryName(data[5]) + "\\DXF\\", nameDXF, pathDXF);
+                    fDXF = copy(System.IO.Path.GetDirectoryName(data[5]) + "\\DXF\\", nameDXF, pathDXF, pathFinal);
+//                     if (final) 
+//                         if (copy(System.IO.Path.GetDirectoryName(data[5]) + "\\" + pathFinal, nameDXF, pathDXF) && !fDXF) 
+//                             fDXF = false;
                     if (!fDXF) mydgv.setColors("ffn", data[5], System.Drawing.Color.Blue, false);
                     else if (!(fDXF && fPDF)) mydgv.setColors("ffn", data[5], System.Drawing.Color.Violet, false);
                 }
@@ -1620,8 +1817,9 @@ namespace InvAddIn
                 if (fi.LastWriteTimeUtc == fi.CreationTimeUtc) addCont(pathPDF, xdoc, nCont);
             }
         }
-        public void addSortProp(string[] props, Document doc, XElement el, XMLDoc xml)
+        public void addSortProp(string[] props, Document doc, XElement el, XMLDoc xml, XElement exc)
         {
+
             foreach (Document item in doc.ReferencedDocuments)
             {
                 string pn = item.PropertySets[3][2].Value.ToString().Trim();
@@ -1631,6 +1829,7 @@ namespace InvAddIn
                     if (cd.SurfaceBodies.Count == 0)
                         continue;
                 }
+                if (except(exc, item))
                 if (pn == "") continue;
                 pr = new InventorPRoperties(item, props);
                 XElement row = new XElement("row");
@@ -1642,32 +1841,174 @@ namespace InvAddIn
                 {
                     properties.Add(item.FullFileName, pr);
                     if (item.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject && item.ReferencedDocuments.Count != 0)
-                        addSortProp(props, item, row, xml);
+                        addSortProp(props, item, row, xml, exc);
                     el.Add(row);
                 }
             }
         }
-        public void show()
+        public static bool except(XElement el, Document doc)
         {
-            path = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt");
+            string fn = doc.FullDocumentName;
+            foreach (var item in el.Elements())
+            {
+                if (fn.IndexOf(item.Value) != -1)
+                    return false; 
+            }
+            return true;
+        }
+        public static XMLDoc addPatches(XMLDoc projectPr, string path, bool add)
+        {
+            if (add && InvAddIn.PropBtn.lastPath != null) path = InvAddIn.PropBtn.lastPath + "|" + path;
+            InvAddIn.PropBtn.lastPath = path;
+            var pathes = u.getSpl(path, '|');
             if (path.EndsWith(".iam") || path.EndsWith(".ipt"))
             {
                 string path1 = InvDoc.u.pathUtil(I.aDoc());
                 projectPr = new XMLDoc(path1 + "\\Pathes.xml", "row");
                 //string name = ""; bool first = true; string nameforsave = "";
-                projectPr.Doc.Root.Add(new XElement("row", new XAttribute("ffn", path)));
+                foreach (var item in pathes)
+                {
+                    projectPr.Doc.Root.Add(new XElement("row", new XAttribute("ffn", item)));
+                }
             }
             else
-            projectPr = new XMLDoc(path, "row");
+                projectPr = new XMLDoc(path, "row");
+            return projectPr;
+        }
+        public class compare : IComparer<string>
+        {
+            string[] s1, s2;
+            string model = "";
+            string dn = null;
+            string f = "", n = "", l = "00", val = "";
+            public compare(string str, string model)
+            {
+                if (str != "")
+                {
+                    var spl = str.Split('|');
+                    if (spl.Length != 2) return;
+                    s1 = spl[0].Split(';'); s2 = spl[1].Split(';');
+                    this.model = model;
+                    dn = getReg();
+                }
+            }
+            public int Compare(string x, string y)
+            {
+                string vx = get(x), vy = get(y);
+                return String.Compare(vx, vy);
+            }
+            public string get(string v)
+            {
+                string fn = file.name(v);
+                if (dn == null) return "";
+                Regex r = new Regex(dn);
+                Match m = r.Match(fn);
+                if (m.Groups.Count == 4)
+                {
+                    f = m.Groups[2].Value;
+                    n = m.Groups[3].Value;
+                }
+                r = new Regex(@"\^(\d*)");
+                m = r.Match(fn);
+                if (m.Groups.Count == 2)
+                {
+                    l = m.Groups[1].Value;
+                }
+                else l = "00";
+                val = sort(f, s1) + sort(n, s2) + l;
+                return val;
+            }
+            string sort(string v, string[] spl)
+            {
+                v = conv(v);
+                for (int i = 0; i < spl.Length; i++)
+                {
+                    if (spl[i] == v) return i.ToString(); 
+                }
+                return "";
+            }
+            public string getReg()
+            {
+                if (model == "3") return @".*(\d)\d\d(\d)(\D).*";
+                else if (model == "4") return @".*(\d)\d(\d)\d(\D).*";
+                return null;
+            }
+            public string conv(string v)
+            {
+                return v.ToUpper().Replace("Е", "E").Replace("А", "A");
+            }
+        }
+        public List<string> clear(List<string> lst, string v, string model)
+        {
+            if (v == null || v == "") return lst;
+            if (v.IndexOf('|') == -1) return lst;
+            var spl1 = v.Split('|');
+            if (spl1[0] == null) return lst;
+            var spl2 = spl1[0].Split(';');
+            string pat = null;
+            if (model == "3") pat = @".*\D\d\d\d(\d)\D.*";
+            else if (model == "4") pat = @".*\D\d\d(\d)\d\D.*";
+            Regex reg = new Regex(pat);
+            List<string> ret = new List<string>();
+            foreach (var item in lst)
+            {
+                Match m = reg.Match(item);
+                if (m.Groups.Count != 2) continue;
+                if (spl2.Contains(m.Groups[1].Value)) ret.Add(item);
+            }
+            return ret;
+        }
+        public void show(bool add, string pathO = "")
+        {
+            //string pathO = "";
+            var fn = doc.FullDocumentName;
+            if (pathO != "")
+            {
+
+            }
+            else
+            {
+                if (sort == "" && decNum == "")
+                    pathO = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt", true, fn);
+                else
+                {
+                    MyXML exc = new MyXML("PathFilter.xml");
+                    exc.elem.Element("Filter").Add(new XElement("Value", ".ipt"));
+                    exc.elem.Element("Filter").Add(new XElement("Value", ".xls"));
+                    exc.remove("Value", "^");
+                    //MessageBox.Show("путь: " + prPath + "\n" + decNum);
+                    // return;
+                    var spl = file.getFiles(Prop.spath, decNum, exc.elem.Element("Filter"));
+                    if (sort != "" && model != "") spl.Sort(new compare(sort, model));
+                    spl = clear(spl, sort, model);
+                    pathO = file.join(spl);
+                }
+            }
+            path = pathO;
+            projectPr = addPatches(projectPr, path, add);
             if (!projectPr.El.HasAttributes) addStructure(projectPr);
             else loadStructure(projectPr);
-            fillProps(projectPr);
+            fillProps(projectPr);   
+            if (f.Controls[f.Controls.Count - 1] is DataGridView)
+            {
+//                 DataGridView tmp = f.Controls[f.Controls.Count - 1] as DataGridView;
+//                 tmp.Rows.Clear();
+//                 tmp.Update();
+                f.Controls.RemoveAt(f.Controls.Count - 1);
+            }
+            if (def)
+            {
+                changeProps();
+            }
             mydgv.addDGV(pt, bnds.Width, bnds.Height - 50, projectPr.El, dic, weigth);
-            f.Controls.Add(mydgv.Dgv);
+            //if (!(f.Controls[f.Controls.Count - 1] is DataGridView))
+                f.Controls.Add(mydgv.Dgv);
+            mydgv.xmlEv -= mydgv_xmlEv;
             mydgv.xmlEv += mydgv_xmlEv;
+            mydgv.removeEvents();
             mydgv.addEvents();
             ffnIndex = mydgv.Dgv.Columns.OfType<DataGridViewColumn>().FirstOrDefault(c => c.Name.StartsWith("ffn")).Index;
-            filePath = (System.IO.File.Exists(path + "\\" + "dgv.xml")) ? path + "\\" + "Properties.xml" : @"C:\ProgramData\Autodesk\Inventor Addins\dgv.xml";
+            filePath = (System.IO.File.Exists(path + "\\" + "dgv.xml")) ? path + "\\" + "Properties.xml" : I.p() + @"\dgv.xml";
             XMLDoc xmd = new XMLDoc(filePath,"head");
             MyToolStripMenuItem tsmi = new MyToolStripMenuItem("Меню");
             tsmi.add(xmd.El, null);
@@ -1682,15 +2023,406 @@ namespace InvAddIn
             {
                 item.Selected = false;
             }
-            mydgv.Dgv.Columns[mydgv.Dgv.ColumnCount-1].Visible = false;
+            mydgv.Dgv.Columns[mydgv.Dgv.ColumnCount - 1].Visible = false;
             mydgv.setColors("Part Number");
-            mydgv.setColors("Designer", designer, System.Drawing.Color.Silver, true);
-            mydgv.setColorsInv("Литера1", "А");
+            if (!lit)
+            {
+                mydgv.setColors("Designer", designer, System.Drawing.Color.Silver, true);
+                mydgv.setColors("Vendor", "", System.Drawing.Color.Silver, true);
+                mydgv.setColorsInv("Литера1", "А");
+            }
             backColorBlock();
+            mydgv.keyEv -= mydgv_keyEv;
+            mydgv.keyEv += mydgv_keyEv;
+            if (columns != null)
+                mydgv.setColors(columns, System.Drawing.Color.LightGray);
             //behavior = new MyDGV.DataGridViewRowsReorderBehavior(mydgv.Dgv);
             //mydgv.Dgv.CellValueChanged -= mydgv.changeCell;
             //mydgv.Dgv.RowsAdded += Dgv_RowsAdded;
             //mydgv.Dgv.RowsRemoved += Dgv_RowsRemoved;
+        }
+
+        void changeProps()
+        {
+            columns = new List<string>();
+            XElement el = XMLDoc.getXElement(propNames.El, "Properties");
+            foreach (var item in el.Elements())
+            {
+                string fn = XMLDoc.getAttributeValue(item, "name");
+                string v = XMLDoc.getAttributeValue(item, "value");
+                if (v == null) continue;
+                if (v == "сегодня") 
+                    v = System.DateTime.Now.ToString("dd.MM.yyyy");
+                columns.Add(fn);
+                if (fn.IndexOf(" ") != -1)
+                    fn = fn.Replace(" ", "");
+                foreach (var e in projectPr.El.Descendants())
+                {
+                    if (v.IndexOf(":") == -1)
+                    XMLDoc.attr(e, fn, v);
+                    else
+                    {
+                        var spl = v.Split(':');
+                        var str = XMLDoc.getAttributeValue(e, fn);
+                        str = str == spl[0] ? spl[1] : str;
+                        XMLDoc.attr(e, fn, str);
+                    }
+                }
+            }
+        }
+
+        public static string[] getPathes(string name)
+        {
+            List<string> p = new List<string>();
+            MyXML xml = new MyXML(name);
+            foreach (var el in xml.elem.Elements())
+            {
+                var val = MyXML.getAtt(el, "ffn");
+                p.Add(val);
+            }
+            return p.ToArray();
+        }
+
+        public static void minMKarts(string decNum = "")
+        {
+            int i = 1;
+            XElement bel = null;
+            string p = file.p(I.aDoc().FullDocumentName) + "Документация\\Маршрутки\\";
+            file.dir(p);
+            string pathO = "";
+            if (decNum == "")
+                pathO = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt", true);
+            else
+            {
+                //string prPath = I.app.DesignProjectManager.ActiveDesignProject.WorkspacePath;
+                MyXML exc = new MyXML("PathFilter.xml");
+                exc.elem.Element("Filter").Add(new XElement("Value", ".ipt"));
+                var spl = file.getFiles(Prop.spath, decNum, exc.elem.Element("Filter"));
+                pathO = file.join(spl);
+            }
+            var pathes = u.getSpl(pathO, '|');
+            if (pathes.Length == 1)
+            {
+                var n = pathes[0];
+                if (n.EndsWith(".xml"))
+                {
+                    pathes = getPathes(n);
+                }
+            }
+            AssemblyComponentDefinition acd = null;
+            Dictionary<string, string> props = new Dictionary<string, string>()
+            {
+                {"PartNumber", "Part Number" }, {"Description", "Description"}, {"RevisionNumber", "Revision Number"}
+            };
+            
+            foreach (var path in pathes)
+            {
+                XElement el = new XElement("MKart");
+                AssemblyDocument adoc = I.open(path, drw: false) as AssemblyDocument;
+                acd = adoc.ComponentDefinition;
+                var bom = acd.BOM;
+                bom.PartsOnlyViewEnabled = true;
+                //foreach (BOMView item in bom.BOMViews)
+                //{
+                //    var te = item;
+                //}
+                var view = bom.BOMViews[3];
+                minMKart(view, props, el);
+                Excel.InvExcel exc = new Excel.InvExcel($"{p}{file.name(path)}.xlsx");
+                exc.add(el);
+            }
+        }
+
+        public static void techMKarts(string decNum = "")
+        {
+            int i = 1;
+            XElement bel = null;
+            string p = file.p(I.aDoc().FullDocumentName) + "Документация\\Данные\\";
+            file.dir(p);
+            string pathO = "";
+            if (decNum == "")
+                pathO = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt", true);
+            else
+            {
+                //string prPath = I.app.DesignProjectManager.ActiveDesignProject.WorkspacePath;
+                MyXML exc = new MyXML("PathFilter.xml");
+                exc.elem.Element("Filter").Add(new XElement("Value", ".ipt"));
+                var spl = file.getFiles(Prop.spath, decNum, exc.elem.Element("Filter"));
+                pathO = file.join(spl);
+            }
+            var pathes = u.getSpl(pathO, '|');
+            AssemblyComponentDefinition acd = null;
+            Dictionary<string, string> props = new Dictionary<string, string>()
+            {
+                 {"RevisionNumber", "Revision Number"}
+            };
+
+            foreach (var path in pathes)
+            {
+                XElement el = new XElement("MKart");
+                AssemblyDocument adoc = I.open(path, drw: false) as AssemblyDocument;
+                acd = adoc.ComponentDefinition;
+                var bom = acd.BOM;
+                bom.PartsOnlyViewEnabled = true;
+                //foreach (BOMView item in bom.BOMViews)
+                //{
+                //    var te = item;
+                //}
+                var view = bom.BOMViews[3];
+                techKart(view, props, el);
+                Excel.InvExcel exc = new Excel.InvExcel($"{p}{file.name(path)}.xlsx");
+                exc.addTech(el);
+            }
+        }
+
+        public static void minMKart(BOMView view, Dictionary<string, string> props, XElement par)
+        {
+            foreach (BOMRow r in view.BOMRows)
+            {
+                PartComponentDefinition def = r.ComponentDefinitions[1] as PartComponentDefinition;
+                if (def == null) continue;
+                var dics = u.getProps((Document)def.Document, props);
+                if (dics.Count != 3) continue;
+                var el = MyXML.addXElement("row", dics);
+                SheetMetalComponentDefinition smcd = def as SheetMetalComponentDefinition;
+                if (smcd != null)
+                {
+                    FlatPattern fp = smcd.FlatPattern;
+                    if (fp == null)
+                    {
+                        MessageBox.Show($"Нет развертки на деталь: {((Document)smcd.Document).FullDocumentName}");
+                        return;
+                    }
+                    el.SetAttributeValue("w", Math.Round(fp.Width * 10, 1));
+                    el.SetAttributeValue("l", Math.Round(fp.Length * 10, 1));
+                    el.SetAttributeValue("t", Math.Round((double)smcd.Thickness.Value * 10, 1));
+                }
+                el.SetAttributeValue("Count", r.ItemQuantity);
+                par.Add(el);
+            }
+        }
+
+        public static void techKart(BOMView view, Dictionary<string, string> props, XElement par)
+        {
+            foreach (BOMRow r in view.BOMRows)
+            {
+                PartComponentDefinition def = r.ComponentDefinitions[1] as PartComponentDefinition;
+                if (def == null) continue;
+                var dics = u.getProps((Document)def.Document, props);
+                if (dics.Count != 1) continue;
+                var el = MyXML.addXElement("row", dics);
+                SheetMetalComponentDefinition smcd = def as SheetMetalComponentDefinition;
+
+                if (smcd != null)
+                {
+                    FlatPattern fp = smcd.FlatPattern;
+                    if (fp == null) return;
+                    var st = smcd.ActiveSheetMetalStyle;
+                    var mat = st.Material;
+                    SheetMetalFeatures smf = smcd.Features as SheetMetalFeatures;
+                    el.SetAttributeValue("mass", Math.Round(smcd.MassProperties.Mass, 2));
+                    el.SetAttributeValue("area", Math.Round(fp.TopFace.Evaluator.Area*2, 2));
+                    el.SetAttributeValue("w", Math.Round(fp.Width * 10, 1));
+                    el.SetAttributeValue("l", Math.Round(fp.Length * 10, 1));
+                    el.SetAttributeValue("t", Math.Round((double)smcd.Thickness.Value * 10, 1));
+                    el.SetAttributeValue("density", Math.Round(mat.Density, 3));
+                    el.SetAttributeValue("name", file.name(((Document)smcd.Document).FullDocumentName));
+                    
+                    var cf = u.get<CutFeature>(smf.CutFeatures, f => f.Name.ToLower() == "mark");
+                    if (cf != null)
+                    {
+                        var count = cf.Definition.Profile.Count / 2;
+                        el.SetAttributeValue("bend", count);
+                    }
+                    else
+                    {
+                        el.SetAttributeValue("bend", smcd.Bends.Count);
+                    }
+                }
+                el.SetAttributeValue("Count", r.ItemQuantity);
+                par.Add(el);
+            }
+        }
+
+        public void createMKarts()
+        {
+            int i = 1;
+            XElement vars = null, bel = null;
+            string p = file.p(I.aDoc().FullDocumentName) + "Документация\\Маршрутки\\";
+            createDir(p);
+            string pathO = "";
+            if (decNum == "")
+            pathO = InvDoc.u.OFD(InvDoc.u.pathUtil(I.aDoc()), "files(*.xml)|*.xml;*.iam|Inventor Part(*.ipt)|*.ipt", true);
+            else
+            {
+                //string prPath = I.app.DesignProjectManager.ActiveDesignProject.WorkspacePath;
+                MyXML exc = new MyXML("PathFilter.xml");
+                exc.elem.Element("Filter").Add(new XElement("Value", ".ipt"));
+                var spl = file.getFiles(Prop.spath, decNum, exc.elem.Element("Filter"));
+                pathO = file.join(spl);
+            }
+            var pathes = u.getSpl(pathO, '|');
+            AssemblyComponentDefinition acd = null;
+            properties.Clear();
+            foreach (var path in pathes)
+            {
+                string lPath = "";
+                if (path.ToLower().IndexOf("e") != 1 || path.ToLower().IndexOf("е") != -1)
+                {
+                    var names = TableInv.getAsms(path);
+                    lPath = file.join(names);
+                }
+                if (lPath == "") lPath = path;
+                projectPr = addPatches(projectPr, lPath, false);
+                if (!projectPr.El.HasAttributes) addStructure(projectPr);
+                else loadStructure(projectPr);
+                fillProps(projectPr);
+                string type = "", dn = @".*(\d)\d\d(\d).*\.(\d*)\.(\d*)";
+                if (model != "")
+                {
+                    switch (model)
+                    {
+                        case "3":
+                            dn = @".*(\d)\d(\d)\d.*\.(\d*)\.(\d*)";
+                            break;
+                        case "4":
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                XElement elem = projectPr.El.FirstNode as XElement;
+                XElement elo = null;
+                foreach (var el in projectPr.El.Elements())
+                {
+                    string ffn = el.FirstAttribute.Value;
+                    doc = I.open(ffn);
+                    acd = I.getACD(doc);
+                    string pn = u.getPropValue(doc, "Part Number");
+                    if (pn != "")
+                    {
+                        Regex reg = new Regex(dn);
+                        Match m = reg.Match(pn);
+                        if (m.Groups.Count == 5)
+                        {
+                            type = m.Groups[1].Value + m.Groups[2].Value;
+                        }
+                    }
+                    if (elo == null)
+                    {
+                        bel = new XElement("row");
+                        elo = projectProperties.mKart(el, acd.BOM.BOMViews[1]);
+                    }
+                    else
+                    {
+                        var mk = projectProperties.mKart(el, acd.BOM.BOMViews[1]);
+                        if (vars == null) vars = MyXML.addXElement("row", new Dictionary<string, string>() { { "Description", "Исполнения: "} });
+                        if (mk != null)
+                        {
+                            XElement xl = MyXML.addXElement("row", new Dictionary<string, string>() { { "Description", "Исполнение " + i.ToString("00") } });
+                            xl.Add(mk);
+                            vars.Add(xl);
+                            vars.Add(new XElement("row"));
+                            i++;
+                        }
+                    }
+                }
+                if (elo == null) continue;
+                sortXML(elo, type, dn, model);
+                if (vars != null) 
+                {
+                    bel.Add(elo); bel.Add(vars);
+                    elo = bel;
+                }
+                changeCountXML(elo);
+                Prop.excelRun(elo, p, elem.Attribute("PartNumber").Value);
+                projectPr = new XMLDoc(path, "row");
+                properties.Clear();
+            }
+        }
+
+        public void changeCountXML(XElement el)
+        {
+            foreach (var item in el.Elements())
+            {
+                if (item.HasElements) changeCountXML(item);
+                string v = MyXML.getAtt(item, "Count"), p = MyXML.getAtt(el, "Count");
+                if (p != "" && v != "" && p != v)
+                {
+                    int i = int.Parse(p) * int.Parse(v);
+                    MyXML.changeAtt(item, "Count", i.ToString());
+                } 
+            }
+        }
+
+        public void sortXML(XElement el, string type, string dn, string model)
+        {
+            string bpath = "";
+            if (model == "")
+            {
+                bpath = MyXML.getAtt(el, "ffn");
+            }
+            MyXML.forElems(el, "row", a => addSort(a, type, dn, bpath));
+            XMLDoc.sortRec(el, "sort", "decNum");
+        }
+
+        public void addSort(XElement el, string type, string reg, string bpath)
+        {
+
+            var pn = MyXML.getAtt(el, "PartNumber");
+            string s = "5";
+            string decNum = "", t = "";
+            if (pn == "") s = "9";
+            else if (bpath != "")
+            {
+                string p = file.p(bpath), ffn = MyXML.getAtt(el, "ffn");
+                bool flag = ffn.StartsWith(p);
+                Regex re = new Regex(@"\.(\d\d)(\.)(\d\d\d)");
+                Match match = re.Match(pn);
+                if (match.Groups.Count == 4)
+                {
+                    decNum = match.Groups[1].Value + match.Groups[3].Value;
+                    if (decNum[4] != '0' && flag) s = "6";
+                    else if (decNum[4] == '0' && !flag) s = "7";
+                    else if (decNum[4] != '0' && !flag) s = "8";
+                }
+            }
+            else
+            {
+                Regex r = new Regex(reg);
+                Match m = r.Match(pn);
+                if (m.Groups.Count == 5)
+                {
+                    t = m.Groups[1].Value + m.Groups[2].Value;
+                    if (t == type) s = "0";
+                    decNum = m.Groups[3].Value + m.Groups[4].Value;
+                    if (decNum[0] == '0' && decNum[4] != '0' && type == t)
+                        s = "6";
+                }
+            }
+            MyXML.addAtt(el, "sort", s);
+            MyXML.addAtt(el, "decNum", decNum);
+        }
+
+        void mydgv_keyEv(object sender, myKeyEventArgs e)
+        {
+            switch (e.Vals[0])
+            {
+                case "save":
+                    Prop.save();
+                    break;
+                case "close":
+                    f.Close();
+                    break;
+                case "open":
+                    Prop.open();
+                    break;
+                case "add":
+                    Prop.open(true);
+                    break;
+                default:
+                    break;
+            }
         }
 
         void mydgv_xmlEv(object sender, xmlEventArgs e)
@@ -1700,10 +2432,15 @@ namespace InvAddIn
                 projectPr.delete("ffn", e.Vals[1]);
             }
         }
+        public bool copy(string inputPath, string name, string outputPath, string addPath)
+        {
+            if (copy(inputPath + addPath, name, outputPath)) return true;
+            else return copy(inputPath, name, outputPath);
+        }
 
         public bool copy(string inputPath, string name, string outputPath)
-        {
-            string fn = System.IO.Path.Combine(inputPath, name),
+        { 
+            string fn = System.IO.Path.Combine(inputPath, name), 
                 fon = System.IO.Path.Combine(outputPath, name);
             if (!System.IO.File.Exists(fn)) return false;
             System.IO.File.Copy(fn, fon, true);
@@ -1734,6 +2471,7 @@ namespace InvAddIn
         internal class PropBtn : Button
         {
             public static Prop m_Prop;
+            public static string lastPath;
             public static projectProperties prjPr;
             public Inventor.Document pDoc { get; set; }
             public static Prop getProp
@@ -1755,6 +2493,7 @@ namespace InvAddIn
             {
                 Macros.StandardAddInServer.forms.Add(m_Prop);
                 if (Macros.StandardAddInServer.activeteForm()) System.Windows.Forms.Application.Run(m_Prop = new InvAddIn.Prop(InventorApplication.ActiveDocument));
+               
             }
 
             #endregion

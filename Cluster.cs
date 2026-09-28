@@ -15,15 +15,18 @@ namespace InvAddIn
     {
         double h = 0, w = 0;
         SketchLine slh, slw;
-        Point2d insPt; bool one = true;
+        Point2d insPt; 
+        //bool one = true;
         //double offsetX = 0, offsetY = 0;
-        double x, y;
+        //double x, y;
         int countX = 0, countY = 0;
         new MyXML xml; new PlanarSketch ps;
         PlanarSketch psOut;
         new PartDocument doc;
         PartComponentDefinition compDef;
         List<ClusterData> data = new List<ClusterData>();
+        public bool full = false;
+        CutFeature ob = null;
         public Cluster()
             : base(entTypes.Sketch)
         {
@@ -39,6 +42,7 @@ namespace InvAddIn
             xml.getInt("countX", ref ClusterData.countX); xml.getInt("countY", ref ClusterData.countY);
             xml.getDouble("D", ref ClusterData.D, ClusterData.tol); xml.getDouble("dx", ref ClusterData.dx, ClusterData.tol);
             xml.getDouble("dy", ref ClusterData.dy, ClusterData.tol);  xml.getInt("rotate", ref ClusterData.rotate);
+            if (xml.getAtt("full") != "") full = true;
             foreach (var item in xml.elem.Elements())
             {
                 data.Add(new ClusterData(new MyXML(item))); 
@@ -50,7 +54,9 @@ namespace InvAddIn
 //             }
             doc = I.aDoc() as PartDocument;
             compDef = doc.ComponentDefinition;
-            ps = compDef.Sketches[compDef.Sketches.Count];
+            var ss = I.getSS();
+            if (ss.Count == 1 && ss[1] is PlanarSketch) ps = ss[1] as PlanarSketch;
+            else ps = compDef.Sketches[compDef.Sketches.Count];
             if (ps.Consumed) return;
             psOut = compDef.Sketches.Add(ps.PlanarEntity);
             psOut.OriginPoint = ps.OriginPoint;
@@ -148,39 +154,52 @@ namespace InvAddIn
                 }
                 CreateComponent.hole(compDef, (ClusterData.D*ClusterData.tol).ToString(), psOut);
             }
-            else if (data.Count == 2)
+            else if (data.Count == 2 || data.Count == 1)
             {
+
                 x /= -2; y /= -2;
                 setCount(countX * ClusterData.countX);
                 if (ClusterData.dir.X != 0)
                 {
-                    draw(data, new List<int> { 0, 1});
+                    draw(data, new List<int> { 0,1});
                 }
                 else
                 {
                     setCount(countY * ClusterData.countY);
-                    draw(data, new List<int> { 0, 1});
+                    draw(data, new List<int> { 0,1});
                 }
 
-                if (ClusterData.dir.X != 0)
+                //double maxy = y *-1 - y, maxx = x *-1 - x;
+                if (!this.full)
                 {
-                    y = y * -1 - ClusterData.starty;
-                    draw(data, new List<int> { 0, 1});
+                    //draw(data, new List<int> { 1 });
+                    if (ClusterData.dir.X != 0)
+                    {
+                        y = y * -1 - ClusterData.starty;
+                        draw(data, new List<int> { 0, 1 });
+                    }
+                    else
+                    {
+                        setCount(countY * ClusterData.countY);
+                        x = x * -1 - ClusterData.startx;
+                        draw(data, new List<int> { 0, 1 });
+                    }
+
                 }
-                else
-                {
-                    setCount(countY * ClusterData.countY);
-                    x = x * -1 - ClusterData.startx;
-                    draw(data, new List<int> { 0, 1 });
-                }
-                Dictionary<string, double> dic = new Dictionary<string, double>() { { "a", ClusterData.l*ClusterData.tol }, { "ширина", ClusterData.D*ClusterData.tol } };
+                //Dictionary<string, double> dic = new Dictionary<string, double>() { { "a", ClusterData.l*ClusterData.tol }, { "ширина", ClusterData.D*ClusterData.tol } };
                 //I.createPunch("Punches\\Овал.ide", psOut, dic, 0);
-
-                foreach (SketchPoint item in psOut.SketchPoints)
+                if (data[0].name == "Slot")
                 {
-                    I.createSlot(item.Geometry, psOut, I.CV2d(0, 1), (ClusterData.l - ClusterData.D)/2, ClusterData.D);
+                    foreach (SketchPoint item in psOut.SketchPoints)
+                    {
+                        I.createSlot(item.Geometry, psOut, I.CV2d(0, 1), (ClusterData.l - ClusterData.D) / 2, ClusterData.D);
+                    }
+                    ob = I.createCut(psOut);
                 }
-                I.createCut(psOut);
+                else if (data[0].name == "Flower")
+                {
+                    CreateComponent.hole(compDef, (ClusterData.D * ClusterData.tol).ToString(), psOut);
+                }
             }
         }
 
@@ -188,7 +207,7 @@ namespace InvAddIn
         {
             for (int i = 0; i < lst.Count; i++)
             {
-                if (filter.Contains(i)) add(lst[i], x*xsing, y*ysing); 
+                if (filter.Contains(i)/*true*/) add(lst[i], x*xsing, y*ysing); 
             }
         }
 
@@ -196,19 +215,56 @@ namespace InvAddIn
         {
             string fn = I.aDoc().FullFileName;
             fn = fn.Replace(".ipt", "(Кластер).txt");
+            int cx = (countX * ClusterData.countX) * data.Count;
+            int cy = (countY * ClusterData.countY) * data.Count;
+            if (data.Count == 2) cy = countY * ClusterData.countY;
+            double a = 0;
+            xml.getDouble("area", ref a, 1);
             using (System.IO.StreamWriter sw = System.IO.File.CreateText(fn))
             {
-                int cx = (countX*ClusterData.countX) *data.Count/2;
-                int cy = (countY*ClusterData.countY) *data.Count/2;
-                if (data.Count == 2) cy = countY * ClusterData.countY;
-                double a = 0;
-                xml.getDouble("area", ref a, 1);
                 sw.Write("Кластер: " + MyXML.getAtt(xml.elem, "val") + "\n");
                 sw.Write("Количество ударов: " + cx*cy/(ClusterData.countX*ClusterData.countY) +"\n");
                 sw.Write("Количество отверстий по горизонтали: " + cx + " шт.\n");
                 sw.Write("Количество отверстий по вертикали: " + cy + " шт.\n");
                 sw.Write("Общее количество отверстий: " + cx * cy + " шт.\n");
                 sw.Write("Площадь: " + (cx * cy * a).ToString("##.####") + "мм2.");
+            }
+            if (this.full)
+            {
+                object ax = null;
+                UnitVector v = null;
+                ObjectCollection col = I.COC(ob);
+                int c = cx;
+                double dist = ClusterData.dx;
+                v = psOut.AxisEntityGeometry.Direction;
+                if (ClusterData.dir.X == 0)
+                {
+                    
+                }
+                else
+                {
+                    c = cy;
+                    dist = ClusterData.dy;
+                    if (psOut.AxisIsX)
+                    {
+                        double[] d = { };
+                        double[] dpl = { };
+                        v.GetUnitVectorData(ref d);
+                        psOut.PlanarEntityGeometry.Normal.GetUnitVectorData(ref dpl);
+
+                        for (int i = 0; i < d.Length; i++)
+                        {
+                            if (d[i] != 0 || dpl[i] != 0)
+                            {
+                                d[i] = 0;
+                            }
+                            else d[i] = -1;
+                        }
+                        v = u.createUnitVector(d[0], d[1], d[2]);
+                    }
+                }
+                ax = u.getWAxis(compDef, v);
+                compDef.Features.RectangularPatternFeatures.Add(col, ax, psOut.NaturalAxisDirection, c, dist);
             }
         }
 
@@ -242,28 +298,32 @@ namespace InvAddIn
 
         public override void get()
         {
-            IEnumerable<SketchLine> slX = u.gets<SketchLine>(ps.SketchLines, f => u.eq(f.StartSketchPoint.Geometry.Y, f.EndSketchPoint.Geometry.Y) && f.Construction == false);
+            IEnumerable<SketchLine> slX = u.gets<SketchLine>(ps.SketchLines, f => u.eq(f.Geometry.StartPoint.Y, f.Geometry.EndPoint.Y) && f.Construction == false);
             if (slX.Count() != 2) return;
-            IEnumerable<SketchLine> slY = u.gets<SketchLine>(ps.SketchLines, f => u.eq(f.StartSketchPoint.Geometry.X, f.EndSketchPoint.Geometry.X) && f.Construction == false);
+            IEnumerable<SketchLine> slY = u.gets<SketchLine>(ps.SketchLines, f => u.eq(f.Geometry.StartPoint.X, f.Geometry.EndPoint.X) && f.Construction == false);
             if (slY.Count() != 2) return;
-            slX.OrderBy(e => e.StartSketchPoint.Geometry.Y); slY.OrderBy(e =>  e.StartSketchPoint.Geometry.X);
+            slX.OrderBy(e => e.Geometry.StartPoint.Y); slY.OrderBy(e =>  e.Geometry.StartPoint.X);
             slh = slY.ElementAt(1); slw = slX.ElementAt(1);
             //double l1 = slh.Length, l2 = slw.Length;
             //SketchLine d = I.Pick(SelectionFilterEnum.kSketchCurveLinearFilter, "Выберите направление") as SketchLine;
             //ClusterData.dir = d.Geometry.Direction;         
-//             if (!(d.Geometry.Direction.X == 0 && slh.Geometry.Direction.X == 0))
-//             {
-//                 slh = slw; slw = slY.ElementAt(1);
+            //             if (!(d.Geometry.Direction.X == 0 && slh.Geometry.Direction.X == 0))
+            //             {
+            //                 slh = slw; slw = slY.ElementAt(1);
             //             }
-            insPt = I.CP2d(Math.Min(slX.ElementAt(0).Geometry.StartPoint.X, slX.ElementAt(1).Geometry.StartPoint.X),
-                Math.Min(slY.ElementAt(0).Geometry.StartPoint.Y, slY.ElementAt(1).Geometry.StartPoint.Y));
+            //insPt = I.CP2d(Math.Min(slX.ElementAt(0).Geometry.StartPoint.X, slX.ElementAt(1).Geometry.StartPoint.X),
+            //    Math.Min(slY.ElementAt(0).Geometry.StartPoint.Y, slY.ElementAt(1).Geometry.StartPoint.Y));
+            Point2d p1 = slX.ElementAt(0).Geometry.StartPoint, p2 = slX.ElementAt(0).Geometry.EndPoint, p3 = slX.ElementAt(1).Geometry.StartPoint,
+                p4 = slX.ElementAt(1).Geometry.EndPoint;
+            Point2d mp1 = u.midPt(p1, p2), mp2 = u.midPt(p3, p4);
+            insPt = u.midPt(mp1, mp2);
 //             insPt = slw.StartSketchPoint.Geometry.X < slw.EndSketchPoint.Geometry.X ? slw.StartSketchPoint.Geometry : slw.EndSketchPoint.Geometry;
 //             insPt = slw.StartSketchPoint.Geometry.Y < slw.EndSketchPoint.Geometry.Y ? insPt : 
             int ix = 1, iy = 1;
 //             if (insPt.X < 0) ix = -1; 
 //             if (insPt.Y < 0) iy = -1;
-            if (u.eq(slw.Geometry.Direction.Y, 0)) { insPt.X += slw.Length / 2*ix; insPt.Y += slh.Length / 2*iy; h = u.round(slh.Length); w = u.round(slw.Length); }
-            else if (u.eq(slw.Geometry.Direction.X,0)) { insPt.X += slh.Length / 2*ix; insPt.Y += slw.Length / 2*iy; h = u.round(slw.Length); w = u.round(slh.Length); }
+            if (u.eq(mp1.X, mp2.X)) { /*insPt.X += slw.Length / 2*ix; insPt.Y += slh.Length / 2*iy;*/ h = u.round(slh.Length); w = u.round(slw.Length); }
+            else if (u.eq(mp1.Y, mp2.Y)) { /*insPt.X += slh.Length / 2*ix; insPt.Y += slw.Length / 2*iy;*/ h = u.round(slw.Length); w = u.round(slh.Length); }
             //ClusterData.dir = slw.Geometry.Direction;
             if (h > w) ClusterData.dir = I.CUV2d(1, 0);
             else ClusterData.dir = I.CUV2d(0, 1);

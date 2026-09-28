@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 using Inventor;
 using InvDoc;
+using InvAddIn;
 
 
 namespace InvDoc
@@ -27,7 +28,7 @@ namespace InvDoc
             try
             {
                 InitializeComponent();
-                reader = new XML(@"C:\ProgramData\Autodesk\Inventor Addins\Modules.xml");
+                reader = new XML(I.p() + @"\Modules.xml");
                 strs = new System.Collections.Generic.List<string>();
                 attr = new List<string>();
                 strs = reader.ReadXML("Spec", ref attr);

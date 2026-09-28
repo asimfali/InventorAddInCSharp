@@ -25,7 +25,8 @@ namespace InvAddIn
         public List<slot> slots = new List<slot>();
         MyXML xml, cont;
         //public IEnumerable<FaceProxy> faces;
-        public List<FaceProxy> faces;
+        public HashSet<FaceProxy> faces = new HashSet<FaceProxy>();
+        public IEnumerable<FaceProxy> fs;
 
         public Fastener(Document doc)
         {
@@ -37,6 +38,7 @@ namespace InvAddIn
             else xml = Macros.StandardAddInServer.xml;
             cont = new MyXML("ContentCenter.xml");
             find(acd.Occurrences);
+            u.action<FaceProxy>(fs, a => faces.Add(a));
             //faces = faces.Distinct();
             int count = faces.Count;
             //addSlot();
@@ -44,22 +46,47 @@ namespace InvAddIn
             {
                 findSlots(item);
             }
-            for (int i = 0; i < count; i++)
+            //List<EdgeProxy> teds = new List<EdgeProxy>();
+            while (!u.isNull(faces) && faces.Count() != 0)
             {
-                i++;
-                List<EdgeProxy> lst = findEdges();
+                List<EdgeProxy> lst = findEdges();           
                 if (lst != null)
                 {
+                    //teds.AddRange(lst); 
                     fastenerSource ed = new fastenerSource(lst);
                     if (ed != null)
                     {
                         edges.Add(ed);
                     }
+                    //u.action<EdgeProxy>(lst, a => findFProxy(a));
                 }
-                if (faces.Count() == 0) break;
-                /*lst = */
+                //else faces = null;
             }
+//            u.clientTxt(teds, acd);
+//            I.app.Views[1].Update();
+//             for (int i = 0; i < count; i++)
+//             {
+//                 i++;
+//                 List<EdgeProxy> lst = findEdges();
+//                 if (lst != null)
+//                 {
+//                     fastenerSource ed = new fastenerSource(lst);
+//                     if (ed != null)
+//                     {
+//                         edges.Add(ed);
+//                     }
+//                 }
+//                 if (faces.Count() == 0) break;
+//                 /*lst = */
+//             }
             cleanEdges();
+        }
+
+        void findFProxy(EdgeProxy ed)
+        {
+            var f = u.get<FaceProxy>(ed.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+            if (u.isNull(f)) return;
+            faces.RemoveWhere(p => p.Equals(f));
         }
 
 //         public void addSlot()
@@ -88,19 +115,22 @@ namespace InvAddIn
             {
                 if (item.Suppressed) continue;
                 if (item.ReferencedDocumentDescriptor.FullDocumentName.IndexOf("Content Center Files") != -1) continue;
-                if (item.ReferencedDocumentDescriptor.FullDocumentName.EndsWith(".ipt"))
+                if (item.DefinitionDocumentType == DocumentTypeEnum.kPartDocumentObject)
                 {
-                    faces = u.add<FaceProxy>(faces, u.gets<FaceProxy>(item.SurfaceBodies[1].Faces, f => check(f, maxR))).ToList();
+                    fs = u.add<FaceProxy>(fs, u.gets<FaceProxy>(item.SurfaceBodies[1].Faces, f => check(f, maxR))).ToList();
                 }
-                else if (item.ReferencedDocumentDescriptor.FullDocumentName.EndsWith(".iam"))
+                else if (item.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
                 {
                     find(item.SubOccurrences);
                 }
             }
+//              u.clientTxt(fs, acd);
+//              I.app.Views[1].Update();
         }
 
         private bool check(FaceProxy f, double maxR)
         {
+            if (slot.except.Contains(f)) return false;
             if (f.SurfaceType != SurfaceTypeEnum.kCylinderSurface) return false;
             Cylinder c = f.Geometry as Cylinder;
             if (c == null) return false;
@@ -108,27 +138,31 @@ namespace InvAddIn
             //pt.TranslateBy(c.AxisVector.AsVector());
             if (f.TangentiallyConnectedFaces.Count == 3)
             {
+                if (c.Radius < 0.24 || c.Radius > 0.5) return false;
                 if (c.Radius == 9.3 / 20 || c.Radius == 0.2) return false;
                 slots.Add(new slot(f));
                 return false;
             }
-            return check(pt) && f.SurfaceType == SurfaceTypeEnum.kCylinderSurface && (f.CreatedByFeature is HoleFeatureProxy || f.CreatedByFeature is CutFeatureProxy || 
+            if (c.Radius < 0.125 || c.Radius > 0.7) return false;
+            return check(pt) && (f.CreatedByFeature is HoleFeatureProxy || f.CreatedByFeature is CutFeatureProxy || 
                 f.CreatedByFeature is ReferenceFeatureProxy || 
                 f.CreatedByFeature is PunchToolFeatureProxy || f.CreatedByFeature is MirrorFeatureProxy
                     || f.CreatedByFeature is RectangularPatternFeatureProxy) 
-               && (f.TangentiallyConnectedFaces.Count == 3 || f.TangentiallyConnectedFaces.Count == 0) && ((Cylinder)f.Geometry).Radius < maxR;
+               && (f.TangentiallyConnectedFaces.Count == 3 || f.TangentiallyConnectedFaces.Count == 0) && c.Radius < maxR;
         }
 
         private bool check(Point pt)
         {
-            int count = 0; bool f = false;
-            foreach (ComponentOccurrence item in acd.Occurrences)
-            {
-                f = item.RangeBox.Contains(pt);
-                if (f && item.ReferencedDocumentDescriptor.FullDocumentName.IndexOf("Content Center Files") != -1) return false;
-                //if (f) count++;
-            }
-            return true;
+            return u.findAtPoint(acd, pt);
+            //int count = 0; bool f = false;
+            
+//             foreach (ComponentOccurrence item in acd.Occurrences)
+//             {
+//                 f = item.RangeBox.Contains(pt);
+//                 if (f && item.ReferencedDocumentDescriptor.FullDocumentName.IndexOf("Content Center Files") != -1) return false;
+//                 //if (f) count++;
+//             }
+//             return true;
         }
 
         private void find(fastenerSource fast)
@@ -238,16 +272,26 @@ namespace InvAddIn
             }
         }
 
+        private void bpoint(FaceProxy face, ref Point cen)
+        {
+            if (face.Edges.Count != 2) return;
+            Circle circle = face.Edges[1].Geometry as Circle;
+            if (circle != null) cen = circle.Center; //I.CP(circle.Center, circle.Normal.AsVector(), -0.1);
+        }
+
         private List<EdgeProxy> findEdges()
         {
             if (faces.Count == 0) return null;
-            //FaceProxy face = faces.ElementAt(0);
-            FaceProxy face = u.get<FaceProxy>(faces, fi => !except.Contains(fi));
+            FaceProxy face = faces.ElementAt(0);
+            faces.RemoveWhere(e => e.Equals(face));
+            if (except.Contains(face)) return null;
+            //FaceProxy face = u.get<FaceProxy>(faces, fi => !except.Contains(fi));
+            
             if (face == null) return null;
             //except.Add(face);
             Cylinder cylfind = face.Geometry as Cylinder;
             UnitVector vb = cylfind.AxisVector;
-            Point ptb = cylfind.BasePoint;
+            Point ptb =/* bpoint(face);*/ cylfind.BasePoint;
             bool isHole = true;
             if (face.TangentiallyConnectedFaces.Count == 3) isHole = false;
             List<EdgeProxy> lst = new List<EdgeProxy>();
@@ -256,6 +300,7 @@ namespace InvAddIn
             if (face.Edges.Count == 2)
             {
                 lst.AddRange(face.Edges.OfType<EdgeProxy>());
+                bpoint(face, ref ptb);
             }
             foreach (FaceProxy item in faces)
             {
@@ -263,7 +308,8 @@ namespace InvAddIn
                 Cylinder c = item.Geometry as Cylinder;
                 if (c == null) continue;
                 UnitVector v = c.AxisVector;
-                Point pt = c.BasePoint;
+                Point pt = /*bpoint(item);*/ c.BasePoint;
+                //bpoint(item, ref pt);
                 if (u.eq(ptb, vb, pt))
                 {
                     if (item.Edges.Count == 2)
@@ -289,7 +335,7 @@ namespace InvAddIn
         {
             if (faces.Count == 0) return;
             if (item.missing) return;
-            IEnumerable<Face> dist = null;
+            IEnumerable<FaceProxy> dist = null;
             //Debug.Print(faces.Count().ToString());
             bool add = false;
             List<EdgeProxy> lst = new List<EdgeProxy>();
@@ -299,13 +345,15 @@ namespace InvAddIn
             {
                 Cylinder c = f.Geometry as Cylinder;
                 v = c.AxisVector;
-                Point pt = c.BasePoint;
-                if (u.eq(item.bpt, item.dir, pt))
+                //Point pt = c.BasePoint;
+                if (u.eqScalar(item.bpt, item.dir, c.BasePoint) || u.crossLenght(item.bpt, item.dir, c.BasePoint) < item.r / 2)
                 {
                     //if (item.bpt.DistanceTo(pt) > 0.7) continue;
                     lst.AddRange(u.gets<EdgeProxy>(f.Edges, fi => fi.GeometryType == CurveTypeEnum.kCircleCurve));
+                                  
                     add = true;
-                    //dist = u.add<Face>(dist, f);
+                    dist = u.add<FaceProxy>(dist, f);
+                    break;
                 }   
             }
             if (add)
@@ -317,7 +365,7 @@ namespace InvAddIn
                 fs.dir = v;
                 edges.Add(fs);
             }
-            //if (dist != null) faces = faces.Except(dist);
+            if (dist != null) u.action<FaceProxy>(dist, a => faces.Remove(a));
         }
 
         public BrowserFolder addFolder(string name)
@@ -592,10 +640,17 @@ namespace InvAddIn
         public fastEdge(EdgeProxy ed, UnitVector d)
         {
             e = ed; dir = d;
-            if (ed.GeometryType == CurveTypeEnum.kCircleCurve) pt = (e.Geometry as Circle).Center;
-            else if (ed.GeometryType == CurveTypeEnum.kCircularArcCurve) 
-            { 
-                pt = (e.Geometry as Arc3d).Center;
+            if (ed.GeometryType == CurveTypeEnum.kCircleCurve)
+            {
+                var c = e.Geometry as Circle;
+               // pt = I.CP(c.Center, c.Normal.AsVector(), -0.1);
+                pt = c.Center;
+            }
+            else if (ed.GeometryType == CurveTypeEnum.kCircularArcCurve)
+            {
+                var c = e.Geometry as Arc3d;
+               // pt = I.CP(c.Center, c.Normal.AsVector(), -0.1);
+                pt = c.Center;
             }
         }
     }
@@ -603,6 +658,7 @@ namespace InvAddIn
     class slot
     {
         public Point bpt;
+        public double r;
         public UnitVector dir;
         public List<EdgeProxy> e = new List<EdgeProxy>();
         static public HashSet<FaceProxy> except = new HashSet<FaceProxy>();
@@ -620,6 +676,7 @@ namespace InvAddIn
                 if (u.eq(c1.Radius, c2.Radius))
                 {
                     bpt = u.midPt(c1.BasePoint, c2.BasePoint);
+                    r = c1.BasePoint.DistanceTo(c2.BasePoint);
                     e.AddRange(u.gets<EdgeProxy>(f.Edges, fi => fi.GeometryType == CurveTypeEnum.kCircularArcCurve));
 //                     foreach (EdgeProxy item in u.gets<EdgeProxy>(f.Edges, fi => fi.GeometryType == CurveTypeEnum.kCircularArcCurve))
 //                     {

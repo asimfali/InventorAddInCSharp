@@ -201,7 +201,7 @@ namespace InvAddIn
             string path = doc.pathUtil();
             smcd = pDoc.ComponentDefinition as SheetMetalComponentDefinition;
             if (smcd == null) return;
-            xDoc = xDoc ?? XDocument.Load(@"C:\ProgramData\Autodesk\Inventor Addins\Material.xml");
+            xDoc = xDoc ?? XDocument.Load(I.p() + @"\Material.xml");
             if (System.IO.File.Exists(path + "\\Material.xml"))
                 xDoc = XDocument.Load(path + "\\Material.xml");
         }
@@ -254,10 +254,15 @@ namespace InvAddIn
             XElement el = xDoc.Root.Descendants("Material").FirstOrDefault(e => e.FirstAttribute.Value == matName);
             if (el == null) return false;
             //el.Element("MaterialUpLine").Value = el.Element("MaterialUpLine").Value.Replace("t", t.ToString("0.0", System.Globalization.CultureInfo.CreateSpecificCulture("da-DK")));
-            List<string> vals = new List<string>() { el.Element("MaterialUpLine").Value.Replace("t", t.ToString("0.0", System.Globalization.CultureInfo.CreateSpecificCulture("da-DK"))), el.Element("MaterialDownLine").Value, el.Element("MaterialLine").Value, el.Element("MaterialCenter").Value };
+            List<string> vals = new List<string>() {
+                el.Element("MaterialUpLine").Value.Replace(
+                "t", t.ToString("0.0", System.Globalization.CultureInfo.CreateSpecificCulture("da-DK"))),
+                el.Element("MaterialDownLine").Value, el.Element("MaterialLine").Value,
+                el.Element("MaterialCenter").Value.Replace(
+                "t", t.ToString("0.0", System.Globalization.CultureInfo.CreateSpecificCulture("da-DK")))};
             if (base[0] != null)
             {
-                changed = changes(vals, 3);
+                changed = changes(vals, 4);
             }
             return changed;
         }

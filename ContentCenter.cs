@@ -81,6 +81,8 @@ namespace InvAddIn
         string filename;
         string pathFile;
         bool flag;
+        string path;
+        Dictionary<string, string> pathes = new Dictionary<string, string>();
         OpenFileDialog ofd;
         double offsetDouble, hd;
         InvDoc.XML set, folders;
@@ -88,26 +90,27 @@ namespace InvAddIn
         System.Collections.Generic.List<string> attr = new System.Collections.Generic.List<string>();
         System.Collections.Generic.List<string> val = new System.Collections.Generic.List<string>();
         ComponentOccurrence coOld = null, coNew = null;
+        private bool del = false;
 
-        public ContentOp() { }
+        public ContentOp()
+        {
+            Document doc = I.aDoc();
+            init(doc);
+        }
 
         public ContentOp(Inventor.Document newDoc)
         {
-            if (newDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject) m_AsmDoc = (AssemblyDocument)newDoc;
-            invApp = (Inventor.Application)newDoc.Parent;
-            pathFile = newDoc.FullFileName.ToString();
-            pathFile = pathFile.Substring(0, pathFile.LastIndexOf('\\'));
-            compDef = (AssemblyComponentDefinition)m_AsmDoc.ComponentDefinition;
+            init(newDoc);
             fCol = invApp.TransientObjects.CreateFaceCollection();
             edge = new List<Edge>(); edgeflip = new List<Edge>(); edgeCmp = new List<Edge>(); edgeCmp1 = new List<Edge>();
             selOp(ref edgeCmp, ref edgeCmp1);
             ofd = new OpenFileDialog();
             ofd.Filter = "XML Files|*.xml";
             ofd.Title = "Выберите файл описания крепежа";
-            ofd.InitialDirectory = @"C:\ProgramData\Autodesk\Inventor Addins\";
+            ofd.InitialDirectory = I.p() + @"\";
             ofd.ShowDialog();
             filename = ofd.FileName;
-            set = new InvDoc.XML(filename/*@"C:\ProgramData\Autodesk\Inventor Addins\ContentCenter.xml"*/);
+            set = new InvDoc.XML(filename/*I.p() + @"\ContentCenter.xml"*/);
             set.ReadXML("Fasteners", ref val, ref attr);
             val.Add("Fasteners"); attr.Add("End");
             separator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalSeparator[0];
@@ -115,15 +118,24 @@ namespace InvAddIn
             addFastener();
         }
 
-         ~ContentOp()
+        public void init(Document newDoc)
+        {
+            if (newDoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject) m_AsmDoc = (AssemblyDocument)newDoc;
+            invApp = (Inventor.Application)newDoc.Parent;
+            pathFile = newDoc.FullFileName.ToString();
+            pathFile = pathFile.Substring(0, pathFile.LastIndexOf('\\'));
+            compDef = (AssemblyComponentDefinition)m_AsmDoc.ComponentDefinition;
+        }
+
+        ~ContentOp()
         {
             fams = null;
             //cc = null;
         }
 
-        private List<EdgeProxy> findMirrorEdge(ComponentOccurrence occ ,string name, int ind)
-         {
-             FaceProxy f = occ.SurfaceBodies[1].Faces.OfType<FaceProxy>().FirstOrDefault(face => face.CreatedByFeature is MirrorFeatureProxy && face.CreatedByFeature.Name == name);
+        private List<EdgeProxy> findMirrorEdge(ComponentOccurrence occ, string name, int ind)
+        {
+            FaceProxy f = occ.SurfaceBodies[1].Faces.OfType<FaceProxy>().FirstOrDefault(face => face.CreatedByFeature is MirrorFeatureProxy && face.CreatedByFeature.Name == name);
             if (f == null) return null;
             MirrorFeatureProxy mfp = f.CreatedByFeature as MirrorFeatureProxy;
             List<EdgeProxy> edges = new List<EdgeProxy>();
@@ -134,33 +146,33 @@ namespace InvAddIn
                 edges.Add(ed);
             }
             return edges;
-         }
+        }
 
         private void isRectPat(AssemblyComponentDefinition compDef, ref List<Edge> edges)
-         {
-             foreach (OccurrencePattern pat in compDef.OccurrencePatterns)
-             {
-                 try
-                 {
-                     if (pat is FeatureBasedOccurrencePattern)
-                     {
-                         object fpp = ((FeatureBasedOccurrencePattern)pat).FeaturePattern;
-                         RectangularPatternFeature rpf = ((RectangularPatternFeatureProxy)fpp).NativeObject;
-                         if (rpf.ParentFeatures[1] is HoleFeature)
-                         {
-                             for (int i = 2; i < rpf.PatternElements.Count; i++)
-                             {
-                                 edges.Add(rpf.PatternElements[i].Faces[1].Edges[1]);
-                             }
-                         }
-                     }
-                 }
-                 catch
-                 {
+        {
+            foreach (OccurrencePattern pat in compDef.OccurrencePatterns)
+            {
+                try
+                {
+                    if (pat is FeatureBasedOccurrencePattern)
+                    {
+                        object fpp = ((FeatureBasedOccurrencePattern)pat).FeaturePattern;
+                        RectangularPatternFeature rpf = ((RectangularPatternFeatureProxy)fpp).NativeObject;
+                        if (rpf.ParentFeatures[1] is HoleFeature)
+                        {
+                            for (int i = 2; i < rpf.PatternElements.Count; i++)
+                            {
+                                edges.Add(rpf.PatternElements[i].Faces[1].Edges[1]);
+                            }
+                        }
+                    }
+                }
+                catch
+                {
 
-                 }
-             }
-         }
+                }
+            }
+        }
         private RectangularPatternFeature isRectPat(AssemblyComponentDefinition compDef, InsertiMateDefinitionProxy ins)
         {
             object ent = ins.Entity;
@@ -174,8 +186,8 @@ namespace InvAddIn
                 foreach (RectangularPatternFeature item in (feat.Parent as PartComponentDefinition).Features.RectangularPatternFeatures)
                 {
                     PartFeature pFeat = item.ParentFeatures.OfType<PartFeature>().FirstOrDefault(f => f.Equals(feat));
-                    if (pFeat != null) 
-                        return item;  
+                    if (pFeat != null)
+                        return item;
                 }
             }
             return null;
@@ -215,7 +227,7 @@ namespace InvAddIn
                         break;
                     }
                 }
-                catch {}
+                catch { }
             }
             return con;
         }
@@ -245,14 +257,19 @@ namespace InvAddIn
                 }
                 else if (attr.Value.IndexOf('\\') != -1)
                 {
+                    string fn = path + attr.Value.Trim('\\');
                     Matrix mtx = I.tg.CreateMatrix();
-                    coNew = ((AssemblyComponentDefinition)doc.ComponentDefinition).Occurrences.Add(attr.Value, mtx);
+                    //bool exist = file.check(fn);
+                    //MessageBox.Show($"Путь к файлу: {fn}\nФайл сущестует: {exist}");
+                    coNew = ((AssemblyComponentDefinition)doc.ComponentDefinition).Occurrences.Add(fn, mtx);
+                    occs.Add(coNew);
                 }
                 if (offset != "")
                     offsetDouble = double.Parse(offset.Replace('.', ','));
                 if (dist != 0 && first)
                 {
                     offsetDouble = dist * 10;
+                    offset = "1";
                     if (offsetDouble < 0)
                     {
                         boolDir = !boolDir;
@@ -283,34 +300,71 @@ namespace InvAddIn
 
         public bool filter(string name, ref string iname)
         {
-            int ind = iname.IndexOf("$");
-            if (ind != -1)
+            bool r = true;
+            var spl = iname.Split('$');
+            string indS = spl[1];
+            iname = spl[0];
+            var occspl = name.Split(':');
+            string indooc = occspl[1];
+            foreach (var item in indS.Split(';'))
             {
-                var spl = iname.Split('$');
-                string indS = spl[1];
-                iname = spl[0];
-                var occspl = name.Split(':');
-                string indooc = occspl[1];
-                if (indS != indooc)
-                    return true;
-//                 var spl = iname.Split('$');
-// 
-// 
-// 
-//                 ind = int.Parse(spl[1]);
-//                 iname = spl[0];
-//                 var occspl = name.Split(':');
-//                 int indooc = int.Parse(occspl[1]);
-//                 if (ind != indooc)
-//                     return true;
+                foreach (var occ in indooc.Split(';'))
+                {
+                    if (item == occ)
+                    {
+                        //if (!iname.StartsWith("_"))
+                        // iname = "_" + iname;                                                
+                        return !r;
+                    }
+                }
             }
-            return false;
+            //                 var spl = iname.Split('$');
+            // 
+            // 
+            // 
+            //                 ind = int.Parse(spl[1]);
+            //                 iname = spl[0];
+            //                 var occspl = name.Split(':');
+            //                 int indooc = int.Parse(occspl[1]);
+            //                 if (ind != indooc)
+            //                     return true;
+            return r;
+        }
+
+        void setPathes(XElement elem)
+        {
+            foreach (var item in elem.Elements("path"))
+            {
+                var _path = item.Value;
+                if (item.Attribute("proj") != null)
+                    _path = I.curProjPath() + _path;
+                pathes[item.Attribute("name").Value] = _path;
+
+            }
+        }
+
+        public XMLDoc getXMLDoc(string fn, string root)
+        {
+            fn = I.p() + fn;
+            XMLDoc xmldoc = new XMLDoc(fn, root);
+            var el = xmldoc.Doc.Root;
+            try
+            {
+                path = el.Attribute("path").Value;
+                setPathes(el);
+            }
+            catch (Exception)
+            {
+
+            }
+
+            return xmldoc;
         }
 
         public void programmAdd(AssemblyDocument doc)
-         {
-            XMLDoc xmldoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\AutoFastener.xml", "Fasteners");
-            invApp =  Macros.StandardAddInServer.m_inventorApplication;
+        {
+            var xmldoc = getXMLDoc(@"\AutoFastener.xml", "Fasteners");
+            invApp = Macros.StandardAddInServer.m_inventorApplication;
             TransientGeometry tg = invApp.TransientGeometry;
             TransientObjects to = invApp.TransientObjects;
             EdgeCollection col = to.CreateEdgeCollection();
@@ -322,55 +376,58 @@ namespace InvAddIn
             try
             {
                 //isRectPat(compDef, ref edges);
-            foreach (ComponentOccurrence occ in compDef.Occurrences)
-            {
-                var imate = occ.iMateDefinitions.OfType<InsertiMateDefinitionProxy>().Where(e => !(e.Name.StartsWith("iIns")));
-                if (!imate.Any()) continue;
-                foreach (var insImate in imate)
+                foreach (ComponentOccurrence occ in compDef.Occurrences)
                 {
-                    string iName = insImate.Name;
-                    if (filter(occ.Name, ref iName))
-                        continue;
-                    //var constrain = doc.ComponentDefinition.Constraints.OfType<InsertConstraint>().Where(con =>/* con.EntityOne.Equals(insImate.Entity) ||*/ con.EntityTwo.Equals(insImate.Entity));
-                    //IEnumerator<InsertConstraint> ienum = constrain.GetEnumerator();
-                    //if (ienum.Current != null) 
-                    //    continue;
-                    if (insImate.Suppressed == true) continue;
-                    XElement elem = xmldoc.Doc.Root.Elements("Fastener").FirstOrDefault(ele => ele.FirstAttribute.Value == iName);
-                     if (elem != null)
-                     {
-                         //IEnumerable<AssemblyConstraint> ii = occ.Constraints.OfType<AssemblyConstraint>().Where(ent => ent.EntityTwo != null);
-                         //AssemblyConstraint con = null;
-                         //if (!ii.IsEmpty()) con = ii.FirstOrDefault(co => co.EntityTwo.Equals(insImate.Entity));
-                         //else continue;
-                         if (check(occ, insImate.Entity)) continue;
-                         insertComp(doc, elem, ref occs, (double)insImate.Distance.Value, (Edge)insImate.Entity);
+                    var imate = occ.iMateDefinitions.OfType<InsertiMateDefinitionProxy>().Where(e => !(e.Name.StartsWith("iIns")));
+                    if (!imate.Any()) continue;
+                    foreach (var insImate in imate)
+                    {
+                        string iName = insImate.Name;
+                        if (iName.IndexOf("$") != -1 && filter(occ.Name, ref iName))
+                            continue;
+                        //var constrain = doc.ComponentDefinition.Constraints.OfType<InsertConstraint>().Where(con =>/* con.EntityOne.Equals(insImate.Entity) ||*/ con.EntityTwo.Equals(insImate.Entity));
+                        //IEnumerator<InsertConstraint> ienum = constrain.GetEnumerator();
+                        //if (ienum.Current != null) 
+                        //    continue;
+                        if (insImate.Suppressed == true) continue;
+                        XElement elem = xmldoc.Doc.Root.Elements("Fastener").FirstOrDefault(ele => ele.FirstAttribute.Value == iName);
+                        if (elem != null)
+                        {
+                            //IEnumerable<AssemblyConstraint> ii = occ.Constraints.OfType<AssemblyConstraint>().Where(ent => ent.EntityTwo != null);
+                            //AssemblyConstraint con = null;
+                            //if (!ii.IsEmpty()) con = ii.FirstOrDefault(co => co.EntityTwo.Equals(insImate.Entity));
+                            //else continue;
+                            if (check(occ, insImate.Entity)) continue;
+                            insertComp(doc, elem, ref occs, (double)insImate.Distance.Value, (Edge)insImate.Entity);
 
-                         RectangularPatternFeature rpf = isRectPat(compDef, insImate);
-                         if (rpf != null)
-                         {
-                             addRectPat(compDef, occ, occs, rpf);
-                             VariableData vd = new VariableData(doc as Document);
-                             Inventor.Attribute att = vd.getAttrib(rpf, "Mirror");
-                             if (att != null)
-                             {
-                                string nameRP = att.Value as string;
-                                List<EdgeProxy> eds = findMirrorEdge(occ, nameRP, getInd(insImate));
-                                foreach (EdgeProxy item in eds)
+                            RectangularPatternFeature rpf = isRectPat(compDef, insImate);
+                            if (rpf != null)
+                            {
+                                //addRectPat(compDef, occ, occs, rpf);
+                                VariableData vd = new VariableData(doc as Document);
+                                Inventor.Attribute att = vd.getAttrib(rpf, "Mirror");
+                                if (att != null)
                                 {
-                                    coOld = null; coNew = null;
-                                    insertComp(doc, elem,ref occs, (double)insImate.Distance.Value, (Edge)item); 
+                                    string nameRP = att.Value as string;
+                                    List<EdgeProxy> eds = findMirrorEdge(occ, nameRP, getInd(insImate));
+                                    foreach (EdgeProxy item in eds)
+                                    {
+                                        coOld = null; coNew = null;
+                                        insertComp(doc, elem, ref occs, (double)insImate.Distance.Value, (Edge)item);
+                                    }
                                 }
-                             }
-                         }
-                         coOld = null; coNew = null; occs.Clear();
-                     }
-                 }
-             }
-            addToFolder(ref doc);
+                            }
+                            coOld = null; coNew = null; occs.Clear();
+                        }
+                    }
+                }
+                addToFolder(ref doc);
             }
-            catch {}
-         }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.ToString());
+            }
+        }
 
         private int getInd(InsertiMateDefinitionProxy insImate)
         {
@@ -385,18 +442,326 @@ namespace InvAddIn
             return i;
         }
 
+        public void highlight(CompositeiMateDefinitionProxy im)
+        {
+            u.clearHiglight();
+            //m_AsmDoc.SelectSet.Select(im);           
+            List<Object> ents = new List<object>();
+            foreach (iMateDefinition item in im)
+            {
+                dynamic r = item;
+                string name = item.Name.ToLower();
+                if (name.StartsWith("iins"))
+                    ents.Add(r.entity);
+                else if (name.StartsWith("imate"))
+                {
+                    var mate = item as MateiMateDefinition;
+                    if (mate.EntityInferredType == InferredTypeEnum.kInferredLine) ents.Add(mate);
+                }
+            }
+            if (ents.Count > 1) u.higlight((Document)m_AsmDoc, ents[0], ents[1], null, null);
+        }
+
+        public void highlight(ComponentOccurrence occ)
+        {
+            u.clearHiglight();
+            if (occ.DefinitionDocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
+            {
+                u.higlight((Document)m_AsmDoc, occ, null, null, null);
+            }
+            else
+            {
+                var sb = occ.SurfaceBodies[1];
+                u.higlight((Document)m_AsmDoc, sb, null, null, null);
+            }
+        }
+
+        public void cancel(object send, EventArgs arg)
+        {
+            Control el = (Control)send;
+            var f = (Form)el.Parent;
+            f.DialogResult = DialogResult.Cancel;
+        }
+        public void delete(object send, EventArgs arg)
+        {
+            Control el = (Control)send;
+            var f = (Form)el.Parent;
+            this.del = true;
+            f.DialogResult = DialogResult.Cancel;
+        }
+
+        public bool checkiMate(CompositeiMateDefinitionProxy im, XElement elem)
+        {
+            if (im.Count != 2) return true;
+            var d1 = getDist((CompositeiMateDefinition)im.NativeObject);
+            if (d1 < 0) return false;
+            var val = elem.Attribute("val").Value;
+            var pa = getPath(elem);
+            pa = u.getFN(elem, pa);
+            var doc = I.open(pa);
+            var ims = I.getIM(doc);
+            if (ims == null) return false;
+            var im1 = u.get<CompositeiMateDefinition>(ims, f => f.Name == val);
+            var d2 = getDist(im1);
+            if (!u.eq(d1, d2)) return false;
+            return true;
+        }
+
+        public double getDist(CompositeiMateDefinition im)
+        {
+            List<InsertiMateDefinition> lst = new List<InsertiMateDefinition>();
+            foreach (var item in im)
+            {
+                var pr = item as InsertiMateDefinition;
+                if (pr != null)
+                    lst.Add(pr);
+            }
+            if (lst.Count != 2) return -5;
+            var p1 = getPoint(lst[0]);
+            var p2 = getPoint(lst[1]);
+            var d = p1.DistanceTo(p2);
+            return d;
+        }
+
+        public Inventor.Point getPoint(InsertiMateDefinition im)
+        {
+            var ent = im.Entity as Edge;
+            var g = ent.Geometry as Circle;
+            return g.Center;
+        }
+
+        public void insertPart(XElement elem, CompositeiMateDefinitionProxy insImate)
+        {
+            string name = ""; CompositeiMateDefinition imateDef = null; ComponentOccurrence coNew = null;
+            string iName = insImate.Name;
+            if (elem == null) return;
+            highlight(insImate);
+            imateDef = (CompositeiMateDefinition)insImate;
+
+            foreach (var item in elem.Elements())
+            {
+                if (!checkiMate(insImate, item))
+                    item.Add(new XAttribute("skip", "1"));
+            }
+
+            name = iName;
+            var count = elem.Elements().Count();
+            if (count > 1)
+            {
+                List<string> vals = new List<string>();
+                foreach (var item in elem.Elements())
+                {
+                    if (item.Attribute("skip") == null)
+                    vals.Add(item.Attribute("name").Value);
+                }
+                InterfaceDll.MyForm F = new InterfaceDll.MyForm("BaseCBInterface.xml", elem.Attribute("name").Value);
+                F.lbls[0].Text = elem.Attribute("name").Value;
+                F.cbs[0].Items.Clear();
+                F.cbs[0].Items.AddRange(vals.ToArray());
+                F.bnts[0].Text = "Добавить";
+                var b1 = F.bnts[0];
+                InterfaceDll.Btn b2 = new InterfaceDll.Btn(10, 10, b1.Width, b1.Height,
+                    new System.Drawing.Point(b1.Location.X - b1.Width - 10, b1.Location.Y), F.f, cancel, "Пропустить", "cancel");
+
+                F.f.ShowDialog();
+                string f;
+                u.clearHiglight();
+                if (F.f.DialogResult == DialogResult.OK)
+                {
+                    f = F.cbs[0].Text;
+                }
+                else return;
+                elem = u.get<XElement>(elem.Elements(), e => e.Attribute("name").Value == f);
+            }
+            else
+            {
+                elem = elem.Elements().ElementAt(0);
+            }
+
+            var _path = path;
+            var p = XMLDoc.getAttributeValue(elem, "path");
+            if (p != null) _path = pathes[p];
+            if (elem.Value.IndexOf('\\') != -1)
+            {
+                string fn = u.getFN(elem, _path);
+                Matrix mtx = I.tg.CreateMatrix();
+                if (!file.check(fn))
+                {
+                    MessageBox.Show($"Отстутствует файл {fn}");
+                    return;
+                }
+                coNew = (compDef).Occurrences.Add(fn, mtx);
+            }
+            if (coNew != null)
+            {
+                name = XMLDoc.getAttributeValue(elem, "val");
+                if (name == null) return;
+                //IEnumerable<CompositeiMateDefinition> ie = coNew.iMateDefinitions.OfType<CompositeiMateDefinition>()
+                var ie = u.gets<CompositeiMateDefinition>(coNew.iMateDefinitions, e => e.Suppressed == false);
+                CompositeiMateDefinition iComp = ie.FirstOrDefault(e => e.Name == name);
+                if (iComp != null)
+                {
+                    iMateResult ir = compDef.iMateResults.AddByTwoiMates((iMateDefinition)iComp, (iMateDefinition)imateDef);
+                    //if (name != null) ir.Name = name;
+                }
+                else coNew.Delete();
+            }
+        }
+
+        string getPath(XElement elem)
+        {
+            var _path = path;
+            var p = XMLDoc.getAttributeValue(elem, "path");
+            if (p != null) _path = pathes[p];
+            return _path;
+        }
+
+        public void replacePart(XElement elem, ComponentOccurrence occ, CompositeiMateDefinitionProxy im, ref List<ComponentOccurrence> occs)
+        {
+            if (occs.Contains(occ)) return;
+            if (elem == null) return;
+            highlight(occ);
+
+            foreach (var item in elem.Elements())
+            {
+                if (checkiMate(im, item))
+                    item.Add(new XAttribute("skip", "1"));
+            }
+
+            var count = elem.Elements().Count();
+            if (count > 1)
+            {
+                List<string> vals = new List<string>();
+                foreach (var item in elem.Elements())
+                {
+                    if (item.Attribute("skip") == null)
+                        vals.Add(item.Attribute("name").Value);
+                }
+                InterfaceDll.MyForm F = new InterfaceDll.MyForm("BaseCBInterface.xml", elem.Attribute("name").Value);
+                F.lbls[0].Text = elem.Attribute("name").Value;
+                F.cbs[0].Items.Clear();
+                F.cbs[0].Items.AddRange(vals.ToArray());
+                F.bnts[0].Text = "Заменить";
+                var b1 = F.bnts[0];
+                
+                var loc = new System.Drawing.Point(b1.Location.X - b1.Width - 10, b1.Location.Y);
+                InterfaceDll.Btn b2 = new InterfaceDll.Btn(10, 10, b1.Width, b1.Height,
+                    loc, F.f, cancel, "Пропустить", "cancel");
+                InterfaceDll.Btn b3 = new InterfaceDll.Btn(10, 10, b1.Width, b1.Height,
+                    new System.Drawing.Point(loc.X - b2.Width - 10, loc.Y), F.f, delete, "Удалить", "delete");
+
+
+                F.f.ShowDialog();
+                string f;
+                u.clearHiglight();
+                if (F.f.DialogResult == DialogResult.OK)
+                {
+                    f = F.cbs[0].Text;
+                }
+                else
+                {
+                    if (this.del)
+                    {
+                        occ.Delete2();
+                
+                    }
+                    return;
+                }
+
+                elem = u.get<XElement>(elem.Elements(), e => e.Attribute("name").Value == f);
+            }
+            var _path = getPath(elem);
+            if (elem.Value.IndexOf('\\') != -1)
+            {
+                string fn = u.getFN(elem, _path);
+                string fn1 = file.name(fn), fn2 = file.name(occ.ReferencedDocumentDescriptor.FullDocumentName);
+                if (fn1 == fn2) 
+                    return;
+                occ.Replace2(fn, false);
+                occs.Add(occ);
+            }
+        }
+
+        public ComponentOccurrence findiMateResult(CompositeiMateDefinitionProxy im, XElement elem, ref List<AssemblyConstraint> filter)
+        {
+            ComponentOccurrence occ = im.ContainingOccurrence;
+            foreach (AssemblyConstraint item in occ.Constraints)
+            {
+                if (filter.Contains(item))
+                    continue;
+                if (!item.ResultOfiMate) continue;
+                foreach (iMateDefinition def in im)
+                {
+                    dynamic ent = def;
+                    if (ent.entity == item.EntityOne || ent.entity == item.EntityTwo)
+                    {
+                        filter.Add(item);
+                        return checkOcc(elem, item);
+                    }
+                }
+            }
+            return null;
+        }
+
+        public ComponentOccurrence checkOcc(XElement elem, AssemblyConstraint item)
+        {
+            ComponentOccurrence oc1 = item.OccurrenceOne, oc2 = item.AffectedOccurrenceTwo;
+            var name1 = oc1.ReferencedDocumentDescriptor.FullDocumentName;
+            var name2 = oc2.ReferencedDocumentDescriptor.FullDocumentName;
+            foreach (var el in elem.Elements())
+            {
+                if (name1.EndsWith(el.Value)) return oc1;
+                else if (name2.EndsWith(el.Value)) return oc2;
+            }
+            return null;
+        }
+
+        public void insertPart()
+        {
+            XElement elem = null;
+            if (m_AsmDoc == null) return;
+            var xmldoc = getXMLDoc(@"\AutoInsert.xml", "Fasteners");
+            var el = xmldoc.Doc.Root;
+            List<AssemblyConstraint> f = new List<AssemblyConstraint>();
+            List<ComponentOccurrence> occs = new List<ComponentOccurrence>();
+            foreach (ComponentOccurrence occ in compDef.Occurrences)
+            {
+                foreach (CompositeiMateDefinitionProxy insImate in occ.iMateDefinitions.OfType<CompositeiMateDefinitionProxy>())
+                {
+                    if (u.isNull(insImate)) continue;
+                    string iName = insImate.Name;
+                    if (iName.IndexOf("$") != -1 && filter(occ.Name, ref iName))
+                        continue;
+                    if (insImate.IsConsumed == true)
+                    {
+                        elem = el.Elements("Insert").FirstOrDefault(ele => ele.FirstAttribute.Value == iName);
+                        if (elem == null) continue;
+                        var occ2 = findiMateResult(insImate, elem, ref f);
+
+                        if (occ2 != null)
+                        {
+                            replacePart(elem, occ2, insImate, ref occs);
+                        }
+                    }
+                    else
+                    {
+                        elem = el.Elements("Insert").FirstOrDefault(ele => ele.FirstAttribute.Value == iName);
+                        insertPart(elem, insImate);
+                    }
+                }
+            }
+        }
+
         private void addIMateCompositeResults(AssemblyComponentDefinition compDef, XElement el)
         {
             string name = ""; CompositeiMateDefinition imateDef = null; ComponentOccurrence coNew = null;
-            foreach (ComponentOccurrence occ in compDef.Occurrences)                                         
+            foreach (ComponentOccurrence occ in compDef.Occurrences)
             {
-                //IEnumerable<iMateDefinition> imate = u.gets<iMateDefinition>(occ.iMateDefinitions, f => f is CompositeiMateDefinitionProxy);
-                var imate = occ.iMateDefinitions.OfType<CompositeiMateDefinitionProxy>();
-                if (!imate.Any()) continue;
-                foreach (CompositeiMateDefinitionProxy insImate in imate)
+                foreach (CompositeiMateDefinitionProxy insImate in occ.iMateDefinitions.OfType<CompositeiMateDefinitionProxy>())
                 {
+                    if (u.isNull(insImate)) continue;
                     string iName = insImate.Name;
-                    if (filter(occ.Name, ref iName))
+                    if (iName.IndexOf("$") != -1 && filter(occ.Name, ref iName))
                         continue;
                     if (insImate.IsConsumed == true) continue;
                     XElement elem = el.Elements("Composite").FirstOrDefault(ele => ele.FirstAttribute.Value == iName);
@@ -406,7 +771,7 @@ namespace InvAddIn
                         name = iName;
                         foreach (var item in elem.Elements())
                         {
-                            if (item.HasAttributes && item.Attribute("name") != null) 
+                            if (item.HasAttributes && item.Attribute("name") != null)
                             {
                                 name = item.FirstAttribute.Value; imateDef = coNew.iMateDefinitions.OfType<CompositeiMateDefinition>().FirstOrDefault(e => e.Name == name);
                             }
@@ -417,8 +782,9 @@ namespace InvAddIn
                             }
                             else if (elem.Value.IndexOf('\\') != -1)
                             {
+                                string fn = u.getFN(elem, path);
                                 Matrix mtx = I.tg.CreateMatrix();
-                                coNew = (compDef).Occurrences.Add(item.Value, mtx);
+                                coNew = (compDef).Occurrences.Add(fn, mtx);
                             }
                             if (coNew != null)
                             {
@@ -436,7 +802,8 @@ namespace InvAddIn
                                 }
                                 if (iComp != null)
                                 {
-                                    compDef.iMateResults.AddByTwoiMates((iMateDefinition)iComp, (iMateDefinition)imateDef);
+                                    iMateResult ir = compDef.iMateResults.AddByTwoiMates((iMateDefinition)iComp, (iMateDefinition)imateDef);
+                                    //if (name != null) ir.Name = name;
                                 }
                                 else coNew.Delete();
                             }
@@ -447,136 +814,136 @@ namespace InvAddIn
         }
 
         private void addFastener()
-         {
-             try
-             {
-                 int j = 0; string holediameter = "";
-                 List<string> attr1 = new List<string>();
-                 List<string> val1 = new List<string>();
-                 fams = new List<ContentFamily>();
-                 tr = ((Inventor.Application)m_AsmDoc.Parent).TransactionManager.StartTransaction((_Document)m_AsmDoc, "Автовставка");
+        {
+            try
+            {
+                int j = 0; string holediameter = "";
+                List<string> attr1 = new List<string>();
+                List<string> val1 = new List<string>();
+                fams = new List<ContentFamily>();
+                tr = ((Inventor.Application)m_AsmDoc.Parent).TransactionManager.StartTransaction((_Document)m_AsmDoc, "Автовставка");
 
-                 while (j <= attr.Count - 2)
-                 {
-                     /*if (j == 0)*/
-                     holediameter = set.substring(attr[j], "HoleDiameter=").Replace('.', separator);
-                     //else holediameter = substring(attr[j-1], "HoleDiameter=").Replace('.', separator);
-                     edge.Clear(); edgeflip.Clear(); attr1.Clear(); val1.Clear(); fCol.Clear();
-                     if (holediameter != "")
-                         hd = Convert.ToDouble(holediameter);
-                     if (edgeCmp.Count != 0)
-                     {
-                         edge = edgeCmp;
-                         edgeflip = edgeCmp1;
-                     }
-                     else
-                     { findHoles(ref edge, ref edgeflip, hd); }
+                while (j <= attr.Count - 2)
+                {
+                    /*if (j == 0)*/
+                    holediameter = set.substring(attr[j], "HoleDiameter=").Replace('.', separator);
+                    //else holediameter = substring(attr[j-1], "HoleDiameter=").Replace('.', separator);
+                    edge.Clear(); edgeflip.Clear(); attr1.Clear(); val1.Clear(); fCol.Clear();
+                    if (holediameter != "")
+                        hd = Convert.ToDouble(holediameter);
+                    if (edgeCmp.Count != 0)
+                    {
+                        edge = edgeCmp;
+                        edgeflip = edgeCmp1;
+                    }
+                    else
+                    { findHoles(ref edge, ref edgeflip, hd); }
 
-                     coNew = null;
+                    coNew = null;
 
-                     for (int x = j + 1; x < val.Count; x++)
-                     {
-                         if (val[x] == "Fasteners")
-                         {
-                             j = x;
-                             break;
-                         }
-                         attr1.Add(attr[x]);
-                         val1.Add(val[x]);
-                     }
+                    for (int x = j + 1; x < val.Count; x++)
+                    {
+                        if (val[x] == "Fasteners")
+                        {
+                            j = x;
+                            break;
+                        }
+                        attr1.Add(attr[x]);
+                        val1.Add(val[x]);
+                    }
 
-                     for (int k = 0; k < edge.Count; k++)
-                     {
+                    for (int k = 0; k < edge.Count; k++)
+                    {
 
-                         for (int i = 0; i < val1.Count; i++)
-                         {
-                             if (val1[i] != "Fasteners" && edge.Count != 0)
-                             {
-                                 if (val1[i].IndexOf('\\') == -1)
-                                 {
-                                     if (fams.Count != 0)
-                                     {
-                                         fam = fams.Find(delegate(ContentFamily cf)
-                                         {
-                                             return /*cf.DisplayName.IndexOf(val1[i]) != -1;*/ val1[i].IndexOf(cf.DisplayName) != -1;
-                                         });
-                                         if (fam == null)
-                                         {
-                                             fam = find(val1[i]); fams.Add(fam);
-                                         }
-                                     }
-                                     else
-                                     {
-                                         fam = find(val1[i]); fams.Add(fam);
-                                     }
-                                 }
-                                 string d = set.substring(attr1[i], "Diameter=").Replace('.', separator);
-                                 string dname = set.substring(attr1[i], "DiameterName=");
-                                 string len = set.substring(attr1[i], "Lenght=").Replace('.', separator);
-                                 string lname = set.substring(attr1[i], "DiameterLen=");
-                                 string thick = set.substring(attr1[i], "Thickness=").Replace('.', separator);
-                                 string thickname = set.substring(attr1[i], "ThicknessName=");
-                                 string offset = (set.substring(attr1[i], "Offset=").Replace('.', separator));
-                                 if (offset != "")
-                                     offsetDouble = Convert.ToDouble(offset);
-                                 string dir = set.substring(attr1[i], "Direction=");
-                                 bool boolDir = false;
-                                 if (dir == "Встречно") boolDir = true;
-                                 if (dir == "Сонаправлено") boolDir = false;
+                        for (int i = 0; i < val1.Count; i++)
+                        {
+                            if (val1[i] != "Fasteners" && edge.Count != 0)
+                            {
+                                if (val1[i].IndexOf('\\') == -1)
+                                {
+                                    if (fams.Count != 0)
+                                    {
+                                        fam = fams.Find(delegate (ContentFamily cf)
+                                        {
+                                            return /*cf.DisplayName.IndexOf(val1[i]) != -1;*/ val1[i].IndexOf(cf.DisplayName) != -1;
+                                        });
+                                        if (fam == null)
+                                        {
+                                            fam = find(val1[i]); fams.Add(fam);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        fam = find(val1[i]); fams.Add(fam);
+                                    }
+                                }
+                                string d = set.substring(attr1[i], "Diameter=").Replace('.', separator);
+                                string dname = set.substring(attr1[i], "DiameterName=");
+                                string len = set.substring(attr1[i], "Lenght=").Replace('.', separator);
+                                string lname = set.substring(attr1[i], "DiameterLen=");
+                                string thick = set.substring(attr1[i], "Thickness=").Replace('.', separator);
+                                string thickname = set.substring(attr1[i], "ThicknessName=");
+                                string offset = (set.substring(attr1[i], "Offset=").Replace('.', separator));
+                                if (offset != "")
+                                    offsetDouble = Convert.ToDouble(offset);
+                                string dir = set.substring(attr1[i], "Direction=");
+                                bool boolDir = false;
+                                if (dir == "Встречно") boolDir = true;
+                                if (dir == "Сонаправлено") boolDir = false;
 
-                                 if (coNew != null) coOld = coNew;
-                                 if (val1[i].StartsWith("v3#")) coNew = place(val1[i],compDef);
-                                     else if (val1[i].IndexOf('\\') != -1)
-                                 {
-                                     coNew = compDef.Occurrences.Add(val1[i], I.tg.CreateMatrix());
-                                 }
-                                 else
-                                 {
-                                     if (d != "" && len != "")
-                                         coNew = place(fam, Convert.ToDouble(d), dname, Convert.ToDouble(len), lname);
-                                     if (d != "" && len == "" && thick == "")
-                                         coNew = place(fam, Convert.ToDouble(d), dname);
-                                     if (d != "" && len == "" && thick != "")
-                                         coNew = place(fam, Convert.ToDouble(d), dname, Convert.ToDouble(thick), thickname);
-                                 }
-                                 if (coOld != null && coNew != coOld)
-                                 {
-                                     if (offset != "" && boolDir == true)
-                                         constr = insertMate(coNew, coOld, offsetDouble, true, "Вставка", "IDS_CONNECT", "iInsert",compDef);
-                                     else if (offset != "" && boolDir == false)
-                                         constr = insertMate(coNew, coOld, offsetDouble, false, "Вставка", "IDS_CONNECT", "iInsert",compDef);
-                                     else
-                                         iMateRes = insertMate(coNew, coOld, "Вставка", "IDS_CONNECT", "iInsert");
-                                 }
-                                 if (coOld == null && coNew != null)
-                                 {
-                                     if (offset != "")
-                                         insertMate(coNew, edge[k], offsetDouble / 10, boolDir, "Вставка", "IDS_CONNECT", "iInsert", compDef);
-                                     else if (offset == "" && boolDir == true)
-                                         insertMate(coNew, edge[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert", compDef);
-                                     else if (offset == "" && boolDir == false)
-                                         insertMate(coNew, edgeflip[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert", compDef);
-                                 }
-                                 //else
-                                 //{
-                                 //    insertMate(coNew, edge[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert");
-                                 //}
-                             }
-                             offsetDouble = 0;
+                                if (coNew != null) coOld = coNew;
+                                if (val1[i].StartsWith("v3#")) coNew = place(val1[i], compDef);
+                                else if (val1[i].IndexOf('\\') != -1)
+                                {
+                                    coNew = compDef.Occurrences.Add(val1[i], I.tg.CreateMatrix());
+                                }
+                                else
+                                {
+                                    if (d != "" && len != "")
+                                        coNew = place(fam, Convert.ToDouble(d), dname, Convert.ToDouble(len), lname);
+                                    if (d != "" && len == "" && thick == "")
+                                        coNew = place(fam, Convert.ToDouble(d), dname);
+                                    if (d != "" && len == "" && thick != "")
+                                        coNew = place(fam, Convert.ToDouble(d), dname, Convert.ToDouble(thick), thickname);
+                                }
+                                if (coOld != null && coNew != coOld)
+                                {
+                                    if (offset != "" && boolDir == true)
+                                        constr = insertMate(coNew, coOld, offsetDouble, true, "Вставка", "IDS_CONNECT", "iInsert", compDef);
+                                    else if (offset != "" && boolDir == false)
+                                        constr = insertMate(coNew, coOld, offsetDouble, false, "Вставка", "IDS_CONNECT", "iInsert", compDef);
+                                    else
+                                        iMateRes = insertMate(coNew, coOld, "Вставка", "IDS_CONNECT", "iInsert");
+                                }
+                                if (coOld == null && coNew != null)
+                                {
+                                    if (offset != "")
+                                        insertMate(coNew, edge[k], offsetDouble / 10, boolDir, "Вставка", "IDS_CONNECT", "iInsert", compDef);
+                                    else if (offset == "" && boolDir == true)
+                                        insertMate(coNew, edge[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert", compDef);
+                                    else if (offset == "" && boolDir == false)
+                                        insertMate(coNew, edgeflip[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert", compDef);
+                                }
+                                //else
+                                //{
+                                //    insertMate(coNew, edge[k], 0, true, "Вставка", "IDS_CONNECT", "iInsert");
+                                //}
+                            }
+                            offsetDouble = 0;
 
-                         }
-                         coNew = null; coOld = null;
-                     }
-                 }
-                 fams = null;
-                 addToFolder(ref m_AsmDoc);
-                 tr.End();
-             }
-             catch (Exception ex)
-             {
-                 MessageBox.Show(ex.ToString());
-             }
-         }
+                        }
+                        coNew = null; coOld = null;
+                    }
+                }
+                fams = null;
+                addToFolder(ref m_AsmDoc);
+                tr.End();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString());
+            }
+        }
 
         private void insertComponent(string strAttr, ref ComponentOccurrence coNew, ref ComponentOccurrence coOld)
         {
@@ -606,98 +973,98 @@ namespace InvAddIn
 
         private void findHoles(ref List<Inventor.Edge> lst, ref List<Inventor.Edge> lstflip, double d)
         {
-            
+
             foreach (ComponentOccurrence co in compDef.Occurrences)
             {
-                findEdges(co,ref lst,ref lstflip,d,co);
+                findEdges(co, ref lst, ref lstflip, d, co);
                 if (co.Suppressed == false && co.SubOccurrences.Count != 0)
                 {
                     foreach (ComponentOccurrence co1 in co.SubOccurrences)
                     {
                         ComponentOccurrence co3 = co1;
-                        findEdges(co1, ref lst, ref lstflip, d,co3);
-                   }
+                        findEdges(co1, ref lst, ref lstflip, d, co3);
+                    }
                 }
-            }    
+            }
         }
 
         private void findEdges(ComponentOccurrence co, ref List<Inventor.Edge> lst, ref List<Inventor.Edge> lstflip, double d, ComponentOccurrence co1)
         {
             bool flag = false;
             if (co.DefinitionDocumentType == DocumentTypeEnum.kPartDocumentObject)
+            {
+                Inventor.Document oDoc = (Document)co.Definition.Document;
+                //fCol = faceFromScketch((PartDocument)oDoc);
+                if (oDoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
                 {
-                    Inventor.Document oDoc = (Document)co.Definition.Document;
-                    //fCol = faceFromScketch((PartDocument)oDoc);
-                    if (oDoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
+                    foreach (PartFeature pf in co.SurfaceBodies[1].AffectedByFeatures)
                     {
-                        foreach (PartFeature pf in co.SurfaceBodies[1].AffectedByFeatures)
+                        if (pf.Type == ObjectTypeEnum.kHoleFeatureProxyObject)
                         {
-                            if (pf.Type == ObjectTypeEnum.kHoleFeatureProxyObject)
+                            HoleFeatureProxy hf = (HoleFeatureProxy)pf;
+                            foreach (Inventor.Face face in hf.Faces)
                             {
-                                HoleFeatureProxy hf = (HoleFeatureProxy)pf;
-                                foreach (Inventor.Face face in hf.Faces)
+                                if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
                                 {
-                                    if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
+                                    Circle geom = (Circle)face.Edges[1].Geometry;
+                                    if ((int)(geom.Radius * 1000) == (int)(d * 50))
                                     {
-                                        Circle geom = (Circle)face.Edges[1].Geometry;
-                                        if ((int)(geom.Radius * 1000) == (int)(d * 50))
+                                        flag = findInAsm(face.Edges[1], co1);
+                                        if (!flag) flag = findInAsm(face.Edges[2], co1);
+                                        if (!flag)
                                         {
-                                            flag = findInAsm(face.Edges[1], co1);
-                                            if (!flag) flag = findInAsm(face.Edges[2], co1);
-                                            if (!flag)
-                                            {
-                                                lst.Add(face.Edges[1]);
-                                                lstflip.Add(face.Edges[2]);
-                                            }
+                                            lst.Add(face.Edges[1]);
+                                            lstflip.Add(face.Edges[2]);
                                         }
                                     }
                                 }
                             }
-                            if (pf.Type == ObjectTypeEnum.kRectangularPatternFeatureProxyObject)
-                            {
-                                RectangularPatternFeatureProxy ro = (RectangularPatternFeatureProxy)pf;
-                                foreach (Inventor.Face face in ro.Faces)
-                                {
-                                    if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
-                                    {
-                                        Circle geom = (Circle)face.Edges[1].Geometry;
-                                        if ((int)(geom.Radius * 1000) == (int)(d * 50))
-                                        {
-                                            flag = findInAsm(face.Edges[1], co1);
-                                            if (!flag) flag = findInAsm(face.Edges[2], co1);
-                                            if (!flag)
-                                            {
-                                                lst.Add(face.Edges[1]);
-                                                lstflip.Add(face.Edges[2]);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            //if (pf.Type == ObjectTypeEnum.kiFeatureObject)
-                            //{
-                            //    iFeature iF = (iFeature)pf;
-                            //    foreach (Inventor.Face face in iF.Faces)
-                            //    {
-                            //        if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
-                            //        {
-                            //            Circle geom = (Circle)face.Edges[1].Geometry;
-                            //            if ((int)(geom.Radius * 1000) == (int)(d * 50))
-                            //            {
-                            //                flag = findInAsm(face.Edges[1], co1);
-                            //                if (!flag) flag = findInAsm(face.Edges[2], co1);
-                            //                if (!flag)
-                            //                {
-                            //                    lst.Add(face.Edges[1]);
-                            //                    lstflip.Add(face.Edges[2]);
-                            //                }
-                            //            }
-                            //        }
-                            //    }
-                            //}
                         }
+                        if (pf.Type == ObjectTypeEnum.kRectangularPatternFeatureProxyObject)
+                        {
+                            RectangularPatternFeatureProxy ro = (RectangularPatternFeatureProxy)pf;
+                            foreach (Inventor.Face face in ro.Faces)
+                            {
+                                if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
+                                {
+                                    Circle geom = (Circle)face.Edges[1].Geometry;
+                                    if ((int)(geom.Radius * 1000) == (int)(d * 50))
+                                    {
+                                        flag = findInAsm(face.Edges[1], co1);
+                                        if (!flag) flag = findInAsm(face.Edges[2], co1);
+                                        if (!flag)
+                                        {
+                                            lst.Add(face.Edges[1]);
+                                            lstflip.Add(face.Edges[2]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        //if (pf.Type == ObjectTypeEnum.kiFeatureObject)
+                        //{
+                        //    iFeature iF = (iFeature)pf;
+                        //    foreach (Inventor.Face face in iF.Faces)
+                        //    {
+                        //        if (face.Edges[1].GeometryType == CurveTypeEnum.kCircleCurve)
+                        //        {
+                        //            Circle geom = (Circle)face.Edges[1].Geometry;
+                        //            if ((int)(geom.Radius * 1000) == (int)(d * 50))
+                        //            {
+                        //                flag = findInAsm(face.Edges[1], co1);
+                        //                if (!flag) flag = findInAsm(face.Edges[2], co1);
+                        //                if (!flag)
+                        //                {
+                        //                    lst.Add(face.Edges[1]);
+                        //                    lstflip.Add(face.Edges[2]);
+                        //                }
+                        //            }
+                        //        }
+                        //    }
+                        //}
                     }
-                }                                                      
+                }
+            }
         }
 
         private bool cmpD(Inventor.Edge edge, double d)
@@ -711,17 +1078,17 @@ namespace InvAddIn
             return false;
         }
 
-        private void insertMate (ComponentOccurrence co, Edge edge, double offset, bool axes, string name, string nameEng, string nameEng2,AssemblyComponentDefinition compDef)
+        private void insertMate(ComponentOccurrence co, Edge edge, double offset, bool axes, string name, string nameEng, string nameEng2, AssemblyComponentDefinition compDef)
         {
-           foreach (iMateDefinition idef1 in co.iMateDefinitions)
-           {
-               if (idef1.Name.IndexOf(name) != -1 || idef1.Name.IndexOf(nameEng) != -1 || idef1.Name.IndexOf(nameEng2) != -1)
-               {
-                   Edge ed1 = (Edge)((InsertiMateDefinitionProxy)idef1).Entity;
-                   compDef.Constraints.AddInsertConstraint(ed1, edge, axes, offset);
-                   break;
-               }
-           }
+            foreach (iMateDefinition idef1 in co.iMateDefinitions)
+            {
+                if (idef1.Name.IndexOf(name) != -1 || idef1.Name.IndexOf(nameEng) != -1 || idef1.Name.IndexOf(nameEng2) != -1)
+                {
+                    Edge ed1 = (Edge)((InsertiMateDefinitionProxy)idef1).Entity;
+                    compDef.Constraints.AddInsertConstraint(ed1, edge, axes, offset);
+                    break;
+                }
+            }
         }
 
         private iMateResult insertMate(ComponentOccurrence co1, ComponentOccurrence co2, string name, string nameEng, string nameEng2)
@@ -746,10 +1113,10 @@ namespace InvAddIn
                     }
                 }
             }
-            return null;    
+            return null;
         }
 
-        private InsertConstraint insertMate(ComponentOccurrence co1, ComponentOccurrence co2, double offset ,bool axes , string name, string nameEng, string nameEng2, AssemblyComponentDefinition compDef,
+        private InsertConstraint insertMate(ComponentOccurrence co1, ComponentOccurrence co2, double offset, bool axes, string name, string nameEng, string nameEng2, AssemblyComponentDefinition compDef,
              int start1 = 0, int start2 = 0)
         {
             bool flag = false; int count1 = 0, count2 = 0;
@@ -772,7 +1139,7 @@ namespace InvAddIn
                             count2++;
                             if (count2 < start2) continue;
                             return compDef.Constraints.AddInsertConstraint(((InsertiMateDefinitionProxy)(idef1)).Entity, ((InsertiMateDefinitionProxy)(idef2)).Entity,
-                                axes, offset/10);
+                                axes, offset / 10);
                         }
                     }
                 }
@@ -783,10 +1150,10 @@ namespace InvAddIn
         private bool findInAsm(iMateDefinition idef, AssemblyComponentDefinition acd)
         {
             foreach (iMateResult ires in acd.iMateResults)
-                    {
-                        if (idef.ReferencedEntity == ires.Constraints[1].EntityOne || idef.ReferencedEntity == ires.Constraints[1].EntityTwo)
-                            return true;
-                    }
+            {
+                if (idef.ReferencedEntity == ires.Constraints[1].EntityOne || idef.ReferencedEntity == ires.Constraints[1].EntityTwo)
+                    return true;
+            }
             return false;
         }
 
@@ -794,7 +1161,7 @@ namespace InvAddIn
         {
             Circle cir1;
             cir1 = (Circle)edge.Geometry;
-            Inventor.Point pt1 = cir1.Center; 
+            Inventor.Point pt1 = cir1.Center;
             //pt1.TransformBy(co.Transformation);
             List<InsertConstraint> insconstr = new List<InsertConstraint>();
             foreach (ComponentOccurrence co1 in co.OccurrencePath)
@@ -804,7 +1171,7 @@ namespace InvAddIn
                     foreach (InsertConstraint ires in co1.Constraints)
                     {
                         if (ires.Suppressed == false)
-                        insconstr.Add(ires);
+                            insconstr.Add(ires);
                     }
                 }
                 catch (Exception)
@@ -821,7 +1188,7 @@ namespace InvAddIn
                 //pt2.TransformBy(co.Transformation); pt3.TransformBy(co.Transformation);
                 //if (edge.Equals(ires.EntityOne) || edge.Equals(ires.EntityTwo))
                 //if (cir1.Equals(ires.GeometryOne) || cir1.Equals(ires.GeometryTwo))
-                if (eq(pt1,pt2,pt3))
+                if (eq(pt1, pt2, pt3))
                     return true;
             }
             return false;
@@ -837,7 +1204,7 @@ namespace InvAddIn
             return false;
         }
 
-        private ComponentOccurrence place(ContentFamily cf, double d,string dname)
+        private ComponentOccurrence place(ContentFamily cf, double d, string dname)
         {
             mtx = invApp.TransientGeometry.CreateMatrix();
             //foreach (ContentTableColumn col in cf.TableColumns)
@@ -896,33 +1263,6 @@ namespace InvAddIn
                     if (Macros.StandardAddInServer.StandartPart == "1")
                         memberfilename = cf.CreateMember(row, out err, out failuremessage);
                     else
-                        {
-                            string name = pathFile + "\\" + row.GetCellValue("FILENAME").Replace("/", "-") + ".ipt";
-                            if (System.IO.File.Exists(name))
-                            {
-                                memberfilename = name;
-                            }
-                            else
-                            {
-                                memberfilename = cf.CreateMember(row, out err, out failuremessage, Custom: true, FileName: name);
-                            }
-                        }
-                    co = compDef.Occurrences.Add(memberfilename, mtx);
-                    return co;
-                }
-            }
-            return null;
-        }
-
-        private ComponentOccurrence place(string id, AssemblyComponentDefinition compDef)
-        {
-            mtx = invApp.TransientGeometry.CreateMatrix();
-            ContentCenter c = invApp.ContentCenter;
-            ContentFamily cf = (ContentFamily)c.GetContentObject(id.Substring(0,id.LastIndexOf('#')+1));
-            ContentTableRow row = (ContentTableRow)c.GetContentObject(id);
-                    if (Macros.StandardAddInServer.StandartPart == "1")
-                        memberfilename = cf.CreateMember(row, out err, out failuremessage);
-                    else
                     {
                         string name = pathFile + "\\" + row.GetCellValue("FILENAME").Replace("/", "-") + ".ipt";
                         if (System.IO.File.Exists(name))
@@ -936,6 +1276,33 @@ namespace InvAddIn
                     }
                     co = compDef.Occurrences.Add(memberfilename, mtx);
                     return co;
+                }
+            }
+            return null;
+        }
+
+        private ComponentOccurrence place(string id, AssemblyComponentDefinition compDef)
+        {
+            mtx = invApp.TransientGeometry.CreateMatrix();
+            ContentCenter c = invApp.ContentCenter;
+            ContentFamily cf = (ContentFamily)c.GetContentObject(id.Substring(0, id.LastIndexOf('#') + 1));
+            ContentTableRow row = (ContentTableRow)c.GetContentObject(id);
+            if (Macros.StandardAddInServer.StandartPart == "1")
+                memberfilename = cf.CreateMember(row, out err, out failuremessage);
+            else
+            {
+                string name = pathFile + "\\" + row.GetCellValue("FILENAME").Replace("/", "-") + ".ipt";
+                if (System.IO.File.Exists(name))
+                {
+                    memberfilename = name;
+                }
+                else
+                {
+                    memberfilename = cf.CreateMember(row, out err, out failuremessage, Custom: true, FileName: name);
+                }
+            }
+            co = compDef.Occurrences.Add(memberfilename, mtx);
+            return co;
             //return null;
         }
 
@@ -944,11 +1311,293 @@ namespace InvAddIn
             string memberfilename;
             string failuremessage;
             MemberManagerErrorsEnum err;
-            Matrix mtx = I.tg.CreateMatrix();
-            ContentCenter c = Macros.StandardAddInServer.m_inventorApplication.ContentCenter;
-            ContentFamily cf = (ContentFamily)c.GetContentObject(id.Substring(0, id.LastIndexOf('#') + 1));
-            ContentTableRow row = (ContentTableRow)c.GetContentObject(id);
+            //             Matrix mtx = I.tg.CreateMatrix();
+            ContentCenter c = I.app.ContentCenter;
+            //             ContentFamily cf = (ContentFamily)c.GetContentObject(id.Substring(0, id.LastIndexOf('#') + 1));
+            //             ContentTableRow row = (ContentTableRow)c.GetContentObject(id);
+            ContentFamily cf = getContentFamily(id, c);
+            ContentTableRow row = getContentTableRow(id, c);
             return memberfilename = cf.CreateMember(row, out err, out failuremessage);
+        }
+
+        static public ContentFamily getContentFamily(string id, ContentCenter c)
+        {
+            if (id.StartsWith("v3#"))
+                return c.GetContentObject(id.Substring(0, id.LastIndexOf('#') + 1)) as ContentFamily;
+            else
+            {
+                ContentFamily fam = null;
+                string path = u.getElem(id, 0), name = u.getElem(id, 1);
+                getContentFamily(c.TreeViewTopNode, name, path, ref fam);
+                return fam;
+            }
+        }
+
+        static public ContentTableRow getContentTableRow(string id, ContentCenter c)
+        {
+            return c.GetContentObject(id) as ContentTableRow;
+        }
+
+        static public ContentTableColumn getContentTableColumn(ContentFamily cf, ContentCenter c, string name)
+        {
+            return cf.TableColumns[name];
+        }
+
+        static public ContentTableColumn addColumn(ContentFamily cf, ContentTableColumn c, string name, string disp, string prName, string expr, string id)
+        {
+            if (u.isNull(c)) c = cf.TableColumns.Add(name, disp, ValueTypeEnum.kStringType);
+            if (!u.isNull(expr)) c.Expression = expr;
+            if (!u.isNull(prName)) c.SetPropertyMap(prName, id);
+            return c;
+        }
+
+        static public void addColumn(XMLDoc xml)
+        {
+            foreach (var item in xml.El.Descendants("copy"))
+            {
+                var vals = XMLDoc.getXAttributesValues(item, new string[] { "family", "no" });
+                if (!u.isNull(vals[1])) continue;
+                ContentCenter c = I.app.ContentCenter;
+                ContentFamily cf = getContentFamily(vals[0], c);
+                string p = I.p() + @"\xml\family\";
+                file.dir(p);
+                copyFamily(cf, p);
+            }
+            foreach (var item in xml.El.Descendants("restore"))
+            {
+                var vals = XMLDoc.getXAttributesValues(item, new string[] { "from", "to", "no" });
+                if (!u.isNull(vals[2])) continue;
+                ContentCenter c = I.app.ContentCenter;
+                ContentFamily cf = getContentFamily(vals[1], c);
+                string p = I.p() + @"\xml\family\";
+                file.dir(p);
+                restoreFamily(cf, p + vals[0] + ".xml");
+            }
+            foreach (var item in xml.El.Descendants("change"))
+            {
+                var vals = XMLDoc.getXAttributesValues(item, new string[] { "family", "no" });
+                if (!u.isNull(vals[1])) continue;
+                ContentCenter c = I.app.ContentCenter;
+                ContentFamily cf = getContentFamily(vals[0], c);
+                foreach (var e in item.Elements())
+                {
+                    if (e.Name == "link") linkColumn(e, cf);
+                    if (e.Name == "unlink") unlinkColumn(e, cf);
+                    if (e.Name == "add") addColumn(e, cf);
+                }
+                cf.Save();
+            }
+        }
+
+        static public void unlinkColumn(XElement el, ContentFamily cf)
+        {
+            var vals = XMLDoc.getXAttributesValues(el, new string[] { "cname" });
+            ContentTableColumn col = cf.TableColumns[vals[0]];
+            //string psid, ps;
+            //             try
+            //             {
+            //             }
+            //             catch (System.Exception ex)
+            //             {
+            //             	    
+            //             }
+            //col.GetPropertyMap(out psid, out ps);
+            //if (ps == "" || psid == "") return;
+            col.ClearPropertyMap();
+        }
+        static public void linkColumn(XElement el, ContentFamily cf)
+        {
+            var vals = XMLDoc.getXAttributesValues(el, new string[] { "cname", "id", "prop" });
+            ContentTableColumn col = cf.TableColumns[vals[0]];
+            linkColumn(col, vals[1], vals[2]);
+        }
+        static public void linkColumn(ContentTableColumn col, string set, string pr)
+        {
+            col.SetPropertyMap(set, pr);
+        }
+        static public void getContentFamily(ContentTreeViewNode n, string name, string path, ref ContentFamily fam)
+        {
+            foreach (ContentTreeViewNode node in n.ChildNodes)
+            {
+                string sp = u.getElem(path, 0, '^');
+                if (node.DisplayName != sp) continue;
+                path = file.trimStart(path, "^");
+                getContentFamily(node, name, path, ref fam);
+            }
+            foreach (ContentFamily item in n.Families)
+            {
+                if (item.DisplayName == name) { fam = item; return; }
+            }
+        }
+
+        //         static public string getFamilyName(ContentFamily cf)
+        //         {
+        //             string name = cf.DisplayName;
+        //             cf.
+        //         }
+
+        static public void copyFamily(ContentFamily cf, string p)
+        {
+            XMLDoc xdoc = new XMLDoc(file.combine(p, cf.ContentIdentifier + ".xml"), "head");
+            int i = 0;
+            Dictionary<string, string> dic = new Dictionary<string, string>();
+            dic.Add("folder", cf.MemberDirectory); dic.Add("dName", cf.DisplayName); dic.Add("desc", cf.Description);
+            xdoc.addXElement(xdoc.El, dic, "family");
+            dic.Clear();
+            foreach (ContentTableColumn c in cf.TableColumns)
+            {
+                i++;
+                dic.Add("Name", "c" + i); dic.Add("iName", c.InternalName);
+                dic.Add("dName", c.DisplayHeading);
+                object expr = c.Expression;
+                if (!u.isNull(expr)) dic.Add("expr", expr.ToString());
+                string id = null, pr = null;
+                try
+                {
+                    c.GetPropertyMap(out id, out pr);
+                    if (!u.isNull(id))
+                    {
+                        dic.Add("id", id); dic.Add("prop", pr);
+                    }
+                }
+                catch (System.Exception ex)
+                {
+
+                }
+                xdoc.addXElement(xdoc.El, dic, "column");
+                dic.Clear();
+            }
+            foreach (ContentTableRow row in cf.TableRows)
+            {
+                i = 0;
+                foreach (ContentTableCell ceil in row)
+                {
+                    i++;
+                    dic.Add("c" + i, ceil.Value);
+                }
+                xdoc.addXElement(xdoc.El, dic, "row");
+                dic.Clear();
+            }
+            xdoc.save();
+        }
+
+        static public void restoreFamily(ContentFamily cf, string fn)
+        {
+            XMLDoc xdoc = new XMLDoc(fn, "head");
+            cf.Manufacturer = "Teplomash";
+            foreach (var el in xdoc.El.Descendants("family"))
+            {
+                var els = XMLDoc.getXAttributesValues(el, new string[] { "folder", "desc", "dName" });
+                if (!u.isNull(els[0])) cf.MemberDirectory = els[0];
+                if (!u.isNull(els[1])) cf.Description = els[1];
+                if (!u.isNull(els[2])) cf.DisplayName = els[2] + "_";
+            }
+
+            foreach (ContentTableRow row in cf.TableRows)
+            {
+                row.Delete();
+            }
+            foreach (var el in xdoc.El.Descendants("column"))
+            {
+                var vals = XMLDoc.getXAttributesValues(el, new string[] { "Name", "iName", "dName", "expr", "id", "prop" });
+                ContentTableColumn col;
+                try
+                {
+                    col = cf.TableColumns[vals[1]];
+
+                }
+                catch (System.Exception ex)
+                {
+                    col = cf.TableColumns.Add(vals[1], vals[2], ValueTypeEnum.kStringType);
+                }
+                if (!u.isNull(vals[3]))
+                {
+                    try
+                    {
+                        col.Expression = replace(vals[3]);
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
+                if (u.isNull(vals[4]))
+                {
+                    col.ClearPropertyMap();
+                }
+                else
+                {
+                    //                     try
+                    //                     {
+                    col.SetPropertyMap(vals[4], vals[5]);
+                    //                     }
+                    //                     catch (System.Exception ex)
+                    //                     {
+                    //                     	
+                    //                     }
+                }
+            }
+            int colCount = cf.TableColumns.Count;
+            foreach (var el in xdoc.El.Descendants("row"))
+            {
+                //List<string> vals = new List<string>();
+                //el.SetAttributeValue("id", null);
+                //el.SetAttributeValue("prop", null);
+                //                 foreach (var item in el.Attributes())
+                //                 {
+                //                     vals.Add(item.Value);
+                //                 }
+                //                 while (colCount != vals.Count)
+                //                 {
+                //                     vals.Add(""); 
+                //                 }
+                string[] rd = new string[cf.TableColumns.Count]; //vals.ToArray();
+                ContentTableRow tr = cf.TableRows.Add(ref rd);
+                setValues(tr, el, xdoc);
+            }
+            cf.Save();
+        }
+
+        static public void setValues(ContentTableRow tr, XElement el, XMLDoc xml)
+        {
+            foreach (var item in el.Attributes())
+            {
+                string name = item.Name.ToString();
+                var col = XMLDoc.find("Name", name, "column", xml.El);
+                if (u.isNull(col)) continue;
+                name = XMLDoc.getAttributeValue(col, "iName");
+                ContentTableCell ceil = tr[name];
+                if (u.isNull(ceil)) continue;
+                ceil.Value = item.Value;
+            }
+        }
+
+        static public string replace(string v)
+        {
+            v = v.Replace("&amp;", "&");
+            v = v.Replace("&quot;", "<");
+            return v;
+        }
+
+        static public void addColumn(XElement el, ContentFamily cf)
+        {
+            var vals = XMLDoc.getXAttributesValues(el, new string[] { "cname", "cdisp", "prop", "expr", "id", "propName", "num" });
+            ContentTableColumn col;
+            try
+            {
+                col = cf.TableColumns[vals[0]];
+            }
+            catch (System.Exception ex)
+            {
+                col = null;
+            }
+            if (!u.isNull(vals[5]))
+            {
+                Property pr = u.getProp(I.aDoc(), vals[5]);
+                vals[4] = pr.PropId.ToString(); vals[2] = pr.Parent.InternalName;
+            }
+            col = addColumn(cf, col, vals[0], vals[1], vals[2], vals[3], vals[4]);
+            if (!u.isNull(vals[6])) col.KeyColumnOrder = u.convToInt(vals[6]);
         }
 
         //private void printToFile(string fileName)
@@ -963,7 +1612,7 @@ namespace InvAddIn
         {
             if (path.StartsWith("v3#"))
             {
-                string findStr = path.Substring(0,path.LastIndexOf('#')+1);
+                string findStr = path.Substring(0, path.LastIndexOf('#') + 1);
                 return (ContentFamily)invApp.ContentCenter.GetContentObject(findStr);
             }
             string[] spl = path.Split(':');
@@ -980,7 +1629,7 @@ namespace InvAddIn
 
             for (int i = 0; i < spl.Length - 1; i++)
             {
-                try 
+                try
                 {
                     ctvn = ctvn.ChildNodes[spl[i]];
                 }
@@ -992,18 +1641,18 @@ namespace InvAddIn
 
             //ctvn = findNode(ctvn, 0, spl);
 
-                                       
+
             ContentFamily cf;
             foreach (ContentFamily fam in ctvn.Families)
             {
-                if (fam.DisplayName == spl[spl.Length - 1]) { cf = fam; return cf ; }
+                if (fam.DisplayName == spl[spl.Length - 1]) { cf = fam; return cf; }
             }
             return null;
         }
 
-        private ContentTreeViewNode findNode(ContentTreeViewNode ctvn,int i, string[] path)
+        private ContentTreeViewNode findNode(ContentTreeViewNode ctvn, int i, string[] path)
         {
-            for (int j=1; j <= ctvn.ChildNodes.Count; j++)
+            for (int j = 1; j <= ctvn.ChildNodes.Count; j++)
             {
                 if (ctvn.ChildNodes[j].DisplayName == path[i])
                 {
@@ -1019,7 +1668,7 @@ namespace InvAddIn
         public bool containtsNode(BrowserNode node, BrowserFolder folder)
         {
             string[] spl = node.FullPath.Split(':');
-            string name = spl[spl.Length - 2] + ":" + spl[spl.Length-1];
+            string name = spl[spl.Length - 2] + ":" + spl[spl.Length - 1];
             BrowserNode tmp = folder.BrowserNode.BrowserNodes.OfType<BrowserNode>().FirstOrDefault(e => e.FullPath.EndsWith(name));
             return tmp == null ? false : true;
         }
@@ -1033,7 +1682,7 @@ namespace InvAddIn
             string[] tmp;
             System.Collections.Generic.List<string> match = new System.Collections.Generic.List<string>();
             System.Collections.Generic.List<string> result = new System.Collections.Generic.List<string>();
-            folders = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Folders.xml");
+            folders = new InvDoc.XML(I.p() + @"\Folders.xml");
             folders.ReadXML("Folders", ref match, ref result);
             //if ()
 
@@ -1047,7 +1696,7 @@ namespace InvAddIn
                 {
                     for (int i = 0; i < result.Count; i++)
                     {
-                        tmp = match[i+1].Split('$');
+                        tmp = match[i + 1].Split('$');
                         foreach (string str in tmp)
                         {
                             if (name.IndexOf(str) != -1)
@@ -1056,7 +1705,7 @@ namespace InvAddIn
                                 ss = ss.Substring(0, ss.Length - 1);
                                 BrowserFolder folder = addFolder(ss, ref asmDoc);
                                 if (!containtsNode(node, folder))
-                                folder.Add(node);
+                                    folder.Add(node);
                             }
                         }
                     }
@@ -1106,7 +1755,7 @@ namespace InvAddIn
         public void selOp(ref List<Edge> edgeCmp, ref List<Edge> edgeCmp1)
         {
             CommandManager cmdMgr = Macros.StandardAddInServer.m_inventorApplication.CommandManager;
-                    //input = cmdMgr.UserInputEvents;
+            //input = cmdMgr.UserInputEvents;
             try
             {
                 intEvts = cmdMgr.CreateInteractionEvents();
@@ -1172,8 +1821,8 @@ namespace InvAddIn
                 {
                     if (e.GeometryType == CurveTypeEnum.kCircleCurve && ((Circle)e.Geometry).Radius == r)
                     {
-                        if (!findInAsm(e,co))
-                        sel.AddToSelectedEntities(e);
+                        if (!findInAsm(e, co))
+                            sel.AddToSelectedEntities(e);
                     }
                 }
             }
@@ -1190,7 +1839,7 @@ namespace InvAddIn
                 try
                 { fc.Add((Face)s.PlanarEntity); }
                 catch (Exception) { }
-             }
+            }
             return fc;
         }
 

@@ -29,7 +29,7 @@ public class FormTreeView : Form
         sortDic = new List<KeyValuePair<int, int>>();
         val = InvAddIn.PropBtn.m_Prop.sort_val;
         NuM = new Dictionary<string, string>();
-        check = InvAddIn.PropBtn.m_Prop.part.Checked;
+        //check = InvAddIn.PropBtn.m_Prop.part.Checked;
 
         this.SuspendLayout();
 

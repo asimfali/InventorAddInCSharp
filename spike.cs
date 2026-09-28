@@ -54,7 +54,7 @@ namespace InvAddIn
             return Convert.ToDouble(val.Replace(',', separator));
         }
 
-        public bool colin (UnitVector2d v1, UnitVector2d v2, int tolerance)
+        public bool colin(UnitVector2d v1, UnitVector2d v2, int tolerance)
         {
             int x1 = (int)(v1.X * tolerance), x2 = (int)(v2.X * tolerance), y1 = (int)(v1.Y * tolerance), y2 = (int)(v2.Y * tolerance);
             if (x1 == x2 && y1 == y2) return false;
@@ -88,13 +88,13 @@ namespace InvAddIn
             SketchBlockDefinition def = smcd.SketchBlockDefinitions.Add(name);
             TransientGeometry tg = invApp.TransientGeometry;
             Point2d pt = tg.CreatePoint2d();
-            SketchPoint origin = def.SketchPoints.Add(pt,false);
+            SketchPoint origin = def.SketchPoints.Add(pt, false);
             def.GeometricConstraints.AddGround((SketchEntity)origin);
-            Point2d center = tg.CreatePoint2d(pt.X,pt.Y + H-R);
+            Point2d center = tg.CreatePoint2d(pt.X, pt.Y + H - R);
             SketchLine centerLine = def.SketchLines.AddByTwoPoints(origin, center);
             centerLine.Construction = true;
             centerLine.Centerline = true;
-            SketchLine leftLine = def.SketchLines.AddByTwoPoints(tg.CreatePoint2d(pt.X - L / 2, pt.Y),tg.CreatePoint2d(pt.X-R,center.Y));
+            SketchLine leftLine = def.SketchLines.AddByTwoPoints(tg.CreatePoint2d(pt.X - L / 2, pt.Y), tg.CreatePoint2d(pt.X - R, center.Y));
             SketchLine rightLine = def.SketchLines.AddByTwoPoints(tg.CreatePoint2d(pt.X + L / 2, pt.Y), tg.CreatePoint2d(pt.X + R, center.Y));
             SketchLine bottomLine = def.SketchLines.AddByTwoPoints(leftLine.StartSketchPoint, rightLine.StartSketchPoint);
             SketchArc arc = def.SketchArcs.AddByCenterStartEndPoint(centerLine.EndSketchPoint, rightLine.EndSketchPoint, leftLine.EndSketchPoint);
@@ -104,12 +104,13 @@ namespace InvAddIn
             def.GeometricConstraints.AddHorizontal((SketchEntity)bottomLine);
             def.GeometricConstraints.AddPerpendicular((SketchEntity)centerLine, (SketchEntity)bottomLine);
             def.GeometricConstraints.AddSymmetry((SketchEntity)leftLine, (SketchEntity)rightLine, centerLine);
+            if (name == "Прямой шип") def.GeometricConstraints.AddParallel((SketchEntity)leftLine, (SketchEntity)centerLine);
             def.GeometricConstraints.AddTangent((SketchEntity)arc, (SketchEntity)leftLine);
             def.GeometricConstraints.AddTangent((SketchEntity)arc, (SketchEntity)rightLine);
             def.GeometricConstraints.AddCoincident((SketchEntity)centerLine.EndSketchPoint, (SketchEntity)arc.CenterSketchPoint);
             RadiusDimConstraint rad = def.DimensionConstraints.AddRadius((SketchEntity)arc, arc.Geometry.Center);
-            rad.Parameter.Value = R; 
-            TwoPointDistanceDimConstraint dist = def.DimensionConstraints.AddTwoPointDistance(origin, arc.CenterSketchPoint, DimensionOrientationEnum.kVerticalDim,arc.Geometry.EndPoint);
+            rad.Parameter.Value = R;
+            TwoPointDistanceDimConstraint dist = def.DimensionConstraints.AddTwoPointDistance(origin, arc.CenterSketchPoint, DimensionOrientationEnum.kVerticalDim, arc.Geometry.EndPoint);
             dist.Parameter.Value = H - R;
             dist = def.DimensionConstraints.AddTwoPointDistance(bottomLine.StartSketchPoint, bottomLine.EndSketchPoint, DimensionOrientationEnum.kHorizontalDim, bottomLine.Geometry.EndPoint);
             dist.Parameter.Value = L;
@@ -119,16 +120,27 @@ namespace InvAddIn
             }
         }
 
-        public Edge findEdge(SheetMetalComponentDefinition smcd, ref UnitVector vec, ref UnitVector dir)
+        public Edge findEdge(SheetMetalComponentDefinition smcd, ref UnitVector vec, ref UnitVector dir, bool rev = true)
         {
             SurfaceBody body = smcd.SurfaceBodies[1];
             Face face = body.Faces.OfType<Face>().FirstOrDefault(f => f.SurfaceType == SurfaceTypeEnum.kCylinderSurface && f.TangentiallyConnectedFaces.Count != 0);
             if (face == null) return null;
             Cylinder cyl = face.Geometry as Cylinder;
-            dir = cyl.AxisVector;
             UnitVector vec1 = cyl.AxisVector;
-            InvDoc.u.abs(ref vec1);
+            //if (rev) InvDoc.u.abs(ref vec1);
+            if (rev)
+            {
+                Vector v = vec1.AsVector();
+                v.ScaleBy(-1);
+                vec1 = v.AsUnitVector();
+            }
+            ContourFlangeFeature cff = face.CreatedByFeature as ContourFlangeFeature;
+            if (cff != null)
+            {
+                vec1 = ((PlanarSketch)((SketchEntity)cff.Definition.Path[1].SketchEntity).Parent).PlanarEntityGeometry.Normal;
+            }
             vec = vec1;
+            dir = vec1;
             Edge ed = face.Edges.OfType<Edge>().Where(e => e.TangentiallyConnectedEdges.Count > 1).OrderBy(el => direct(vec1, el)).Last();
             Double thick = (double)smcd.Thickness.Value;
             thick = Math.Round(thick, 3);
@@ -152,6 +164,7 @@ namespace InvAddIn
             Face f = ed.Faces.OfType<Face>().OrderBy(a => a.Evaluator.Area).First();
             foreach (Edge e in f.Edges)
             {
+                if (e.GeometryType != CurveTypeEnum.kCircularArcCurve) continue;
                 if (!e.Equals(ed) && InvDoc.u.getLenght(e) != thick)
                 {
                     ed = e; break;
@@ -166,30 +179,36 @@ namespace InvAddIn
             Edge edStart = null/* = edges[1] as Edge*/,
                 edEnd = null/* = edges[edges.Count] as Edge*/;
             UnitVector v = I.tg.CreateUnitVector(vec.Y, vec.Z, vec.X);
-
-                for (int i = 0; i < edges.Count - 1; i++)
+            if (edges.Count == 2)
+            {
+                Edge e = u.get<Edge>(edges, f => f.GeometryType == CurveTypeEnum.kLineSegmentCurve);
+                return e;
+            }
+            for (int i = 0; i < edges.Count - 1; i++)
+            {
+                Edge ed1 = edges[i + 1] as Edge;
+                Edge ed2 = edges[i + 2] as Edge;
+                if (!(InvDoc.u.eq(ed1.StopVertex, ed2.StartVertex) || InvDoc.u.eq(ed1.StartVertex, ed2.StopVertex)))
                 {
-                    Edge ed1 = edges[i + 1] as Edge;
-                    Edge ed2 = edges[i + 2] as Edge;
-                    if (!(InvDoc.u.eq(ed1.StopVertex, ed2.StartVertex) || InvDoc.u.eq(ed1.StartVertex, ed2.StopVertex)))
+                    edStart = ed1;
+                    if (ed1.GeometryType == CurveTypeEnum.kLineSegmentCurve && ed2.GeometryType == CurveTypeEnum.kLineSegmentCurve)
                     {
-                        edStart = ed1;
-                        if (ed1.GeometryType == CurveTypeEnum.kLineSegmentCurve && ed2.GeometryType == CurveTypeEnum.kLineSegmentCurve)
-                        {
-                            if (i - 1 == 0) edEnd = edges[edges.Count] as Edge;
-                            else edEnd = edges[i - 1] as Edge;
-                        }
-                        else
-                        {
-                            edEnd = ed2;
-                        }
+                        if (i - 1 == 0) edEnd = edges[edges.Count] as Edge;
+                        else edEnd = edges[i - 1] as Edge;
+                    }
+                    else
+                    {
+                        edEnd = ed2;
                     }
                 }
-            
-                double d1 = direct(v, edEnd.StopVertex), d2 = direct(v, edStart.StartVertex);
+            }
 
-                if (vec.Y == 1) return (d1 > d2) ? edEnd : edStart;
-                else return (d1 < d2) ? edEnd : edStart;
+            double d1 = direct(v, edEnd.StopVertex), d2 = direct(v, edStart.StartVertex);
+            if (edEnd.GeometryType != CurveTypeEnum.kLineSegmentCurve) return edStart;
+            else if (edStart.GeometryType != CurveTypeEnum.kLineSegmentCurve) return edEnd;
+
+            if (vec.Y == 1) return (d1 > d2) ? edEnd : edStart;
+            else return (d1 < d2) ? edEnd : edStart;
         }
 
         public double direct(UnitVector vec, Vertex vert)
@@ -215,21 +234,34 @@ namespace InvAddIn
             return null;
         }
 
-        public void addSketch(SheetMetalComponentDefinition smcd, double H, double R, double L)
+        public void addSketch(SheetMetalComponentDefinition smcd, double H, double R, double L, bool rev = true, Vertex v = null)
         {
             UnitVector vect = null;
-            edge = findEdge(smcd, ref vec, ref vect);
+            edge = null;
+            if (v != null)
+            {
+                var edges = v.Edges.OfType<Edge>().OrderBy(f => f.StartVertex.Point.DistanceTo(f.StopVertex.Point));
+                edge = edges.Last();
+                var tmp = (edge.StopVertex.Equals(v)) ? edge.StartVertex.Point.VectorTo(edge.StopVertex.Point) :
+                    edge.StopVertex.Point.VectorTo(edge.StartVertex.Point);
+                vect = tmp.AsUnitVector();
+                vec = vect;
+                edge = edges.ElementAt(1);
+            }
+            else
+                edge = findEdge(smcd, ref vec, ref vect, rev);
             Face face = edge.Faces.OfType<Face>().OrderBy(f => f.Evaluator.Area).Last();
             ps = smcd.Sketches.Add(face);
             WorkAxis w = wa(smcd, vect);
             if (w != null)
             {
-                ps.AxisEntity = w;
+                ps.AxisEntity = w; ps.NaturalAxisDirection = true;
             }
-            ps.Name = "Шип";
+            if (v == null)
+                ps.Name = "Шип";
             lengths = new double[edge.TangentiallyConnectedEdges.Count];
-            addLenght(edge, ref lengths);
-            addSData(lengths);
+            var ts = addLenght(edge, ref lengths);
+            addSData(lengths, ts);
             fillSData();
             spikesForm();
         }
@@ -258,12 +290,18 @@ namespace InvAddIn
             InterfaceDll.Lbl lbs;
             lbs = new InterfaceDll.Lbl(offsetX, offsetY, 100, 15, insPt, f, "Участок ");
             cbs = new InterfaceDll.CB(offsetX, offsetY, 200, 15, insPt, f);
+            cbs[0].Visible = false;
             foreach (spickesData d in sData)
             {
                 cbs.position(lbs.last(), true);
                 lbs.add("Участок " + i, Y: true);
                 cbs.add(d.count.ToString(), new[] { "0", "1", "2", "3", "4", "5" }, Y: true);
-                i++; 
+                if (d.l < 0.8 && d.ty == typeLineSpike.Arc)
+                {
+                    cbs.last().Visible = false;
+                    cbs.last().Text = "0";
+                }
+                i++;
             }
 
             InterfaceDll.Btn btns = new InterfaceDll.Btn(offsetX, offsetY, 100, 20, insPt, f, spike_Click, "Добавить");
@@ -318,9 +356,9 @@ namespace InvAddIn
             bool last = false;
             List<int> except = new List<int>(1);
             XMLDoc xmlDoc;
-            if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml"))
+            if (System.IO.File.Exists(I.p() + @"\spike.xml"))
             {
-                xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml", "head");
+                xmlDoc = new XMLDoc(I.p() + @"\spike.xml", "head");
                 foreach (var el in xmlDoc.Doc.Root.Element("except").Elements())
                 {
                     except.Add((int)(double.Parse(el.Value.Replace('.', ',')) * 10));
@@ -337,7 +375,7 @@ namespace InvAddIn
                 {
                     spickesData sd = sData.Find(s => InvDoc.u.eq(s.l, lengths[i]));
                     if (sd.count != 0)
-                    addSketchBlock(le, lengths[i], pt, projectSL, last, dir, norm, sd);
+                        addSketchBlock(le, lengths[i], pt, projectSL, last, dir, norm, sd);
                 }
                 le += lengths[i];
             }
@@ -365,7 +403,7 @@ namespace InvAddIn
 
         public void move(SketchLine sl, Vector2d v, double l)
         {
-            v.Normalize(); v.ScaleBy(l); 
+            v.Normalize(); v.ScaleBy(l);
             SketchPoint sp = sl.StartSketchPoint;
             sp.MoveBy(v);
             sp = sl.EndSketchPoint;
@@ -374,12 +412,14 @@ namespace InvAddIn
 
         public void next()
         {
+            TwoPointDistanceDimConstraint dim_con = null;
+            List<TwoPointDistanceDimConstraint> dims = new List<TwoPointDistanceDimConstraint>();
             foreach (SketchBlock item in ps.SketchBlocks)
             {
                 item.Explode();
             }
             SketchLine newLin = ps.SketchLines.OfType<SketchLine>().FirstOrDefault(l => (int)(l.Length * 1000) == (int)(L * 1000));
-            ps.DimensionConstraints.AddTwoPointDistance(newLin.StartSketchPoint, newLin.EndSketchPoint, DimensionOrientationEnum.kAlignedDim, Drawings.midPoint(newLin.StartSketchPoint.Geometry, newLin.EndSketchPoint.Geometry, 0));
+            dim_con = ps.DimensionConstraints.AddTwoPointDistance(newLin.StartSketchPoint, newLin.EndSketchPoint, DimensionOrientationEnum.kAlignedDim, Drawings.midPoint(newLin.StartSketchPoint.Geometry, newLin.EndSketchPoint.Geometry, 0));
             foreach (SketchLine item in ps.SketchLines.OfType<SketchLine>().Where(l => (int)(l.Length * 1000) == (int)(L * 1000)))
             {
                 if (item.Equals(newLin) || item.Constraints.OfType<EqualLengthConstraint>().Count() != 0) continue;
@@ -394,8 +434,9 @@ namespace InvAddIn
             SketchLine oldLine = null;
             newLin = ps.SketchLines.OfType<SketchLine>().First(l => l.Centerline == true);
             SketchLine startLine = ps.SketchLines.OfType<SketchLine>().First(l => l.Construction == true);
-            ps.DimensionConstraints.AddTwoPointDistance(newLin.StartSketchPoint, newLin.EndSketchPoint, DimensionOrientationEnum.kAlignedDim,
+            dim_con = ps.DimensionConstraints.AddTwoPointDistance(newLin.StartSketchPoint, newLin.EndSketchPoint, DimensionOrientationEnum.kAlignedDim,
                 Drawings.midPoint(newLin.StartSketchPoint.Geometry, newLin.EndSketchPoint.Geometry, 0));
+            dim_con.Parameter.Value = u.round((double)dim_con.Parameter.Value, 2);
             var slines = ps.SketchLines.OfType<SketchLine>().Where(l => l.Centerline == true);
             double offset = 0;
             foreach (SketchLine l in slines)
@@ -410,14 +451,24 @@ namespace InvAddIn
                     Point2d pt = oldLine.EndSketchPoint.Geometry;
                     offset += 5;
                     ps.GeometricConstraints.AddEqualLength(l, newLin);
-                    ps.DimensionConstraints.AddTwoPointDistance(l.StartSketchPoint, startLine.StartSketchPoint, DimensionOrientationEnum.kVerticalDim,
-                      Drawings.midPoint(pt, l.EndSketchPoint.Geometry, offset));
+                    dims.Add(ps.DimensionConstraints.AddTwoPointDistance(l.StartSketchPoint, startLine.StartSketchPoint, DimensionOrientationEnum.kVerticalDim,
+                      Drawings.midPoint(pt, l.EndSketchPoint.Geometry, offset)));
+
                 }
                 oldLine = l;
+            }
+            foreach (var dim in dims)
+            {
+                dim.Parameter.Value = u.round((double)dim.Parameter.Value, 1);
             }
             try
             {
                 WorkPlane wp = smcd.WorkPlanes["Шип_справа"];
+                CutFeature cut = Offset.addCut(smcd, "Шип");
+                Offset.project(smcd, "Шип_проекция");
+                ObjectCollection objs = Macros.StandardAddInServer.m_inventorApplication.TransientObjects.CreateObjectCollection();
+                objs.Add(cut);
+                Offset.addMirror(smcd, objs, "Шип_слева", vec);
             }
             catch (Exception)
             {
@@ -429,24 +480,29 @@ namespace InvAddIn
                 Offset.addMirror(smcd, objs, "Шип_слева", vec);
             }
         }
+        public enum typeLineSpike
+        {Line, Arc}
 
         public class spickesData
         {
             public double l;
             public int count;
+            public bool vis = true;
+            public typeLineSpike ty = typeLineSpike.Line;
             public spickesData(double l, int c)
             {
                 this.l = l; count = c;
+                
             }
         }
 
-        public void addSData(double[] lengths)
+        public void addSData(double[] lengths, List<typeLineSpike> ts)
         {
             List<int> except = new List<int>(1);
             XMLDoc xmlDoc; bool last = false;
-            if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml"))
+            if (System.IO.File.Exists(I.p() + @"\spike.xml"))
             {
-                xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml", "head");
+                xmlDoc = new XMLDoc(I.p() + @"\spike.xml", "head");
                 foreach (var el in xmlDoc.Doc.Root.Element("except").Elements())
                 {
                     except.Add((int)(double.Parse(el.Value.Replace('.', ',')) * 10));
@@ -459,9 +515,11 @@ namespace InvAddIn
             {
                 if (i == lengths.Length - count)
                     last = true;
-                if (lengths[i] > 0.7 && !except.Exists(e => e == Math.Round(lengths[i], 2) * 100))
+                if (lengths[i] > 0 && !except.Exists(e => e == Math.Round(lengths[i], 2) * 100))
                 {
-                    sData.Add(new spickesData(lengths[i], 1));
+                    var sd = new spickesData(lengths[i], 1);
+                    sd.ty = ts[i];
+                    sData.Add(sd); 
                 }
             }
         }
@@ -472,9 +530,9 @@ namespace InvAddIn
             for (int i = 0; i < sData.Count; i++)
 			{
                 spickesData sd = sData[i];
-                if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml"))
+                if (System.IO.File.Exists(I.p() + @"\spike.xml"))
                 {
-                    xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\spike.xml", "head");
+                    xmlDoc = new XMLDoc(I.p() + @"\spike.xml", "head");
                     foreach (var el in xmlDoc.Doc.Root.Element("spikes").Elements())
                     {
                         if (sd.l > double.Parse(el.Attribute("min").Value.Replace('.', ',')) * 0.1 && sd.l <= double.Parse(el.Attribute("max").Value.Replace('.', ',')) * 0.1)
@@ -690,25 +748,31 @@ namespace InvAddIn
             return vec;
         }
 
-        public void addLenght(Edge e, ref double[] arr)
+        public List<typeLineSpike> addLenght(Edge e, ref double[] arr)
         {
             //bool flag = false;
+            List<typeLineSpike> ts = new List<typeLineSpike>();
             Edge ed = null, edComp = null; //Vector vec = null, vec1 = null; Vertex pt = null;
             double kFactor = double.Parse(smcd.UnfoldMethod.kFactor.Remove(5).Replace('.',',')), le;
             double thickness = Math.Round((double)smcd.Thickness.Value,3);
+            var sb = e.Faces[1].SurfaceBody;
+            thickness = Math.Round(double.Parse(smcd.GetBodySheetMetalStyle(sb).Thickness)/10, 3); ;
             for (int i = 1; i < e.TangentiallyConnectedEdges.Count+1; i++)
             {
+                var t = typeLineSpike.Line;
                 ed = e.TangentiallyConnectedEdges[i] as Edge;
                 getLenght(ed);
                 if (ed.GeometryType == CurveTypeEnum.kCircularArcCurve)
                 {
                     edComp = changeEdge(ed, thickness);
-                    if (InvDoc.u.getLenght(ed) > InvDoc.u.getLenght(edComp)) ed = edComp;
+                    if (u.getLenght(ed) > u.getLenght(edComp)) 
+                        ed = edComp;
                     Arc3d arc = (Arc3d)ed.Geometry;
                     double r = arc.Radius;
                     double angl = arc.SweepAngle;
                     r += kFactor * thickness;
                     le = r * angl;
+                    t = typeLineSpike.Arc;
                     //vec1 = pt.Point.VectorTo(ed.StopVertex.Point);
                 }
                 else
@@ -725,7 +789,9 @@ namespace InvAddIn
 //                     else flag = false;
 //                 }
                 arr[i-1] = le;
+                ts.Add(t);
             }
+            return ts;
         }
 
         public double getLenght(Edge e)
@@ -759,18 +825,44 @@ namespace InvAddIn
             ps.RotateSketchObjects(col, sl.Geometry.MidPoint, angl);
         }
 
+        static public double getMax(Box b)
+        {
+            return b.MaxPoint.X - b.MinPoint.X;
+        }
+
         static public WorkPlane addPlane(SheetMetalComponentDefinition smcd, UnitVector vec)
         {
             string val = "0";
             SheetMetalFeatures smf = smcd.Features as SheetMetalFeatures;
-            DistanceExtent pfe = smf.ContourFlangeFeatures[1].Definition.DefaultWidthExtent as DistanceExtent;
-            val = pfe.Distance.Name + "/2 - 6.5";
+            if (smf.ContourFlangeFeatures.Count != 0)
+            {
+                DistanceExtent pfe = smf.ContourFlangeFeatures[1].Definition.DefaultWidthExtent as DistanceExtent;
+                val = pfe.Distance.Name + "/2 - 6.5";
+            }
+            else
+            {
+                var der = smcd.ReferenceComponents.DerivedPartComponents[1];
+                if (der == null) return null;
+                var b = der.SolidBodies[1];
+                var rb = b.RangeBox;
+                val = Math.Round((getMax(rb)*5 - 6.5)).ToString();
+            }
             Parameter p = InvAddIn.CreateComponent.getParameter((Document)smcd.Document, "БВ_длина");
             if (p != null)
             {
             val = "БВ_длина/2 + 1";
             }
-                WorkPlane wp = smcd.WorkPlanes.OfType<WorkPlane>().First(w => InvDoc.u.eq(vec, w.Plane.Normal));
+                WorkPlane wp = null;
+                try
+                {
+                    wp = smcd.WorkPlanes.OfType<WorkPlane>().First(w => InvDoc.u.eq(vec, w.Plane.Normal));
+                }
+                catch (System.Exception ex)
+                {
+                    Vector v = vec.AsVector(); v.ScaleBy(-1);
+                    vec = v.AsUnitVector();
+                    wp = smcd.WorkPlanes.OfType<WorkPlane>().First(w => InvDoc.u.eq(vec, w.Plane.Normal));
+                }
                 wp = smcd.WorkPlanes.AddByPlaneAndOffset(wp, val);
                 wp.Name = "Шип_справа"; wp.Visible = false;
                 //val = "-(БВ_длина/2 + 1)";

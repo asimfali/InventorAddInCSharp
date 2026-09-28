@@ -5,14 +5,16 @@ using Inventor;
 namespace InvAddIn
 {
     class Panel
-    { 
+    {
+        
         #region DataMembers
             private static Inventor.Application m_inventorApplication;
             public static Inventor.CommandControl m_commandControl;
             private Inventor.CommandControls m_commandControls;
+            private readonly UserInterfaceManager uim = I.app.UserInterfaceManager;
         #endregion
-            #region "Properties"
-            public Inventor.Application InventorApplication
+        #region "Properties"
+        public Inventor.Application InventorApplication
             {
                 set
                 {
@@ -34,10 +36,8 @@ namespace InvAddIn
         #region "Methods"
             public Panel( Inventor.Application invApp, ButtonDefinition btnDef ,string ribbonName, string ribbonTabName, string displayName, string intName, string m_guid)
             {
-                UserInterfaceManager userInterfaceManager;
-                userInterfaceManager = invApp.UserInterfaceManager;
                 Ribbons ribbons;
-                ribbons = userInterfaceManager.Ribbons;
+                ribbons = uim.Ribbons;
                 Ribbon ribbon;
                 ribbon = ribbons[ribbonName];
                 RibbonTabs ribbonTabs;
@@ -52,9 +52,13 @@ namespace InvAddIn
                 m_commandControls = ribbonPanel.CommandControls;
                 m_commandControl = m_commandControls.AddButton(btnDef);
             }
+        public Panel(string ribbonName, string ribbonTabName, string displayName, string intName, string m_guid)
+        {
+            RibbonPanel rp = uim.Ribbons[ribbonName].RibbonTabs[ribbonTabName].RibbonPanels.Add(displayName, intName, m_guid);
+            m_commandControls = rp.CommandControls;
+        }
             public Panel(string ribbonName, string ribbonTabName, string ribbonPanelName)
             {
-                UserInterfaceManager uim = Macros.StandardAddInServer.m_inventorApplication.UserInterfaceManager;
                 m_commandControls = uim.Ribbons[ribbonName].RibbonTabs[ribbonTabName].RibbonPanels[ribbonPanelName].CommandControls;
             }
         public void addControl(ButtonDefinition btnDef)

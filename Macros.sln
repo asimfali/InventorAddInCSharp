@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31129.286
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Excel", "..\Excel\Excel.csproj", "{4FB8D545-FC46-46C9-B168-18277E919166}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dxf", "..\WithDXF\dxf\dxf.csproj", "{07E060A1-F6C9-415C-AD47-CFE9EF5AD496}"
@@ -11,11 +13,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Macros", "Macros.csproj", "
 	ProjectSection(ProjectDependencies) = postProject
 		{D1B64442-0EF3-4A17-9D78-94C8ADDA22D5} = {D1B64442-0EF3-4A17-9D78-94C8ADDA22D5}
 		{4122EC58-CD77-4625-88EF-A782961EAEAC} = {4122EC58-CD77-4625-88EF-A782961EAEAC}
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A} = {4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InterfaceDll", "..\InterfaceDll\InterfaceDll.csproj", "{4122EC58-CD77-4625-88EF-A782961EAEAC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TableDll", "..\TableDll\TableDll.csproj", "{D1B64442-0EF3-4A17-9D78-94C8ADDA22D5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "printLib", "..\printLib\printLib.csproj", "{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -105,8 +110,27 @@ Global
 		{D1B64442-0EF3-4A17-9D78-94C8ADDA22D5}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{D1B64442-0EF3-4A17-9D78-94C8ADDA22D5}.Release|x64.ActiveCfg = Release|Any CPU
 		{D1B64442-0EF3-4A17-9D78-94C8ADDA22D5}.Release|x86.ActiveCfg = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|x64.Build.0 = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Debug|x86.Build.0 = Debug|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|x64.ActiveCfg = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|x64.Build.0 = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|x86.ActiveCfg = Release|Any CPU
+		{4E6B35BB-4CAE-4E47-BAC0-0871367DB79A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B14674C0-1806-4197-B897-12B4F6ACBC40}
 	EndGlobalSection
 EndGlobal

@@ -8,12 +8,11 @@ namespace InvAddIn
 {
    public class Utility
     {
+
         #region Data Members
-        String str;
         Inventor.Document m_doc;
         Inventor.DrawingDocument m_Drw;
         Inventor.AssemblyDocument m_Asm;
-        Inventor.Style style;
         #endregion
 
         public Utility(Document newDoc)

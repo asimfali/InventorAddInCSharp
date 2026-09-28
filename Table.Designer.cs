@@ -43,6 +43,7 @@ namespace InvAddIn
             this.Note = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.contextMenuStrip1 = new System.Windows.Forms.ContextMenuStrip(this.components);
             this.VariableToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.удалитьДокументациюToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.subVariableToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.button1 = new System.Windows.Forms.Button();
             this.button3 = new System.Windows.Forms.Button();
@@ -134,16 +135,24 @@ namespace InvAddIn
             // contextMenuStrip1
             // 
             this.contextMenuStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.VariableToolStripMenuItem});
+            this.VariableToolStripMenuItem,
+            this.удалитьДокументациюToolStripMenuItem});
             this.contextMenuStrip1.Name = "contextMenuStrip1";
-            this.contextMenuStrip1.Size = new System.Drawing.Size(241, 26);
+            this.contextMenuStrip1.Size = new System.Drawing.Size(253, 48);
             // 
             // VariableToolStripMenuItem
             // 
             this.VariableToolStripMenuItem.Name = "VariableToolStripMenuItem";
-            this.VariableToolStripMenuItem.Size = new System.Drawing.Size(240, 22);
+            this.VariableToolStripMenuItem.Size = new System.Drawing.Size(252, 22);
             this.VariableToolStripMenuItem.Text = "Добавить в переменные данные";
             this.VariableToolStripMenuItem.Click += new System.EventHandler(this.subVariable_Click);
+            // 
+            // удалитьДокументациюToolStripMenuItem
+            // 
+            this.удалитьДокументациюToolStripMenuItem.Name = "удалитьДокументациюToolStripMenuItem";
+            this.удалитьДокументациюToolStripMenuItem.Size = new System.Drawing.Size(252, 22);
+            this.удалитьДокументациюToolStripMenuItem.Text = "Удалить документацию";
+            this.удалитьДокументациюToolStripMenuItem.Click += new System.EventHandler(this.удалитьДокументациюToolStripMenuItem_Click);
             // 
             // subVariableToolStripMenuItem
             // 
@@ -207,20 +216,20 @@ namespace InvAddIn
             this.safeToolStripMenuItem,
             this.clearToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
-            this.fileToolStripMenuItem.Size = new System.Drawing.Size(45, 20);
+            this.fileToolStripMenuItem.Size = new System.Drawing.Size(48, 20);
             this.fileToolStripMenuItem.Text = "Файл";
             // 
             // safeToolStripMenuItem
             // 
             this.safeToolStripMenuItem.Name = "safeToolStripMenuItem";
-            this.safeToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.safeToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
             this.safeToolStripMenuItem.Text = "Сохранить в модель";
             this.safeToolStripMenuItem.Click += new System.EventHandler(this.safeToolStripMenuItem_Click);
             // 
             // clearToolStripMenuItem
             // 
             this.clearToolStripMenuItem.Name = "clearToolStripMenuItem";
-            this.clearToolStripMenuItem.Size = new System.Drawing.Size(178, 22);
+            this.clearToolStripMenuItem.Size = new System.Drawing.Size(186, 22);
             this.clearToolStripMenuItem.Text = "Очистить модель";
             this.clearToolStripMenuItem.Click += new System.EventHandler(this.clearToolStripMenuItem_Click);
             // 
@@ -230,20 +239,20 @@ namespace InvAddIn
             this.экспортВXMLToolStripMenuItem,
             this.импортИзXMLToolStripMenuItem});
             this.переменныеДанныеToolStripMenuItem.Name = "переменныеДанныеToolStripMenuItem";
-            this.переменныеДанныеToolStripMenuItem.Size = new System.Drawing.Size(124, 20);
+            this.переменныеДанныеToolStripMenuItem.Size = new System.Drawing.Size(135, 20);
             this.переменныеДанныеToolStripMenuItem.Text = "Переменные данные";
             // 
             // экспортВXMLToolStripMenuItem
             // 
             this.экспортВXMLToolStripMenuItem.Name = "экспортВXMLToolStripMenuItem";
-            this.экспортВXMLToolStripMenuItem.Size = new System.Drawing.Size(147, 22);
+            this.экспортВXMLToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
             this.экспортВXMLToolStripMenuItem.Text = "Экспорт в XML";
             this.экспортВXMLToolStripMenuItem.Click += new System.EventHandler(this.экспортВXMLToolStripMenuItem_Click);
             // 
             // импортИзXMLToolStripMenuItem
             // 
             this.импортИзXMLToolStripMenuItem.Name = "импортИзXMLToolStripMenuItem";
-            this.импортИзXMLToolStripMenuItem.Size = new System.Drawing.Size(147, 22);
+            this.импортИзXMLToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
             this.импортИзXMLToolStripMenuItem.Text = "Импорт из XML";
             this.импортИзXMLToolStripMenuItem.Click += new System.EventHandler(this.импортИзXMLToolStripMenuItem_Click);
             // 
@@ -309,12 +318,12 @@ namespace InvAddIn
             this.contextMenuStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.загрузитьДанныеToolStripMenuItem});
             this.contextMenuStrip2.Name = "contextMenuStrip2";
-            this.contextMenuStrip2.Size = new System.Drawing.Size(169, 26);
+            this.contextMenuStrip2.Size = new System.Drawing.Size(173, 26);
             // 
             // загрузитьДанныеToolStripMenuItem
             // 
             this.загрузитьДанныеToolStripMenuItem.Name = "загрузитьДанныеToolStripMenuItem";
-            this.загрузитьДанныеToolStripMenuItem.Size = new System.Drawing.Size(168, 22);
+            this.загрузитьДанныеToolStripMenuItem.Size = new System.Drawing.Size(172, 22);
             this.загрузитьДанныеToolStripMenuItem.Text = "Загрузить данные";
             this.загрузитьДанныеToolStripMenuItem.Click += new System.EventHandler(this.загрузитьДанныеToolStripMenuItem_Click_1);
             // 
@@ -597,6 +606,7 @@ namespace InvAddIn
         private System.Windows.Forms.Button button2;
         private ContextMenuStrip contextMenuStrip2;
         private ToolStripMenuItem загрузитьДанныеToolStripMenuItem;
+        private ToolStripMenuItem удалитьДокументациюToolStripMenuItem;
     }
 
 }

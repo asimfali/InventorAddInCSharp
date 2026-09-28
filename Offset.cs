@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using Inventor;
+using InvDoc;
 
 namespace InvAddIn
 {
@@ -179,7 +180,8 @@ namespace InvAddIn
         {
             WorkPlane wp = smcd.WorkPlanes["Шип_справа"];
             PlanarSketch ps = smcd.Sketches.Add(wp);
-            ps.Name = name; ps.Visible = false; 
+            //ps.Name = name; 
+            ps.Visible = false; 
             ps.ProjectedCuts.Add();
         }
 
@@ -255,23 +257,60 @@ namespace InvAddIn
             smf.CutFeatures.Add(cd);
         }
 
-        static public void offsetAdaptive(SheetMetalComponentDefinition smcd, string name, double valA, double valB, double valB1)
+        static bool checkFace(Face f, SketchEntity ent)
+        {
+            if (ent.ReferencedEntity == null) return false;
+            var e = ent.ReferencedEntity as Edge;
+            if (e == null) return false;
+            foreach (Face item in e.Faces)
+            {
+                if (item.Equals(f)) return true;
+            }
+            return false;
+        }
+
+        static public SketchLine createLine(ProfileEntity pe, PlanarSketch ps)
+        {
+            SketchPoint pt1 = ps.AddByProjectingEntity(pe.StartSketchPoint) as SketchPoint;
+            SketchPoint pt2 = ps.AddByProjectingEntity(pe.EndSketchPoint) as SketchPoint;
+            return ps.SketchLines.AddByTwoPoints(pt1, pt2);
+        }
+
+        static public bool checkLen(ProfileEntity pe, double v)
+        {
+            var l = pe.StartSketchPoint.Geometry.DistanceTo(pe.EndSketchPoint.Geometry);
+            return l > v;
+        }
+
+        static public void offsetAdaptive(SheetMetalComponentDefinition smcd, string name, double valA, double valB, double valB1, HashSet<SurfaceBody> bodies = null)
         {
             double a = valA, b = valB;
+            PlanarSketch newSketch = null;
             PlanarSketch ps = smcd.Sketches[name];
-            PlanarSketch newSketch = smcd.Sketches.Add(ps.PlanarEntity);
+            //if (ps.SketchEntities.Count != 0)
+            //{
+            //    if (ps.SketchEntities[1].ReferencedEntity != null) newSketch = ps;
+            //}
+            //else
+            //{
+                newSketch = smcd.Sketches.Add(ps.PlanarEntity);
+            //}
             name = newSketch.Name;
             Profile profiles = ps.Profiles.AddForSolid();
+            var f = ps.PlanarEntity as Face;
             foreach (ProfilePath pr in profiles)
             {
-                bool flag = cmpLen(pr, valB1-0.03);
-                if (flag)
-                b = valB1;/*Convert.ToDouble(this.textBox3.Text.Replace(',', separator)) / 10;*/
                 if (pr.Count == 4)
                 {
+                    if (!cmpLen(pr, valB/10)) continue;
+                    bool flag = cmpLen(pr, valB1 - 0.03);
+                    if (flag)
+                        b = valB1;/*Convert.ToDouble(this.textBox3.Text.Replace(',', separator)) / 10;*/
                     ProfileEntity pe1 = (ProfileEntity)pr[1];
+                    var ed = pe1.SketchEntity;
+
                     ProfileEntity pe3 = (ProfileEntity)pr[3];
-                    if (pe1.CurveType != Curve2dTypeEnum.kLineSegmentCurve2d || pe1.EndSketchPoint.Geometry.DistanceTo(pe1.StartSketchPoint.Geometry) > valA*2)
+                    if (pe1.CurveType == Curve2dTypeEnum.kCircularArcCurve2d || pe1.EndSketchPoint.Geometry.DistanceTo(pe1.StartSketchPoint.Geometry) > valA*2)
                     {
                         pe1 = (ProfileEntity)pr[2]; pe3 = (ProfileEntity)pr[4];
                     }
@@ -283,12 +322,11 @@ namespace InvAddIn
                     //    (e1.EndSketchPoint.Geometry.DistanceTo(e1.StartSketchPoint.Geometry) <= 0.1));
                     if (pe1 == null || pe3 == null) continue;
 
-
                     //SketchLine sl1 = (SketchLine)pe1.SketchEntity;
                     //SketchLine sl2 = (SketchLine)pe3.SketchEntity;
 
-                    SketchLine sl1 = (SketchLine)newSketch.AddByProjectingEntity(pe1.SketchEntity);
-                    SketchLine sl2 = (SketchLine)newSketch.AddByProjectingEntity(pe3.SketchEntity);
+                    SketchLine sl1 = createLine(pe1, newSketch);
+                    SketchLine sl2 = createLine(pe3, newSketch);
 
                     //sl2.Construction = true;
                     SketchLine sl3 = midleLine(sl1, sl2);
@@ -306,6 +344,8 @@ namespace InvAddIn
                     //}
                     //    newLin = ps.SketchLines.OfType<SketchLine>().LastOrDefault(l => l.Construction == true);
                     //    ps.GeometricConstraints.AddCollinear((SketchEntity)newLin, (SketchEntity)sl3);
+                    if (checkFace(f, pe1.SketchEntity)) continue;
+
 
                     rect(sl3, mp, a, b);       
                 }
@@ -322,7 +362,7 @@ namespace InvAddIn
             //addEqualLength(newSketch, valB);
             //addEqualLength(newSketch, valB1);
 
-            CutFeature cut = addCut(smcd, name); cut.Name = "Пазы";
+            ExtrudeFeature cut = addExtrude(smcd, name, bodies); cut.Name = "Пазы";
         }
 
         static public void addCutDef(SheetMetalComponentDefinition smcd, Double a, Double b, string name = "Паз")
@@ -368,16 +408,46 @@ namespace InvAddIn
             }
         }
 
+        static public ExtrudeFeature addExtrude(SheetMetalComponentDefinition smcd, string name, HashSet<SurfaceBody> bodies = null)
+        {
+            SheetMetalFeatures smf = (SheetMetalFeatures)smcd.Features;
+            PlanarSketch ps = smcd.Sketches[smcd.Sketches.Count];
+            var cd = smf.ExtrudeFeatures.CreateExtrudeDefinition(ps.Profiles.AddForSolid(), PartFeatureOperationEnum.kCutOperation);
+            //CutDefinition cd = smf.CutFeatures.CreateCutDefinition(ps.Profiles.AddForSolid());
+            if (bodies != null)
+            {
+                cd.SetDistanceExtent(30, PartFeatureExtentDirectionEnum.kSymmetricExtentDirection);
+                //var cf = smf.CutFeatures.Add(cd);
+                var cf = smf.ExtrudeFeatures.Add(cd);
+                var col = I.COC();
+                foreach (SurfaceBody item in bodies)
+                {
+                    col.Add(item);
+                }
+                cf.SetAffectedBodies(col);
+                return cf;
+            }
+            try
+            { cd.SetDistanceExtent(30, PartFeatureExtentDirectionEnum.kSymmetricExtentDirection); }
+            catch (Exception)
+            {
+               
+            }
+            return smf.ExtrudeFeatures.Add(cd);
+        }
+
         static public CutFeature addCut(SheetMetalComponentDefinition smcd, string name)
         {
             SheetMetalFeatures smf = (SheetMetalFeatures)smcd.Features;
-            PlanarSketch ps = smcd.Sketches[name];
-            CutDefinition cd = smf.CutFeatures.CreateCutDefinition(ps.Profiles.AddForSolid());
+            PlanarSketch ps = smcd.Sketches[smcd.Sketches.Count];
+            var cd = smf.CutFeatures.CreateCutDefinition(ps.Profiles.AddForSolid());
             try
-            { cd.SetCutAcrossBendsExtent("Толщина"); }
-            catch (Exception)
             {
-                cd.SetCutAcrossBendsExtent("Thickness");
+                cd.SetCutAcrossBendsExtent(smcd.Thickness.Name);
+            }
+            catch (Exception ex)
+            {
+
             }
             return smf.CutFeatures.Add(cd);
         }
@@ -387,7 +457,7 @@ namespace InvAddIn
             SheetMetalFeatures smf = (SheetMetalFeatures)smcd.Features;
             WorkPlane wp = smcd.WorkPlanes.OfType<WorkPlane>().First(e => InvDoc.u.eq(vec, e.Plane.Normal));
             MirrorFeature mir = smf.MirrorFeatures.Add(objs, wp, false, PatternComputeTypeEnum.kAdjustToModelCompute);
-            mir.Name = name;
+            //mir.Name = name;
             return mir;
         }
 
@@ -426,10 +496,20 @@ namespace InvAddIn
             foreach (ComponentOccurrence occ1 in acd.Occurrences)
             {
                 if (occ1 == null) continue;
+                if (occ1.BOMStructure == BOMStructureEnum.kPurchasedBOMStructure) continue;
+                //var fl = ((Document)occ1.Definition.Document).PropertySets[3][14].Value.ToString().ToLower().IndexOf(nameOut) != -1;
                 if (((Document)occ1.Definition.Document).SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
                 {
                     smcd1 = (SheetMetalComponentDefinition)occ1.Definition;
-                    if (!(smcd1.Features[1] is ContourFlangeFeature)) continue;
+                    var sb = getSB(smcd1);
+                    if (sb == null)
+                    {
+                        if (!(smcd1.Features[1] is ContourFlangeFeature)) continue;
+                    }
+                    else
+                    {
+                        if (!(sb.CreatedByFeature is ContourFlangeFeature)) continue;
+                    }
                 }
                 psIn = ((PartComponentDefinition)occ1.Definition).Sketches[sketchName];
 
@@ -465,6 +545,20 @@ namespace InvAddIn
             return acd.Occurrences.OfType<ComponentOccurrence>().FirstOrDefault(occ => ((Document)occ.Definition.Document).PropertySets[3][14].Value.ToString().ToLower().IndexOf(name) != -1);
         }
 
+        static public SurfaceBody getSB(SheetMetalComponentDefinition smcd)
+        {
+            if (smcd.ReferenceComponents.DerivedPartComponents.Count > 0)
+            {
+                var c = smcd.ReferenceComponents.DerivedPartComponents[1];
+                if (c.SolidBodies.Count == 1)
+                {
+                    var sb = c.PrimaryBody.ReferencedEntity as SurfaceBody;
+                    return sb;
+                }
+            }
+            return null;
+        }
+
         static public ComponentOccurrence findFlange(AssemblyComponentDefinition acd)
         {
             foreach (ComponentOccurrence occ1 in acd.Occurrences)
@@ -474,6 +568,15 @@ namespace InvAddIn
                     SheetMetalComponentDefinition smcd = (SheetMetalComponentDefinition)occ1.Definition;
                     if (smcd.ReferenceComponents.DerivedPartComponents.Count == 1
                         && (smcd.ReferenceComponents.DerivedPartComponents[1].Definition as DerivedPartUniformScaleDef).Mirror) continue;
+                    if (smcd.ReferenceComponents.DerivedPartComponents.Count > 0)
+                    {
+                        var c = smcd.ReferenceComponents.DerivedPartComponents[1];
+                        if (c.SolidBodies.Count == 1)
+                        {
+                            var sb = c.PrimaryBody.ReferencedEntity as SurfaceBody;
+                            if (sb != null && sb.CreatedByFeature is FaceFeature) return occ1;
+                        }
+                    }
                     if (smcd.Features[1] is FaceFeature) return occ1;
                 }
             }

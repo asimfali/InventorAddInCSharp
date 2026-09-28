@@ -7,6 +7,9 @@ using System.Linq;
 using System.Globalization;
 using System.Drawing;
 using InterfaceDll;
+using InvAddIn;
+using ut = InvDoc.u;
+using System.Collections.Generic;
 
 namespace Macros
 {
@@ -15,10 +18,10 @@ namespace Macros
     /// that all Inventor AddIns are required to implement. The communication between Inventor and
     /// the AddIn is via the methods on this interface.
     /// </summary>
-    [GuidAttribute("c09e4c46-e69b-478a-a2c1-ad4b52e62879")]
+    [GuidAttribute("C72B334C-FBC3-44CB-B50C-4263A22093A4")]
     public class StandardAddInServer : Inventor.ApplicationAddInServer
     {
-                                                      
+
         #region Data Members
         public static Inventor.Application m_inventorApplication { get; set; }
         //public static TransientGeometry m_tg { get; set; }
@@ -29,7 +32,7 @@ namespace Macros
         //public InvAddIn.InventorEvents events = new InvAddIn.InventorEvents();
         public Inventor.Document m_Doc;
         public Inventor.ContentCenter cc;
-        private InvAddIn. Spec m_SpecButton;
+        private InvAddIn.Spec m_SpecButton;
         private InvAddIn.MyBreakOperation m_Break;
         private InvAddIn.MyBreakOperationVert m_BreakVert;
         private InvAddIn.BalloonOp m_Balloon;
@@ -50,16 +53,27 @@ namespace Macros
         private InvAddIn.DrawingBtn m_DrwBtn;
         private InvAddIn.SurfaceBtn m_surfBtn;
         private InvAddIn.ListBtn m_ListBtn;
+        private InvAddIn.IMatesBtn m_IMatesBtn;
         private InvAddIn.VarBtn m_VarBtn;
         private InvAddIn.GabButton m_Gab;
         private InvAddIn.SketchInModel m_sketchInModel;
         private InvAddIn.DrwArrBtn m_DrwArrBtn;
-        private InvAddIn.SketchBtn m_Sketch;
+        private InteractiveBtn m_inter;
+        private BrowserBtn m_BrowserBtn;
+        private CopyPasteBtn m_CopyPaste;
+        private EditPropBtn m_EditPropBtn;
+        //private InvAddIn.SketchBtn m_Sketch;
         private InvAddIn.BreakButton m_xmlBreak;
         private InvAddIn.SplineButton m_spline;
-        private InvAddIn.ComboBoxBtn m_ComboBox;
+        //private InvAddIn.ComboBoxBtn m_ComboBox;
+        public static InvAddIn.ISettings m_SettingsAct;
+        public static InvAddIn.ISettings m_SettingsHole1;
+        public static InvAddIn.ISettings m_SettingsHole2;
+        public static InvAddIn.ISettings m_FastenerName;
+        public static InvAddIn.ISettings m_FastenerDist;
+        public static InvAddIn.ISettings m_Variable;
         private InvAddIn.Assembly m_Asm;
-        //private InvAddIn.Sketches m_Sketches;
+        private InvAddIn.Sketches m_Sketches;
         RibbonPanel m_partSketchRibbonPanel;
         //private DocumentEvents m_DocEvts;
         private Inventor.ApplicationEvents m_appEvts;
@@ -85,6 +99,7 @@ namespace Macros
         public static string Printflag { get; set; }
         public static string Spike { get; set; }
         public static string dim { get; set; }
+        public static string DXFSpl { get; set; }
         private bool deleteView = false;
         private System.Collections.Generic.List<Inventor.Balloon> balloons;
         static public System.Collections.Generic.List<string> lst;
@@ -111,11 +126,13 @@ namespace Macros
             // The FirstTime flag indicates if the addin is loaded for the first time.
 
             // Initialize AddIn members.
-//              try
-//              {
+                           //try
+                           //{
             m_inventorApplication = addInSiteObject.Application;
             //m_tg = m_inventorApplication.TransientGeometry;
             //m_objs = m_inventorApplication.TransientObjects;
+
+
             InvAddIn.Button.InventorApplication = m_inventorApplication;
             InvAddIn.InvComboBox.InventorApplication = m_inventorApplication;
             cc = m_inventorApplication.ContentCenter;
@@ -147,19 +164,19 @@ namespace Macros
             Icon SetIconLarge = new Icon(SetIcon, 32, 32);
             Icon TblIconLarge = new Icon(TblIcon, 32, 32);
             Icon standartbreakIcon = new Icon(breakIcon, 16, 16);
+            Icon IIcon = InvAddIn.Properties.Resources.interactive;
             Icon largebreakIcon = new Icon(breakIcon, 32, 32);
-
-            m_SpecButton = new InvAddIn.Spec("Спецификация", "Spec","{ED6E59F8-E475-4C14-A5BA-1DDBD041CD82}", "Спецификация",
+            // 
+            m_SpecButton = new InvAddIn.Spec("Спецификация", "Spec", "{ED6E59F8-E475-4C14-A5BA-1DDBD041CD82}", "Спецификация",
                 "Спецификация с переменными данными", specIcon, specIcon);
-            m_SpecButton.addShortCut("Alt+S");
 
-            m_Break = new InvAddIn.MyBreakOperation("ГР", "BreakHor", "{77F3E204-1071-4B17-914F-799E51B292FD}", "Добавить горизонтальный разрыв", 
+            m_Break = new InvAddIn.MyBreakOperation("ГР", "BreakHor", "{77F3E204-1071-4B17-914F-799E51B292FD}", "Добавить горизонтальный разрыв",
                 "Горизонтальный разрыв с определенными параметрами", standartbreakIcon, largebreakIcon);
 
-            m_BreakVert = new InvAddIn.MyBreakOperationVert("ВР", "BreakVert" ,"{57B15465-B68E-42F0-8CEC-B3FBC5B509AB}", "Добавить вертикальный разрыв",
+            m_BreakVert = new InvAddIn.MyBreakOperationVert("ВР", "BreakVert", "{57B15465-B68E-42F0-8CEC-B3FBC5B509AB}", "Добавить вертикальный разрыв",
                 "Вертикальный разрыв с определенными параметрами", breakVertIcon, breakVertIcon);
 
-            m_Balloon = new InvAddIn.BalloonOp("Позиция", "Balloon", "{E641CEF1-A4CB-4C69-9AA8-DCFA6CBB9D4F}", "Вынести номер позиции", 
+            m_Balloon = new InvAddIn.BalloonOp("Позиция", "Balloon", "{E641CEF1-A4CB-4C69-9AA8-DCFA6CBB9D4F}", "Вынести номер позиции",
                 "Групповой номер позиции", BalloonIcon, BalloonIcon);
 
             m_Cut = new InvAddIn.CutButton("Вырез", "Cut", "{C88EAB8B-7C31-4BF3-A5AA-B6B2073DABF1}", "Вырез",
@@ -169,7 +186,7 @@ namespace Macros
             //    "{E7AB7D8E-A972-451B-B6CF-46927D1469B8}", "Используемые модули", "Используемые модули", SetIcon, SetIconLarge, ButtonDisplayEnum.kDisplayTextInLearningMode);
 
             m_cc = new InvAddIn.ContentBtn("Вставка крепежа", "CC", "{60DBC787-F747-43BD-9F6E-6B4F2B85FCF3}", "Вставка крепежа",
-                "Вставка крепежа",FastenersIcon,FastenersIcon);
+                "Вставка крепежа", FastenersIcon, FastenersIcon);
             InvAddIn.ContentBtn.getCC = cc;
 
             m_PDF = new InvAddIn.PDFButton("PDF\\DXF", "PDF", "{078FB534-4264-4159-9AA7-1D64A8629C7D}", "Создание PDF\\DXF",
@@ -184,8 +201,6 @@ namespace Macros
 
             m_Tbl = new InvAddIn.TablesButton("Таблица", "Table",
             "{0483E272-C3EF-479E-A654-F5CF9E165642}", "Создание таблиц", "Создание таблиц", TblIcon, TblIconLarge);
-            m_Tbl.addShortCut("Alt+G");
-
 
             m_Offset = new InvAddIn.OffsetBtn("Шип", "Offset",
             "{7FF6407E-6193-4D27-9C34-BCA7E2F85435}", "Вырез под шип", "Вырез под шип", OffsetIcon, OffsetIcon);
@@ -198,25 +213,30 @@ namespace Macros
 
             m_IMate = new InvAddIn.IMateBtn("Конструктивная пара", "IMate",
             "{9845CF95-4D8A-4E24-B27B-79908DF23CF3}", "Конструктивная пара", "Конструктиваная пара", IMateIcon, IMateIcon);
-            m_IMate.addShortCut("Alt+Q");
-
 
             m_PropBtn = new InvAddIn.PropBtn("Свойства проекта", "Prop",
             "{FF99F993-5248-4834-BD56-EC1AF0023A7C}", "Свойства проекта", "Свойства проекта", PropIcon, PropIcon);
-            m_PropBtn.addShortCut("Alt+C");
 
             m_RecBtn = new InvAddIn.RecoverBtn("Восстановить", "Recover",
             "{168BFABD-D59E-410A-A30A-83EF48A469E4}", "восстановить зависимости", "Восстановить зависимости", RecoverIcon, RecoverIcon);
 
-             m_parts = new InvAddIn.PartsBtn("Создать детали", "Parts",
-            "{246BF5BA-872C-4792-9F6A-27FE9FC45C96}", "Создать детали", "Создать детали", PartsIcon, PartsIcon);
-            m_parts.addShortCut("Alt+D");
+            m_parts = new InvAddIn.PartsBtn("Создать детали", "Parts",
+           "{246BF5BA-872C-4792-9F6A-27FE9FC45C96}", "Создать детали", "Создать детали", PartsIcon, PartsIcon);
 
             m_DrwBtn = new InvAddIn.DrawingBtn("Размеры", "Dimensions",
                 "{EEF8F8DA-EBE1-417D-BCFC-B3344AF6698C}", "Размеры", "Размеры", DrwIcon, DrwIcon);
 
             m_ListBtn = new InvAddIn.ListBtn("Лист", "Autodesk:Macros:List", "{D18615A7-F27A-4A15-B18E-FACBAC3BE295}", "Работа с листом чертежа",
                 "Работа с листом чертежа");
+
+            m_BrowserBtn = new BrowserBtn("Найти в обозревателе", "Autodesk:Macros:find", "{8B6FD6E4-F1E0-4410-BB63-A6F3042AEBF9}",
+                "Найти в обозревателе", "Найти в обозревателе");
+
+            m_CopyPaste = new CopyPasteBtn("Интерактивная вставка", "Autodesk:Macros:paste", "{EAF12EA2-BC75-4F69-B940-59C2A1AF9659}",
+                "Интерактивная вставка", "Интерактивная вставка");
+
+            m_IMatesBtn = new InvAddIn.IMatesBtn("Конструктивная пара", "Autodesk:Macros:IMates", "{D18615A7-F27A-4A15-B18E-FACBAC3BE295}", "АвтоIMate",
+                "АвтоIMate");
 
             m_surfBtn = new InvAddIn.SurfaceBtn("Шероховатость поверхности", "Autodesk:Macros:surf", "{E5E9F634-54BD-48B5-9BF1-D2114433ADA9}",
                 "Добавление символов шероховатости необрабатвыемой поверхности", "Добавление символов шероховатости необрабатвыемой поверхности");
@@ -227,10 +247,12 @@ namespace Macros
             m_Gab = new InvAddIn.GabButton("Размеры", "Autodesk:Macros:gab", "{2591E510-DDA0-49CD-B42E-78C55DEFCCBF}",
             "Добавление размеров на вид", "Добавление размеров на вид");
 
-            m_Asm = new InvAddIn.Assembly("Разнести", "Autodesk:Macros:asm", "{B47B41A2-A984-4326-A275-321C7D663C72}", "Изменить расстояние", "Изменить расстояние");
-            m_Asm.addShortCut("Alt+R");
+            m_EditPropBtn = new EditPropBtn("Редактор свойств", "Autodesk:Macros:EditProp", "{3A4A82BC-4B9A-4D9F-AE8A-F6DF97281006}",
+                "Редактировать несколько свойств", "Редактировать несколько свойств");
 
-            //m_Sketches = new InvAddIn.Sketches("Эскизы", "Autodesk:Macros:sketches", "{0B21CAD3-D1B4-4776-BF07-8BC9F60DAAF1}", "Копировать эскиз", "Копировать эскиз");
+            m_Asm = new InvAddIn.Assembly("Разнести", "Autodesk:Macros:asm", "{B47B41A2-A984-4326-A275-321C7D663C72}", "Изменить расстояние", "Изменить расстояние");
+
+            m_Sketches = new InvAddIn.Sketches("Эскизы", "Autodesk:Macros:sketches", "{0B21CAD3-D1B4-4776-BF07-8BC9F60DAAF1}", "Копировать эскиз", "Копировать эскиз");
             m_DrwArrBtn = new InvAddIn.DrwArrBtn("Массив", "Autodesk:Macros:DrwArr", "{BC16CA31-2D3F-4F2C-93AF-ED4BE5CA0E5A}",
              "Добавление размера массива отверстий", "Добавление размера массива отверстий");
 
@@ -239,14 +261,28 @@ namespace Macros
 
             m_spline = new InvAddIn.SplineButton("Вырыв", "Autodesk:Macros:spline", "{394B0B7D-B034-4F76-B02D-C37F31C8028F}", "Добавить вырыв", "добавить вырыв");
 
-            m_Sketch = new InvAddIn.SketchBtn(SketchIcon, SketchIcon);
+            //m_Sketch = new InvAddIn.SketchBtn(SketchIcon, SketchIcon);
             m_sketchInModel = new InvAddIn.SketchInModel("Отверстия", "Autodesk:Macros:sim", "{D4BDD51E-B174-487C-857E-FC592089CBCB}",
                 "Создать из базового эскиза", "Создать из базового эскиза");
-            m_ComboBox = new InvAddIn.ComboBoxBtn(ComboBoxIcon, ComboBoxIcon, "Данные для Массива");
+
+            m_inter = new InteractiveBtn("Интерактив", "Autodesk:Macros:inter", "{70CA90CD-AFC3-44F4-96BE-EE228FDFAB4A}",
+                "Интерактивные функции", "Интерактивные функции", IIcon, IIcon);
+            var diams = InvDoc.u.getCBValues("Hole");
+            System.Collections.Generic.List<string> tCB = new System.Collections.Generic.List<string>() { "Снаружи", "Изнутри", "Видимые" };
+            //m_ComboBox = new InvAddIn.ComboBoxBtn(ComboBoxIcon, ComboBoxIcon, "Данные для Массива");
+            m_SettingsHole1 = new InvAddIn.ISettings("Отверстие 1", "Autodesk:Macros:hole1", 50, "Hole"); m_SettingsHole1.fill(diams, 2);
+            m_SettingsHole2 = new InvAddIn.ISettings("Отверстие 2", "Autodesk:Macros:hole2", 50, "Hole"); m_SettingsHole2.fill(diams, 1);
+            m_SettingsAct = new InvAddIn.ISettings("Тип", "Autodesk:Macros:Act", 50); m_SettingsAct.fill(tCB, 1);
+            var iNames = InvDoc.u.getCBValues("Value");
+            m_FastenerName = new ISettings("Крепеж", "Autodesk:Macros:FName", 200); m_FastenerName.fill(iNames, 0);
+            var imDist = InvDoc.u.getCBValues("Dist");
+            m_FastenerDist = new ISettings("Расстояние для крепежа", "Autodesk:Macros:FDist", 50); m_FastenerDist.fill(imDist, 0);
+            m_Variable = new ISettings("Текущее исполнение", "Autodesk:Macros:Var", 200);
+            //var varNames = InvDoc.u.set_variable(I.aDoc()); m_Variable.fill(varNames, 0);
 
             if (firstTime == true)
             {
-                InvAddIn.Panel m_specPanel = new InvAddIn.Panel(m_inventorApplication, m_SpecButton._ButtonDefinition, 
+                InvAddIn.Panel m_specPanel = new InvAddIn.Panel(m_inventorApplication, m_SpecButton._ButtonDefinition,
                     "Drawing", "id_TabAnnotateESKD", "Спецификация", "Autodesk:Macros:SpecPanel", "{F7CAE311-990B-4C57-8183-8B59AED1040F}");
                 if (BreakHor == "1") m_specPanel.addControl(m_Break._ButtonDefinition);
                 if (BreakVert == "1") m_specPanel.addControl(m_BreakVert._ButtonDefinition);
@@ -257,30 +293,48 @@ namespace Macros
                 m_specPanel.addControl(m_RecBtn._ButtonDefinition);
                 m_specPanel.addControl(m_parts._ButtonDefinition);
                 //m_specPanel.addControl(m_set._ButtonDefinition);
+                m_specPanel.addControl(m_inter._ButtonDefinition);
                 m_specPanel.CmdControl.UseLargeIcon = true;
                 m_specPanel.addControl(m_Tbl._ButtonDefinition);
                 m_specPanel.CmdControl.UseLargeIcon = true;
-                InvAddIn.Panel m_PartPanel = new InvAddIn.Panel(m_inventorApplication, m_Cut._ButtonDefinition, 
+                InvAddIn.Panel m_PartPanel = new InvAddIn.Panel(m_inventorApplication, m_Cut._ButtonDefinition,
                     "Part", "id_TabSheetMetal", "Элементы", "Autodesk:Macros:SMF", "{BDB0D42F-8E9E-4EF7-A84C-0655C17E0071}");
-                 m_PartPanel.addControl(m_Offset._ButtonDefinition);
+                m_PartPanel.addControl(m_Offset._ButtonDefinition);
+                m_PartPanel.addControl(m_inter._ButtonDefinition);
                 m_PartPanel.addControl(m_PDF._ButtonDefinition);
-                 m_PartPanel.addControl(m_FP._ButtonDefinition);
+                m_PartPanel.addControl(m_FP._ButtonDefinition);
                 m_PartPanel.addControl(m_IMate._ButtonDefinition);
                 m_PartPanel.addControl(m_parts._ButtonDefinition);
                 InvAddIn.Panel m_AssemblyPanel = new InvAddIn.Panel(m_inventorApplication, m_cc._ButtonDefinition,
                      "Assembly", "id_TabAssemble", "Крепеж", "Autodesk:Macros:CC", "{9664E6B8-74A6-432D-BAB1-1ADFFDB7CBB9}");
-                 m_AssemblyPanel.addControl(m_Sticker._ButtonDefinition);
+                m_AssemblyPanel.addControl(m_Sticker._ButtonDefinition);
+                m_AssemblyPanel.addControl(m_inter._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_IMate._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_PropBtn._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_RecBtn._ButtonDefinition);
                 m_AssemblyPanel.addControl(m_parts._ButtonDefinition);
-                 m_AssemblyPanel.addControl(m_PDF._ButtonDefinition);
+                m_AssemblyPanel.addControl(m_PDF._ButtonDefinition);
                 InvAddIn.Panel m_SketchPanel = new InvAddIn.Panel("Part", "id_TabSketch", "id_PanelP_2DSketchFormat");
-                m_SketchPanel.addControl(m_Sketch._ButtonDefinition);
-                m_SketchPanel.addControl(m_ComboBox._ComboBoxDef,"SketchCenterlineCmd");
+                //m_SketchPanel.addControl(m_Sketch._ButtonDefinition);
+                //m_SketchPanel.addControl(m_ComboBox._ComboBoxDef,"SketchCenterlineCmd");
+                InvAddIn.Panel m_SettingsPanel = new InvAddIn.Panel("Part", "id_TabInspect", "Настройки", "Autodesk:Macros:Settings", "{77103CE1-01D4-4250-91AD-E099BE938A91}");
+                m_SettingsPanel.addControl(m_SettingsHole1._ComboBoxDef);
+                m_SettingsPanel.addControl(m_SettingsHole2._ComboBoxDef);
+                m_SettingsPanel.addControl(m_SettingsAct._ComboBoxDef);
+                m_SettingsPanel.addControl(m_FastenerName._ComboBoxDef);
+                m_SettingsPanel.addControl(m_FastenerDist._ComboBoxDef);
+                m_SettingsPanel.addControl(m_Variable._ComboBoxDef);
+                InvAddIn.Panel m_AsmSettings = new InvAddIn.Panel("Assembly", "id_TabInspect", "Настройки", "Autodesk:Macros:Settings", "{9982D5A9-F4A7-4299-B101-9A423DCA4005}");
+                m_AsmSettings.addControl(m_SettingsHole1._ComboBoxDef);
+                m_AsmSettings.addControl(m_SettingsHole2._ComboBoxDef);
+                m_AsmSettings.addControl(m_SettingsAct._ComboBoxDef);
+                m_AsmSettings.addControl(m_FastenerName._ComboBoxDef);
+                m_AsmSettings.addControl(m_FastenerDist._ComboBoxDef);
+                //m_SettingsPanel.addControl(m_SettingsAct._ComboBoxDef, "Action");
+                //m_SettingsPanel.addControl(m_ComboBox._ComboBoxDef, "SketchCenterlineCmd");
             }
 
-            material = new InvAddIn.Material();                                                                                                                              
+            material = new InvAddIn.Material();
             m_appEvts = m_inventorApplication.ApplicationEvents;
             m_asmbllEvts = m_inventorApplication.AssemblyEvents;
             //m_modEvents = m_inventorApplication.ModelingEvents;
@@ -295,15 +349,22 @@ namespace Macros
             m_InputEvts.OnTerminateCommand += new UserInputEventsSink_OnTerminateCommandEventHandler(UserInputEventsSink_OnTerminate);
             m_InputEvts.OnContextMenu += new UserInputEventsSink_OnContextMenuEventHandler(UserInputEventsSink_OnContextMenu);
             m_InputEvts.OnActivateCommand += new UserInputEventsSink_OnActivateCommandEventHandler(UserInputEventsSink_OnActivateCommand);
-            //m_modEvents.OnGenerateMember += new ModelingEventsSink_OnGenerateMemberEventHandler(ModelingEventsSink_OnGenerateMember);
-            m_asmbllEvts.OnNewOccurrence += new AssemblyEventsSink_OnNewOccurrenceEventHandler(AssemblyEventsSink_OnNewOccurrence);
+                //m_modEvents.OnGenerateMember += new ModelingEventsSink_OnGenerateMemberEventHandler(ModelingEventsSink_OnGenerateMember);
+                //m_asmbllEvts.OnNewOccurrence += new AssemblyEventsSink_OnNewOccurrenceEventHandler(AssemblyEventsSink_OnNewOccurrence);
 
 
-//             }
-// 			catch(Exception e)
-// 			{
-// 				MessageBox.Show(e.ToString());
-// 			}
+            //}
+            //catch (Exception e)
+            //{
+            //    MessageBox.Show(e.ToString());
+            //}
+            m_PropBtn.addShortCut("Alt+C");
+            m_parts.addShortCut("Alt+D");
+            m_IMate.addShortCut("Alt+Q");
+            m_Tbl.addShortCut("Alt+G");
+            m_SpecButton.addShortCut("Alt+S");
+            m_inter.addShortCut("Alt+I");
+            //m_EditPropBtn.addShortCut("Alt+E");
         }
 
         void uInterfaceEv_OnEnvironmentChange(Inventor.Environment Environment, EnvironmentStateEnum EnvironmentState, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
@@ -314,121 +375,150 @@ namespace Macros
             {
                 PartDocument pDoc = m_inventorApplication.ActiveDocument as PartDocument;
                 if (pDoc == null) return;
-                data = new InvAddIn.DataToArray(pDoc, m_ComboBox._ComboBoxDef);
+                //data = new InvAddIn.DataToArray(pDoc, m_ComboBox._ComboBoxDef);
             }
         }
 
-//         void m_appEvts_OnActivateDocument(_Document DocumentObject, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
-//         {
-//             HandlingCode = HandlingCodeEnum.kEventHandled;
-//             if (DocumentObject.DocumentType == DocumentTypeEnum.kPartDocumentObject && BeforeOrAfter == EventTimingEnum.kAfter)
-//             {
-//                 data = new InvAddIn.DataToArray(DocumentObject as PartDocument, m_ComboBox._ComboBoxDef);
-//             }
-//         }
+        //         void m_appEvts_OnActivateDocument(_Document DocumentObject, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
+        //         {
+        //             HandlingCode = HandlingCodeEnum.kEventHandled;
+        //             if (DocumentObject.DocumentType == DocumentTypeEnum.kPartDocumentObject && BeforeOrAfter == EventTimingEnum.kAfter)
+        //             {
+        //                 data = new InvAddIn.DataToArray(DocumentObject as PartDocument, m_ComboBox._ComboBoxDef);
+        //             }
+        //         }
 
         static public bool activeteForm()
         {
             bool flag = true;
-                    foreach (var item in Macros.StandardAddInServer.forms)
-                    {
-                        if (item != null && item.Created)
-                        { flag = false; item.Activate(); }
-                    }
-                    return flag;
-        }
-        private void AssemblyEventsSink_OnNewOccurrence(_AssemblyDocument DocumentObject, ComponentOccurrence Occurrence, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
-        {
-            HandlingCode = HandlingCodeEnum.kEventNotHandled;
-            try
+            foreach (var item in Macros.StandardAddInServer.forms)
             {
-                if (BeforeOrAfter == EventTimingEnum.kAfter && Occurrence.SurfaceBodies[1].Name == "Половинка1" && Occurrence.SurfaceBodies[2].Name == "Половинка2")
-                {
-                    PartDocument doc = (PartDocument)Occurrence.Definition.Document; Asset aset = null, aset2 = null;
-                    if (Occurrence.Name.ToLower().IndexOf("серый") != -1)
-                    {
-                        aset = InvDoc.u.createColor(doc, "Gray_", "Серый_", 192, 192, 192); aset2 = aset;
-                    }
-
-                    else if (Occurrence.Name.ToLower().IndexOf("синий") != -1)
-                    {
-                        aset = InvDoc.u.createColor(doc, "Blue_", "Синий_", 0, 0, 255); aset2 = aset;
-                    }
-
-                    else if (Occurrence.Name.ToLower().IndexOf("желто-") != -1)
-                    {
-                        aset = InvDoc.u.createColor(doc, "Yelow_", "Желто_", 255, 255, 0);
-                        aset2 = InvDoc.u.createColor(doc, "Green_", "Зеленый_", 0, 255, 0);
-                    }
-                    if (!doc.ComponentDefinition.SurfaceBodies[1].Appearance.Name.EndsWith("_"))
-                    {
-                        doc.ComponentDefinition.SurfaceBodies[1].Appearance = aset;
-                        doc.ComponentDefinition.SurfaceBodies[2].Appearance = aset2;
-                        doc.Save();
-                    }
-                }
+                if (item != null && item.Created)
+                { flag = false; item.Activate(); }
             }
-            catch (Exception)
-            {
-                throw;
-            }
-            HandlingCode = HandlingCodeEnum.kEventHandled;
+            return flag;
         }
+        //private void AssemblyEventsSink_OnNewOccurrence(_AssemblyDocument DocumentObject, ComponentOccurrence Occurrence, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
+        //{
+        //    HandlingCode = HandlingCodeEnum.kEventNotHandled;
+        //    try
+        //    {
+        //        if (BeforeOrAfter == EventTimingEnum.kAfter && Occurrence.SurfaceBodies[1].Name == "Половинка1" && Occurrence.SurfaceBodies[2].Name == "Половинка2")
+        //        {
+        //            PartDocument doc = (PartDocument)Occurrence.Definition.Document; Asset aset = null, aset2 = null;
+        //            if (Occurrence.Name.ToLower().IndexOf("серый") != -1)
+        //            {
+        //                aset = InvDoc.u.createColor(doc, "Gray_", "Серый_", 192, 192, 192); aset2 = aset;
+        //            }
+
+        //            else if (Occurrence.Name.ToLower().IndexOf("синий") != -1)
+        //            {
+        //                aset = InvDoc.u.createColor(doc, "Blue_", "Синий_", 0, 0, 255); aset2 = aset;
+        //            }
+
+        //            else if (Occurrence.Name.ToLower().IndexOf("желто-") != -1)
+        //            {
+        //                aset = InvDoc.u.createColor(doc, "Yelow_", "Желто_", 255, 255, 0);
+        //                aset2 = InvDoc.u.createColor(doc, "Green_", "Зеленый_", 0, 255, 0);
+        //            }
+        //            if (!doc.ComponentDefinition.SurfaceBodies[1].Appearance.Name.EndsWith("_"))
+        //            {
+        //                doc.ComponentDefinition.SurfaceBodies[1].Appearance = aset;
+        //                doc.ComponentDefinition.SurfaceBodies[2].Appearance = aset2;
+        //                doc.Save();
+        //            }
+        //        }
+        //    }
+        //    catch (Exception)
+        //    {
+        //        //throw;
+        //    }
+        //    HandlingCode = HandlingCodeEnum.kEventHandled;
+        //}
         private void UserInputEventsSink_OnContextMenu(SelectionDeviceEnum SelectionDevice, NameValueMap AdditionalInfo, CommandBar CommandBar)
         {
-//             try
-//             {                                                                        
-                SelectSet set = m_inventorApplication.ActiveDocument.SelectSet;
+            //             try
+            //             {                                                                        
+            SelectSet set = m_inventorApplication.ActiveDocument.SelectSet;
+            Document doc = I.aDoc(); 
+            if (doc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject && doc.ActivatedObject != null && !doc.ActivatedObject.Equals(doc))
+            {
+                doc = doc.ActivatedObject as Document;
+            }
 
-                if (m_inventorApplication.ActiveDocument.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
+            if (set.Count == 1 && (set[1] is Face || set[1] is Edge || set[1] is SketchEntity))
+            {
+                CommandBar.Controls.AddButton(m_BrowserBtn._ButtonDefinition, 1);
+                
+            }
+            if (doc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
+            {
+                if (set.Count == 1 && (set[1] is CompositeiMateDefinitionProxy))
+                    CommandBar.Controls.AddButton(m_IMatesBtn._ButtonDefinition);
+                //CommandBar.Controls.AddButton(m_Asm._ButtonDefinition);
+            }
+            else if (doc.DocumentType == DocumentTypeEnum.kPartDocumentObject)
+            {
+                //if (set.Count == 1 && set[1] is PlanarSketch)
+                //    CommandBar.Controls.AddButton(m_Sketches._ButtonDefinition);
+                if (set.Count == 1 && (set[1] is PlanarSketch || set[1] is HoleFeature || set[1] is MirrorFeature))
+                    CommandBar.Controls.AddButton(m_IMatesBtn._ButtonDefinition);
+                else if (set.Count > 0)
                 {
-                    CommandBar.Controls.AddButton(m_Asm._ButtonDefinition);
-                }
-                else if (m_inventorApplication.ActiveDocument.DocumentType == DocumentTypeEnum.kPartDocumentObject)
-                {
-                    //if (set.Count == 1 && set[1] is PlanarSketch)
-                    //CommandBar.Controls.AddButton(m_Sketches._ButtonDefinition);
-                }
-                else if (m_inventorApplication.ActiveDocument.DocumentType == DocumentTypeEnum.kDrawingDocumentObject)
-                {
-                    if ((set.Count == 1 && set[1] is DrawingCurveSegment) || (set.Count == 2 && set[1] is DrawingCurveSegment && set[2] is DrawingCurveSegment))
+                    if (set[1] is FlangeFeature || set[1] is ContourFlangeFeature || set[1] is Face || set[1] is SketchPoint)
                     {
-                        CommandBar.Controls.AddButton(m_surfBtn._ButtonDefinition);
-                        CommandBar.Controls.AddButton(m_Gab._ButtonDefinition, 1);
-                    }
-                    else if (set.Count == 1 && set[1] is DrawingView)
-                    {
-                        CommandBar.Controls.AddButton(m_Gab._ButtonDefinition, 1);
-                        CommandBar.Controls.AddButton(m_spline._ButtonDefinition, 1);
-                        CommandBar.Controls.AddButton(m_xmlBreak._ButtonDefinition, 1);
-                    }
-                    else if (m_inventorApplication.ActiveEditObject is Sheet)
-                    {
-                        CommandBar.Controls.AddButton(m_ListBtn._ButtonDefinition);
+                        m_CopyPaste.en = cp_enum.copy;
+                        CommandBar.Controls.AddButton(m_CopyPaste._ButtonDefinition, 1);
                     }
                 }
+                else if (set.Count == 0)
+                {
+                    m_CopyPaste.en = cp_enum.paste;
+                    CommandBar.Controls.AddButton(m_CopyPaste._ButtonDefinition);
+                }
+            }
+            else if (doc.DocumentType == DocumentTypeEnum.kDrawingDocumentObject)
+            {
+                if ((set.Count == 1 && set[1] is DrawingCurveSegment) || (set.Count == 2 && set[1] is DrawingCurveSegment && set[2] is DrawingCurveSegment))
+                {
+                    CommandBar.Controls.AddButton(m_surfBtn._ButtonDefinition);
+                    CommandBar.Controls.AddButton(m_Gab._ButtonDefinition, 1);
+                }
+                else if (set.Count == 1 && set[1] is DrawingView)
+                {
+                    CommandBar.Controls.AddButton(m_Gab._ButtonDefinition, 1);
+                    CommandBar.Controls.AddButton(m_spline._ButtonDefinition, 1);
+                    CommandBar.Controls.AddButton(m_xmlBreak._ButtonDefinition, 1);
+                }
+                else if (m_inventorApplication.ActiveEditObject is Sheet)
+                {
+                    CommandBar.Controls.AddButton(m_ListBtn._ButtonDefinition);
+                    CommandBar.Controls.AddButton(m_Gab._ButtonDefinition, 1);
+                }
+            }
 
-                if (set.Count > 1) CommandBar.Controls.AddButton(m_xmlBreak._ButtonDefinition, 1);
-                if (set.Count == 1 && set[1] is SketchedSymbol /*ObjectTypeEnum.kSketchedSymbolObject*/)
-                {
-                    SketchedSymbol ss = (SketchedSymbol)m_inventorApplication.ActiveDocument.SelectSet[1];
-                    string name = ss.Name;
-                    InvAddIn.TablesButton.nameTable = name;
-                    CommandBar.Controls.AddButton(m_Tbl._ButtonDefinition);
-                }
-                else if ((set.Count > 0) && (set[1] is Face || set[1] is FaceProxy || set[1] is HoleFeature))
-                {
-                    CommandBar.Controls.AddButton(m_sketchInModel._ButtonDefinition);
-                }
-                else if (set.Count == 1 && set[1] is PlanarSketch)
-                {
-                    CommandBar.Controls.AddButton(m_VarBtn._ButtonDefinition, 1);
-                }
+            if (set.Count > 1) CommandBar.Controls.AddButton(m_xmlBreak._ButtonDefinition, 1);
+            if (set.Count == 1 && set[1] is SketchedSymbol /*ObjectTypeEnum.kSketchedSymbolObject*/)
+            {
+                SketchedSymbol ss = (SketchedSymbol)m_inventorApplication.ActiveDocument.SelectSet[1];
+                string name = ss.Name;
+                InvAddIn.TablesButton.nameTable = name;
+                CommandBar.Controls.AddButton(m_Tbl._ButtonDefinition);
+            }
+            else if ((set.Count > 0) && (set[1] is Face || set[1] is FaceProxy || set[1] is HoleFeature))
+            {
+                CommandBar.Controls.AddButton(m_sketchInModel._ButtonDefinition);
+            }
+            else if (set.Count == 1 && set[1] is PlanarSketch)
+            {
+                CommandBar.Controls.AddButton(m_VarBtn._ButtonDefinition, 1);
+            }
+
             /*}*/
-//             catch 
-//             {
-// 
-//             }
+            //             catch 
+            //             {
+            // 
+            //             }
         }
 
         private void m_appEvts_OnOpenDocument(_Document DocumentObject, string FullDocumentName, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
@@ -436,24 +526,27 @@ namespace Macros
             HandlingCode = HandlingCodeEnum.kEventNotHandled;
             try
             {
-                if (DocumentObject != null && DocumentObject.DocumentType == DocumentTypeEnum.kDrawingDocumentObject && 
+                if (DocumentObject != null && DocumentObject.DocumentType == DocumentTypeEnum.kDrawingDocumentObject &&
                     BeforeOrAfter == EventTimingEnum.kAfter)
                 {
                     Inventor.DrawingDocument m_Drw = (Inventor.DrawingDocument)DocumentObject;
-                    Property p = InvDoc.u.getProp(InvDoc.u.referendedDoc(m_Drw as Document), "Изв");
-                    if (p != null)
-                    {
-                        string date = "";
-                        string name = p.Value.ToString();
-                        p = InvDoc.u.getProp(InvDoc.u.referendedDoc(m_Drw as Document), "ИзвД");
-                        if (p != null) date = p.Value.ToString();
-                        name = "ТПМШ." + name + "-" + date.Substring(date.LastIndexOf(".")+1);
-                        InvAddIn.Drawings.addIzv(m_Drw, name, date);
-                    }
-                    if (InvDoc.u.referendedDoc(m_Drw as Document).SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
+                    Document rdoc = InvDoc.u.referendedDoc(m_Drw as Document, "Изв");
+                    //Property p = InvDoc.u.getProp(rdoc, "Изв");
+                    //if (p != null)
+                    //{
+                    //    string date = "", author = "";
+                    //    string name = p.Value.ToString();
+                    //    p = InvDoc.u.getProp(rdoc, "ИзвД");
+                    //    if (p != null) date = p.Value.ToString();
+                    //    p = InvDoc.u.getProp(rdoc, "Author");
+                    //    if (p != null) author = p.Value.ToString();
+                    //    InvAddIn.Drawings.addIzv(m_Drw, name, date, author, null);
+                    //}
+                    rdoc = InvDoc.u.referendedDoc(m_Drw as Document);
+                    if (rdoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
                     {
                         bool find = true;
-                        PartDocument pDoc = (PartDocument)InvDoc.u.referendedDoc(m_Drw as Document);
+                        PartDocument pDoc = (PartDocument)rdoc;
                         string materialDownLine = pDoc.PropertySets[4]["MaterialDownLine"].Value.ToString();
                         string materialUpLine = pDoc.PropertySets[4]["MaterialUpLine"].Value.ToString();
                         string materialLine = pDoc.PropertySets[4]["MaterialLine"].Value.ToString();
@@ -469,7 +562,7 @@ namespace Macros
                         {
                             Inventor.Application invApp = (Inventor.Application)m_Drw.Parent;
                             drwTemplate = invApp.DesignProjectManager.ActiveDesignProject.TemplatesPath;
-                            InvDoc.XML name = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\TemplatePath.xml");
+                            InvDoc.XML name = new InvDoc.XML(I.p() + @"\TemplatePath.xml");
                             System.Collections.Generic.List<string> strs = new System.Collections.Generic.List<string>();
                             strs = name.ReadXML("Template", "DrawingTemplate");
                             drwTemplate = drwTemplate + strs[0];
@@ -496,7 +589,7 @@ namespace Macros
                                 m_Drw.StylesManager.TextStyles["Material up"].Underline = false;
                             else m_Drw.StylesManager.TextStyles["Material up"].Underline = true;
                         }
-                        catch {}
+                        catch { }
                     }
                     else
                     {
@@ -504,11 +597,17 @@ namespace Macros
                         {
                             m_Drw.StylesManager.TextStyles["Material up"].Underline = false;
                         }
-                        catch {}
+                        catch { }
                     }
-               }
+                }
+                else if (DocumentObject != null && DocumentObject.DocumentType == DocumentTypeEnum.kPartDocumentObject &&
+                    BeforeOrAfter == EventTimingEnum.kAfter)
+                {
+                    var varNames = InvDoc.u.set_variable(DocumentObject); m_Variable._ComboBoxDef.Clear();
+                    m_Variable.fill(varNames, 0);
+                }
             }
-            catch {}
+            catch { }
             HandlingCode = HandlingCodeEnum.kEventHandled;
         }
 
@@ -518,6 +617,7 @@ namespace Macros
             sketch = tbd.Sketch;
             bool flag = false;
             if (edit) tbd.Edit(out sketch);
+            if (tb == null) return;
             foreach (Inventor.TextBox text in sketch.TextBoxes)
             {
                 string ft = text.FormattedText;
@@ -585,7 +685,6 @@ namespace Macros
                 catch (Exception)
                 {
 
-                    throw;
                 }
             }
         }
@@ -601,15 +700,19 @@ namespace Macros
                     try
                     {
                         Inventor.DrawingDocument m_Drw = (Inventor.DrawingDocument)m_Doc;
-                        Inventor.AssemblyDocument m_AsmDoc = (Inventor.AssemblyDocument)InvDoc.u.referendedDoc(m_Doc);
+                        //Inventor.AssemblyDocument m_AsmDoc = (Inventor.AssemblyDocument)InvDoc.u.referendedDoc(m_Doc);
                         foreach (Balloon bal in m_Drw.ActiveSheet.Balloons)
                         {
-                            if (balloons.Find(delegate(Inventor.Balloon b) { return b.Equals(bal); }) == null)
+                            if (!balloons.Contains(bal))
                             {
-                                addBalloonValueSet(bal, m_AsmDoc);
+                                Document rdoc = (Document)bal.ParentView.ReferencedDocumentDescriptor.ReferencedDocument;
+                                if (rdoc.DocumentType == DocumentTypeEnum.kAssemblyDocumentObject)
+                                {
+                                    addBalloonValueSet(bal, (AssemblyDocument)rdoc);
+                                }
                             }
                         }
-                        
+
                     }
                     catch (Exception ex)
                     {
@@ -636,34 +739,71 @@ namespace Macros
             }
         }
 
+
         static public void addBalloonValueSet(Inventor.Balloon m_ball, Inventor.AssemblyDocument m_Asm)
         {
             lst = new System.Collections.Generic.List<string>();
             bool flag = false;
             ComponentOccurrence DefaultCO = null;
             lstco = new System.Collections.Generic.List<ComponentOccurrence>();
-            InvDoc.XML lstxml = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\StandartElements.xml");
+            InvDoc.XML lstxml = new InvDoc.XML(I.p() + @"\StandartElements.xml");
             oldval = new System.Collections.Generic.List<string>();
-            if (lst.Count == 0) 
-            lst = lstxml.ReadXML("StandartElements", "Value");
+            if (lst.Count == 0)
+                lst = lstxml.ReadXML("StandartElements", "Value");
             ComponentDefinition def = m_ball.BalloonValueSets[1].ReferencedRow.BOMRow.ComponentDefinitions[1];
+            Property p = null;
+            string[] filter = null;
+            string tmp = "";
+            if ((p = InvDoc.u.getProp(def.Document as Document, "NoFastener")) != null)
+            {
+                if ((tmp = p.Value.ToString()) == "1") return;
+                if (tmp.Trim() == "") return;
+                filter = tmp.Split(';');
+            }
             foreach (ComponentOccurrence compOcc in m_Asm.ComponentDefinition.Occurrences)
             {
-                if (compOcc.Definition == def){         
+                if (compOcc.Definition == def)
+                {
                     DefaultCO = compOcc;
                     break;
                 }
             }
-            findToBalloon(DefaultCO);
+            if (filter == null)
+                findToBalloon(DefaultCO);
+            else
+            {
+                foreach (var f in filter)
+                {
+                    foreach (ComponentOccurrence item in m_Asm.ComponentDefinition.Occurrences)
+                    {
+                        p = InvDoc.u.getProp(item.Definition.Document as Document, "Description");
+                        tmp = p.Value.ToString();
+                        if (tmp.IndexOf(f) != -1)
+                        {
+                            lstco.Add(item); break;
+                        }
+                    }
+                }
+            }
             lstco = lstco.Distinct().ToList();
             if (lstco.Count >= 1)
-                for (int i = lstco.Count-1; i >= 0; i--)
+                for (int i = lstco.Count - 1; i >= 0; i--)
                 {
                     m_ball.BalloonValueSets.Add(lstco[i]);
                 }
             if (flag)
             {
             }
+        }
+
+        public Document refDocument(Balloon b)
+        {
+            Document doc;
+
+            var rf = b.BalloonValueSets[1].ReferencedFiles[1];
+            doc = (Document)rf.ReferencedDocument;
+
+            return doc;
         }
 
         //private void findUsingRay(Inventor.AssemblyComponentDefinition acd, ComponentOccurrence co)
@@ -676,7 +816,7 @@ namespace Macros
         private string nameFile(string path, bool with)
         {
             int lastInd = path.LastIndexOf('\\');
-            path = path.Substring(lastInd+1, path.Length - lastInd-1);
+            path = path.Substring(lastInd + 1, path.Length - lastInd - 1);
             if (with)
             {
                 return path;
@@ -698,20 +838,20 @@ namespace Macros
             BOMRowsEnumerator bomRows = bomView.BOMRows;
             int i, j;
             lstco.Sort(
-                delegate(ComponentOccurrence co1, ComponentOccurrence co2)
+                delegate (ComponentOccurrence co1, ComponentOccurrence co2)
             {
                 i = 0; j = 0;
                 foreach (BOMRow row in bomRows)
                 {
-                    if(row.ReferencedFileDescriptor.FullFileName == co1.ReferencedDocumentDescriptor.FullDocumentName)
-                    i = Convert.ToInt16(row.ItemNumber);
-                    if(row.ReferencedFileDescriptor.FullFileName == co2.ReferencedDocumentDescriptor.FullDocumentName)
-                    j = Convert.ToInt16(row.ItemNumber);
+                    if (row.ReferencedFileDescriptor.FullFileName == co1.ReferencedDocumentDescriptor.FullDocumentName)
+                        i = Convert.ToInt16(row.ItemNumber);
+                    if (row.ReferencedFileDescriptor.FullFileName == co2.ReferencedDocumentDescriptor.FullDocumentName)
+                        j = Convert.ToInt16(row.ItemNumber);
                     if (i != 0 && j != 0) break;
                 }
-                if (i>j) return 1;
-                    else return -1;
-             }
+                if (i > j) return 1;
+                else return -1;
+            }
             );
         }
 
@@ -732,10 +872,10 @@ namespace Macros
                         {
                             oldval.Add(co.ReferencedDocumentDescriptor.FullDocumentName);
                             //ComponentOccurrence tmpOcc = item.AffectedOccurrenceOne;
-//                             if (tmpOcc.Equals(co) && item.AffectedOccurrenceTwo != null)
-//                             {
-//                                 tmpOcc = item.AffectedOccurrenceTwo;
-//                             }
+                            //                             if (tmpOcc.Equals(co) && item.AffectedOccurrenceTwo != null)
+                            //                             {
+                            //                                 tmpOcc = item.AffectedOccurrenceTwo;
+                            //                             }
                             add(item.AffectedOccurrenceOne);
                             add(item.AffectedOccurrenceTwo);
                         }
@@ -744,13 +884,13 @@ namespace Macros
                 catch { }
                 return null;
             }
-                return null;
+            return null;
         }
 
         public static void add(ComponentOccurrence tmpOcc)
         {
-             if (!oldval.Contains(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName))
-             {
+            if (!oldval.Contains(tmpOcc.ReferencedDocumentDescriptor.FullDocumentName))
+            {
                 string name1 = ((Document)tmpOcc.Definition.Document).PropertySets[3][14].Value.ToString().Trim();
                 if (lst.Contains(name1))
                 {
@@ -766,17 +906,18 @@ namespace Macros
             try
             {
 
-            m_appEvts.OnSaveDocument -= new ApplicationEventsSink_OnSaveDocumentEventHandler(DocEvts_OnSaveHdlr);
-            m_SketchEvts.OnNewSketch -= new SketchEventsSink_OnNewSketchEventHandler(SketchEvts_OnNewSketch);
-            m_appEvts = null;
-            m_SketchEvts = null;
-            Marshal.ReleaseComObject(m_inventorApplication);
-            m_inventorApplication = null;
-            if (m_partSketchRibbonPanel != null)
-                m_partSketchRibbonPanel.Delete();
+                m_appEvts.OnSaveDocument -= new ApplicationEventsSink_OnSaveDocumentEventHandler(DocEvts_OnSaveHdlr);
+                m_SketchEvts.OnNewSketch -= new SketchEventsSink_OnNewSketchEventHandler(SketchEvts_OnNewSketch);
+                m_appEvts = null;
+                m_SketchEvts = null;
+                //Excel.InvExcel.closeApp();
+                Marshal.ReleaseComObject(m_inventorApplication);
+                m_inventorApplication = null;
+                if (m_partSketchRibbonPanel != null)
+                    m_partSketchRibbonPanel.Delete();
 
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
 
             }
             catch (Exception ex)
@@ -800,7 +941,6 @@ namespace Macros
                 return null;
             }
         }
-        
 
         private void DocEvts_OnSaveHdlr(_Document DocumentObject, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
         {
@@ -813,6 +953,7 @@ namespace Macros
                     if (BeforeOrAfter == EventTimingEnum.kBefore)
                     {
                         Inventor.DrawingDocument m_DrwDoc = (DrawingDocument)m_Doc;
+                        saveFormat(m_DrwDoc);
                         if (Arrow == "1")
                         {
                             Inventor.Application invApp = (Inventor.Application)m_Doc.Parent;
@@ -842,12 +983,33 @@ namespace Macros
             HandlingCode = HandlingCodeEnum.kEventHandled;
         }
 
+        public static void saveFormat(DrawingDocument doc)
+        {
+            if (doc.Sheets.Count == 0) return;
+            var sh = doc.Sheets[1];
+            if (sh.DrawingViews.Count == 0) return;
+            var b = sh.Border;
+            if (b == null) return;
+            var dv = sh.DrawingViews[1];
+            var f = dv.ReferencedFile;
+            if (f == null) return;
+            var d = (Document)f.DocumentDescriptor.ReferencedDocument;
+
+            var name = b.Name;
+            if (d.DocumentType != DocumentTypeEnum.kAssemblyDocumentObject)
+                name = InvDoc.u.getFormat(name);
+            else
+                name = "А4";
+            InvDoc.u.addProp(d, "format", name);
+
+        }
+
         public static void settings()
         {
             System.Collections.Generic.List<string> attr = new System.Collections.Generic.List<string>();
             System.Collections.Generic.List<string> tmplst = new System.Collections.Generic.List<string>();
-            InvDoc.XML set = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Modules.xml");
-            tmplst = set.ReadXML("Spec","Spec",ref attr);
+            InvDoc.XML set = new InvDoc.XML(I.p() + @"\Modules.xml");
+            tmplst = set.ReadXML("Spec", "Spec", ref attr);
             if (tmplst.Count != 0) spec = tmplst[0];
             tmplst = set.ReadXML("BreakHor", "BreakHor", ref attr);
             if (tmplst.Count != 0) BreakHor = tmplst[0];
@@ -871,6 +1033,8 @@ namespace Macros
             if (tmplst.Count != 0) Printflag = tmplst[0];
             tmplst = set.ReadXML("Dimensions", "Dimensions", ref attr);
             if (tmplst.Count != 0) dim = tmplst[0];
+            tmplst = set.ReadXML("DXFSplines", "DXFSplines", ref attr);
+            if (tmplst.Count != 0) DXFSpl = tmplst[0];
         }
 
         private void DrawingLabel(DrawingDocument DrwDoc)
@@ -884,7 +1048,7 @@ namespace Macros
                     attr[0] = "Sort";
                     attr[1] = "FontSize";
                     attr[1] = "FontSizeSmall";
-                    InvDoc.XML viewNames = new InvDoc.XML( @"C:\ProgramData\Autodesk\Inventor Addins\ViewNames.xml");
+                    InvDoc.XML viewNames = new InvDoc.XML(I.p() + @"\ViewNames.xml");
                     lstSort = viewNames.ReadXML("Sort", "Value", ref attr);
                 }
                 string Alf = attr[0].ToString();
@@ -961,10 +1125,14 @@ namespace Macros
             foreach (DrawingView view in drwviews)
             {
                 int start = view.Label.FormattedText.LastIndexOf('>');
-                string str = view.Label.FormattedText.Substring(start+1, view.Label.FormattedText.Length - start-1);
-                if (str == " )") str = "";
+                string str = view.Label.FormattedText.Substring(start + 1, view.Label.FormattedText.Length - start - 1);
+                if (str.IndexOf(" )") != -1)
+                {
+                    int ind = str.LastIndexOf(")");
+                    str = str.Substring(ind + 1, str.Length - ind - 1);
+                }
                 if (!section)
-                formatstring = styleOverride("","<DrawingViewName/>", "FontSize='" + FontSize + "'");
+                    formatstring = styleOverride("", "<DrawingViewName/>", "FontSize='" + FontSize + "'");
                 else formatstring = styleOverride("", "<DrawingViewName/>-<DrawingViewName/>", "FontSize='" + FontSize + "'");
 
                 if (view.Scale == scale) view.Label.FormattedText = formatstring + str;
@@ -978,10 +1146,11 @@ namespace Macros
             }
         }
 
-        private string styleOverride(string oldstr ,string str, string val)
+        private string styleOverride(string oldstr, string str, string val)
         {
             return oldstr + "<StyleOverride " + val + ">" + str + "</StyleOverride>";
         }
+
 
         private void SketchEvts_OnNewSketch(_Document DocumentObject, Sketch Sketch, EventTimingEnum BeforeOrAfter, NameValueMap Context, out HandlingCodeEnum HandlingCode)
         {
@@ -1014,10 +1183,47 @@ namespace Macros
                     m_Doc = null;
                 }
             }
-            catch {}
+            catch { }
             HandlingCode = HandlingCodeEnum.kEventHandled;
         }
 
         #endregion
     }
+    public static class MyCmd
+    {
+        public delegate void MyEv(string cmd);
+        public static MyEv EventHandler;
+    }
+    public class MyEvArgs : EventArgs
+    {
+        public string name { get; set; }
+    }
+    public delegate void MyHandler(Object sender, MyEvArgs e);
+    public static class MyEvents
+    {
+        public static string name;
+        static public void add(CreateComponent cc)
+        {
+            cc.myEvent += new MyHandler(Cc_myEvent);
+        }
+        static public void Cc_myEvent(object sender, Macros.MyEvArgs e)
+        {
+            name = e.name;
+        }
+    }
+
+
+    //     public class Comparer : System.Collections.Generic.IEqualityComparer<string>
+    //     {
+    // 
+    //         public bool Equals(string x, string y)
+    //         {
+    //             return x.IndexOf(y) != -1;
+    //         }
+    // 
+    //         public int GetHashCode(string obj)
+    //         {
+    //             return 0;
+    //         }
+    //     }
 }

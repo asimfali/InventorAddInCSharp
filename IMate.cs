@@ -8,6 +8,9 @@ using System.Text;
 using System.Windows.Forms;
 using Inventor;
 using InvDoc;
+using System.Text.RegularExpressions;
+using InterfaceDll;
+using System.Xml.Linq;
 
 namespace InvAddIn
 {
@@ -21,8 +24,13 @@ namespace InvAddIn
         InsertiMateDefinition insIMateDef;
         AngleiMateDefinition angliMate;
         MateiMateDefinition iMateDef;
+        CompositeiMateDefinition CIMateDef;
         Edge edge1, edge2;
-        public bool flag;
+        WorkPlane wp = null;
+        EdgeProxy ePr;
+        Object pl;
+        List<object> pls = new List<object>();
+        public bool flag, cl = false;
         InteractionEvents intEvts;
         SelectEvents sel;
         KeyboardEvents key;
@@ -33,45 +41,161 @@ namespace InvAddIn
         private Transaction tr;
         double offset;
         string str, nameImate;
+
         //delegate double conv(string str);
         char separator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.CurrencyDecimalSeparator[0];
 
         public IMate() { }
-        public IMate(Inventor.Document oDoc, string name = "", string typ = "", string offset = "")
+        public IMate(Inventor.Document oDoc, string name = "", string typ = "", string offset = "", double x = 0, double y = 0)
         {
             invApp = (Inventor.Application)oDoc.Parent;
             Doc = (Document)oDoc.ActivatedObject;
             if (Doc == null) Doc = oDoc;
             CmdMgr = invApp.CommandManager;
+//             InteractionEvents ie = CmdMgr.CreateInteractionEvents();
+//             ie.KeyboardEvents.OnKeyPress += new KeyboardEventsSink_OnKeyPressEventHandler(mainKeyOp);
             objs = invApp.TransientObjects.CreateObjectCollection();
+            
             InitializeComponent();
+            checkBox1.Visible = false; checkBox1.Checked = false;
+            this.FormClosed += IMate_FormClosed1;
+            MyXML xml = new MyXML("Forms.xml");
+            var el = xml.elem.FirstNode as XElement;
+            if (el != null)
+            {
+                int xpos = int.Parse(el.Attribute("x").Value), ypos = int.Parse(el.Attribute("y").Value);
+                if (this.Location.X != xpos)
+                {
+                    this.StartPosition = FormStartPosition.Manual;
+                    this.Location = new System.Drawing.Point(xpos, ypos);
+                }
+            }
+            if (x != 0) { this.StartPosition = FormStartPosition.Manual; this.Location = new System.Drawing.Point((int)x, (int)y); };
             XML n;
-            string filePath = @"C:\ProgramData\Autodesk\Inventor Addins\Imate.xml";
+            string filePath = I.p() + @"\Imate.xml";
             if (!System.IO.File.Exists(filePath)) MessageBox.Show("Отсутствует файл " + filePath);
             n = new InvDoc.XML(filePath);
             data = new List<XMLData>();
             data = n.ReadXML("Imates");
-            foreach (XMLData s in data)
-            {
-                this.comboBox3.Items.Add(s.val);  
-            }
-            this.comboBox2.Text = offset;
-            this.comboBox1.Text = typ;
-            this.comboBox3.Text = name;
-            //this.Deactivate += (sender, e) => MessageBox.Show("Deactivated!");
+            var name_ = u.shortName(oDoc);
+            name_ += "_";
+            setInit();
+            changeCB(data, comboBox1.Text);
+            this.KeyPreview = true;
+            this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Prop_KeyPress);
+            this.comboBox3.Items.Insert(0, name_);
         }
 
-        public void addName(CompositeiMateDefinition iMate, string name)
+        private void IMate_FormClosed1(object sender, FormClosedEventArgs e)
         {
+            getInit();   
+        }
+
+        void getInit()
+        {
+            IMateBtn.name = comboBox3.Text; IMateBtn.typ = comboBox1.Text; IMateBtn.offset = comboBox2.Text;
+            IMateBtn.d = comboBox4.Text; IMateBtn.count = comboBox5.Text;
+        }
+
+        void setInit()
+        {
+            this.comboBox2.Text = IMateBtn.offset;
+            this.comboBox1.Text = IMateBtn.typ;
+            this.comboBox3.Text = IMateBtn.name;
+            this.comboBox4.Text = IMateBtn.d;
+            this.comboBox5.Text = IMateBtn.count;
+        }
+
+        void Prop_KeyPress(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.W)
+            {
+                this.Close();
+            }
+        }
+
+        private void hide(List<Control> vals, bool s = false)
+        {
+            foreach (var item in vals)
+            {
+                if (s) item.Show();
+                else item.Hide();
+            }
+        }
+
+        private void changeCB(List<XMLData> data, string f)
+        {
+            List<Control> lst = new List<Control>() { this.comboBox4, this.comboBox5, this.label5, this.label4, this.label2 };
+            comboBox3.Items.Clear();
+            if (f == "Одиночная вставка")
+            {
+                hide(lst);
+                foreach (var item in data)
+                {
+                    if (item.name == "Value") comboBox3.Items.Add(item.val);
+                }
+            }
+            else if (f == "Колодка")
+            {
+                hide(lst);
+                comboBox3.Text = "Колодка";
+            }
+            else if (f == "DIN-рейка")
+            {
+                hide(lst);
+                comboBox3.Text = "DINРейка";
+            }
+            else if (f == "Вставка" || f == "" || f == "Переименовать" || f ==  "Совмещение по оси" || f == "ТЭН-резистор" )
+            {
+                hide(lst);
+                foreach (var item in data)
+                {
+                    if (item.name == "Match") comboBox3.Items.Add(item.val);
+                }
+            }
+            else if (f == "Основные плоскости")
+            {
+                hide(lst);
+                comboBox2.Items.Clear();
+                comboBox2.Items.Add("с:0;с:0;с:0"); comboBox2.Items.Add("з:0;з:0;з:0");
+                comboBox2.Text = "с:0;с:0;з:0";
+            }
+            else if (f == "Массив отверстий")
+            {
+                hide(lst, true);
+                this.checkBox1.Visible = true;
+                this.checkBox1.Show();
+            }
+            else
+            {
+                                
+                hide(lst, true);
+            }
+        }
+
+        static public void addName(CompositeiMateDefinition iMate, string name)
+        {
+            string m = "";
             if (name != "")
             {
+                if (name.IndexOf('_') != -1)
+                {
+                    Regex r = new Regex(@"(.*)(_)(.*)");
+                    m = r.Replace(name, @"$3$2$1");
+                    if (name.EndsWith("!"))
+                    {
+                        name = m.Replace("!", "");
+                        m = r.Replace(name, @"$3$2$1");
+                    }
+                }
+                else m = name;
                 iMate.Name = name;
-                string[] names = new string[1]; names[0] = name;
+                string[] names = new string[1]; names[0] = m;
                 iMate.MatchList = names;
             }
         }
 
-        public void addName(InsertiMateDefinition iMate, string name)
+        static public void addName(InsertiMateDefinition iMate, string name)
         {
             if (name != "")
             {
@@ -83,18 +207,51 @@ namespace InvAddIn
 
         private void button1_Click(object sender, EventArgs e)
         {
+            MyXML pos = new MyXML("Forms.xml");
+            XElement elpos = pos.elem.FirstNode as XElement;
+            elpos.Attribute("x").Value = this.Location.X.ToString();
+            elpos.Attribute("y").Value = this.Location.Y.ToString();
+            pos.save();
             this.Hide();
             switch (this.comboBox1.Text)
             {
                 case "Вставка":
-                    selEdge(ref edge1, ref edge2, "Выберите первое отверстие", "Выберите второе отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    selEdge(ref edge1, ref edge2, "Выберите первое отверстие", "Выберите второе отверстие", SelectionFilterEnum.kPartEdgeCircularFilter);
                 break;
                 case "Совмещение по оси":
-                    selEdge(ref edge1, ref edge2, "Выберите первое отверстие", "Выберите второе отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    selEdge(ref edge1, ref edge2, "Выберите первое отверстие", "Выберите второе отверстие", SelectionFilterEnum.kPartEdgeCircularFilter);
                 break;
                 case "Овал":
-                    selOval(ref edge1, "Выберите овал", SelectionFilterEnum.kAllCircularEntities);
-                break;
+                    selOval(ref edge1, "Выберите 1 овал", SelectionFilterEnum.kAllCircularEntities);
+                    selOval(ref edge2, "Выберите 2 овал", SelectionFilterEnum.kAllCircularEntities);
+                    break;
+                case "Овал по центру":
+                    selOval(ref edge1, "Выберите 1 овал или отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    selOval(ref edge2, "Выберите 2 овал или отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    if (this.comboBox4.Text == "0")
+                    {
+                        MyXML xml = new MyXML("Imate.xml");
+                        var txt = u.round((u.getDiam(edge1) * 10)).ToString();
+                        var el = xml.getEl("Maps");
+                        if (edge1.GeometryType == CurveTypeEnum.kCircleCurve)
+                        {
+                            var na = MyXML.find(el, "HoleDiam", txt);
+                            var str = MyXML.getAtt(na, "Diam");
+                            txt = "Овал" + str;
+                            this.comboBox4.Text = str;
+                            this.comboBox3.Text =  "_" + txt;
+                        }
+                        else
+                        {
+                            this.comboBox4.Text = txt;
+                            txt = "Овал" + txt;
+                            this.comboBox3.Text =  txt + "_";
+                        }
+                        
+                        MessageBox.Show("\tДиаметр должен быть больше 0.\nЗначение взято из диаметра первого выбранного элемента"); 
+                        this.Show(); return;
+                    }
+                    break;
                 case "ТЭН-резистор":
                     selEdge(ref edge1, ref edge2, "Выберите первое отверстие", "Выберите отверстие для совмещения по оси", SelectionFilterEnum.kAllCircularEntities);
                 break;
@@ -112,24 +269,71 @@ namespace InvAddIn
                     selEdge(ref edge1, ref edge2, "Выберите отверстие", "", SelectionFilterEnum.kAllCircularEntities);
                     selEdge(ref edge2, ref edge1, "Выберите второе отверстие", "", SelectionFilterEnum.kAllCircularEntities);
                 break;
+                case "Переименовать":
+                    selIMate(this.comboBox3.Text, this.comboBox2.Text);
+                    break;
+                case "Изменить":
+                    changeIMate();
+                    break;
+                case "Основные плоскости":
+                    var spl = comboBox2.Text.Split(';');
+                    foreach (var item in spl)
+                    {
+                        pls.Add(selPlane("Выберите плоскость или грань", SelectionFilterEnum.kAllPlanarEntities));
+                    }
+                    break;
+                case "Ответные отверстия":
+                    ePr = (EdgeProxy)selEdgePr("Выберите отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    break;
+                case "Эскиз для отверстий":
+                    edge1 = (Edge)selEdgePr("Выберите ребро", SelectionFilterEnum.kAllLinearEntities);
+                    break;
+                case "Массив отверстий":
+                    edge1 = (Edge)selEdgePr("Выберите ребро", SelectionFilterEnum.kAllLinearEntities);
+                    break;
+                case "Колодка":
+                    selEdge(ref edge1, ref edge2, "Выберите отверстие", "", SelectionFilterEnum.kAllCircularEntities);
+                    pl = selPlane("Выберите другое отверстие", SelectionFilterEnum.kAllCircularEntities);
+                    Edge ed = pl as Edge;
+                    var fa = u.get<Face>(ed.Faces, f => f.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                    pl = fa;
+                    break;
                 default:
                 break;
             }
-            Func<string, double> conv = s =>
+            string[] vals = new string[] { comboBox2.Text, comboBox4.Text, comboBox5.Text };
+            if (checkBox1.Checked)
             {
-                char rep = (separator == ',') ? '.' : ',';
-                return (s.IndexOf(separator) != -1) ? Convert.ToDouble(s) : Convert.ToDouble(s.Replace(rep, separator));
-            };
+                wp = (WorkPlane)CmdMgr.Pick(SelectionFilterEnum.kWorkPlaneFilter, "Выберите плоскость для отзеркаливания");
+            }
             if (edge1 != null)
-            imate(this.comboBox1.Text, this.comboBox3.Text, conv (this.comboBox2.Text),Doc, edge1, edge2);
+            imate(this.comboBox1.Text, this.comboBox3.Text, u.convToDouble((this.comboBox2.Text), new char[] { '%'}),
+                u.convToDouble((this.comboBox4.Text), new char[] { '%' }), vals, Doc, edge1, edge2, cl);
             else if (edges.Count != 0)
             {
                 foreach (Edge ed in edges)
                 {
-                   imate(this.comboBox1.Text, this.comboBox3.Text, conv (this.comboBox2.Text),Doc, ed, edge2); 
+                   imate(this.comboBox1.Text, this.comboBox3.Text, u.convToDouble((this.comboBox2.Text), new char[] { '%' }),
+                u.convToDouble((this.comboBox4.Text), new char[] { '%' }), vals, Doc, ed, edge2, cl); 
                 }
             }
-            IMateBtn.name = comboBox3.Text; IMateBtn.typ = comboBox1.Text; IMateBtn.offset = comboBox2.Text;
+            getInit();
+            if (this.comboBox1.Text == "Переименовать" || comboBox1.Text == "Изменить") this.Close();
+            if (pls.Count > 0)
+                imate(this.comboBox1.Text, this.comboBox3.Text, 0, 0, vals, Doc, null, null, cl);
+            if (ePr != null)
+                imate(this.comboBox1.Text, this.comboBox3.Text, 0, 0, vals, Doc, null, null, cl);
+            this.edge1 = null; this.edge2 = null;
+            I.aDoc().SelectSet.Clear();
+            if (this.comboBox1.Text == "Массив отверстий") this.Close();
+        }
+
+        private void mainKeyOp(int code)
+        {
+            if (code == 'w')
+            {
+                this.Close();
+            }
         }
 
         public void selEdge(ref Edge edge1,ref Edge edge2, string promt1, string promt2, SelectionFilterEnum filter)
@@ -139,8 +343,95 @@ namespace InvAddIn
             if (promt2 != "")
             edge2 = (Edge)CmdMgr.Pick(filter, promt2);
         }
+        public object selPlane(string prompt, SelectionFilterEnum f)
+        {
+            return CmdMgr.Pick(f, prompt);
+        }
+        public object selEdgePr(string prompt, SelectionFilterEnum f)
+        {
+            return CmdMgr.Pick(f, prompt);
+        }
+        public void selIMate(string name, string offset)
+        {
+            Document adoc = I.aDoc();
+            CompositeiMateDefinition def;
+            if (adoc.SelectSet.Count != 0)
+            {
+                foreach (var item in adoc.SelectSet)
+                {
+                    def = getCImate(item);
+                    if (def != null)
+                    {
+                        addName(def, name);
+                        setOffset(def, offset);
+                    }
+                    var im = getIImate(item);
+                    if (im != null)
+                    {
+                        im.Name = name;
+                        setOffset(im, offset);
+                    }
+                }
+            }
+        }
+        public void changeIMate()
+        {
+            var doc = I.aDoc();
+            if (doc.SelectSet.Count == 0) return;
+            var ims = u.gets<CompositeiMateDefinition>(doc.SelectSet, f => true);
+            var txt = comboBox2.Text;
+            ModelParameter p;
+            var spl = txt.Split(';');
+            foreach (var item in ims)
+            {
+                int i = 0;
+                foreach (iMateDefinition el in item)
+                {
+                    dynamic im = el;
+                    if (el.Type == ObjectTypeEnum.kInsertiMateDefinitionObject)
+                    {
+                        p = im.Distance;
+                    }
+                    else
+                    {
+                        p = im.Offset;
+                    }
+                    if (p == null) continue;
+                    p.Expression = spl[i];
+                    i++;
+                }
+            }
+        }
+        public void setOffset(CompositeiMateDefinition d, string v)
+        {
+            foreach (var im in d)
+            {
+                InsertiMateDefinition iimd = im as InsertiMateDefinition;
+                setOffset(iimd, v);
+            }
+        }
+        public void setOffset(InsertiMateDefinition iimd, string v)
+        {
+            if (iimd == null || v == "") return;
+            iimd.Distance.Expression = v;
+        }
+        public CompositeiMateDefinition getCImate(object item)
+        {
+            CompositeiMateDefinitionProxy p = item as CompositeiMateDefinitionProxy;
+            CompositeiMateDefinition def = item as CompositeiMateDefinition;
+            if (def == null && p != null) def = p.NativeObject as CompositeiMateDefinition;
+            return def;
+        }
+        public InsertiMateDefinition getIImate(object item)
+        {
+            InsertiMateDefinitionProxy p = item as InsertiMateDefinitionProxy;
+            InsertiMateDefinition def = item as InsertiMateDefinition;
+            if (def == null && p != null) def = p.NativeObject as InsertiMateDefinition;
+            return def;
+        }
         public void selOval(ref Edge edge1, string promt1, SelectionFilterEnum filter)
         {
+            if (edge1 != null) return;
             if (promt1 != "")
                 edge1 = (Edge)CmdMgr.Pick(filter, promt1);
         }
@@ -194,7 +485,36 @@ namespace InvAddIn
             }
         }
 
-        public void imate(string str, string name, double offset, Document Doc, object edge1, object edge2, bool close = false)
+        public static CompositeiMateDefinition iInsComposite(object e1, object e2, PartComponentDefinition PartCompDef, double offset, string name, string compName)
+        {
+            ObjectCollection objs = I.COC();
+            objs.Add(iMate_(e1, PartCompDef, offset/10));
+            objs.Add(iMate_(e2, PartCompDef, offset/10));
+            CompositeiMateDefinition comp = PartCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs);
+            addName(comp, name);
+            if (compName != null && compName != "")
+            {
+                comp.MatchList = new string[] { compName };
+            }
+            return comp;
+        }
+
+        public static CompositeiMateDefinition iInsComposite(object e1, object e2, PartComponentDefinition def, object offset, string name, string compName)
+        {
+            ObjectCollection objs = I.COC();
+            objs.Add(def.iMateDefinitions.AddInsertiMateDefinition(e1, true, offset));
+            objs.Add(def.iMateDefinitions.AddInsertiMateDefinition(e2, true, offset));
+            CompositeiMateDefinition comp = def.iMateDefinitions.AddCompositeiMateDefinition(objs);
+            addName(comp, name);
+            if (compName != null && compName != "")
+            {
+                comp.MatchList = new string[] { compName };
+            }
+            return comp;
+        }
+
+        public void imate(string str, string name, double offset, double r, string [] vals, 
+            Document Doc, object edge1, object edge2, bool close = false)
         {
             try
             {
@@ -258,26 +578,123 @@ namespace InvAddIn
                             break;
                     }
                 }
-                else if (str == "Овал")
+                else if (str == "Овал по центру")
                 {
-
+                    MateiMateDefinition m1 = null, m2 = null, m3 = null, m4 = null;
+                    bool cyl = false;
+                    var pt = this.edge1.PointOnEdge;
                     switch (Doc.DocumentType)
                     {
                         case DocumentTypeEnum.kPartDocumentObject:
-                            Face f1;
-                            f1 = (((Edge)edge1).Faces[1].SurfaceType == SurfaceTypeEnum.kPlaneSurface) ? ((Edge)edge1).Faces[1]: ((Edge)edge1).Faces[2];
-                            iMateDef = findAxis(PartCompDef, edge1 as Edge);
+                            Face f2 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f2.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                f2 = u.get<Face>(f2.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                m1 = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20, BiasPoint: pt);
+                                m4 = addWPl(PartCompDef, f2);
+                            }
+                            else
+                            {
+                                cyl = true;
+                                m1 = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20, InferredTypeEnum.kInferredLine, pt);
+                                m4 = addWPl(PartCompDef, f2);
+                            }
+                            Face f3 = u.get<Face>(this.edge2.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f3.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                Cylinder c = (Cylinder)f3.Geometry;
+                                f3 = u.get<Face>(f3.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                m2 = addWPl(PartCompDef, f3);
+                            }
+                            else { m2 = addWPl(PartCompDef, f3); }
+                            Face f1 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                            m3 = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f1, offset / 10, BiasPoint: pt);
+                            objs.Add(m1); objs.Add(m2); objs.Add(m3); objs.Add(m4);
+                            addName(PartCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
+                            break;
+                        case DocumentTypeEnum.kAssemblyDocumentObject:
+                            f2 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f2.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                f2 = u.get<Face>(f2.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                m1 = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20);
+                                m4 = addWPl(AsmCompDef, f2);
+                            }
+                            else 
+                            {
+                                cyl = true;
+                                m1 = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20, InferredTypeEnum.kInferredLine);
+                                m4 = addWPl(AsmCompDef, f2);
+                            }
+                            f3 = u.get<Face>(this.edge2.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f3.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                Cylinder c = (Cylinder)f3.Geometry;
+                                f3 = u.get<Face>(f3.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                m2 = addWPl(AsmCompDef, f3);
+                            }
+                            else { m2 = addWPl(AsmCompDef, f3); }
+                            f1 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                            m3 = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f1, offset / 10);
+                            if (cyl)
+                            {
+                                objs.Add(m1); objs.Add(m2); objs.Add(m3); objs.Add(m4);
+                            }
+                            else { objs.Add(m2); objs.Add(m1); objs.Add(m3); objs.Add(m4); }
+                            addName(AsmCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
+                            break;
+                    }
+                }
+                else if (str == "Овал")
+                {
+                    switch (Doc.DocumentType)
+                    {
+                        case DocumentTypeEnum.kPartDocumentObject:
+                            Face f2 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f2.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                f2 = u.get<Face>(f2.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r/20);
+                            }
+                            else 
+                            { 
+                                iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20, InferredTypeEnum.kInferredLine);
+                            }
                             objs.Add(iMateDef);
+                            Face f3 = u.get<Face>(this.edge2.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f3.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                Cylinder c = (Cylinder)f3.Geometry;
+                                f3 = u.get<Face>(f3.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f3, c.Radius);
+                            } 
+                            else { iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f3, r / 20, InferredTypeEnum.kInferredLine); }
+                            objs.Add(iMateDef);
+                            Face f1 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
                             iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(f1, offset / 10);
                             objs.Add(iMateDef);
                             addName(PartCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
                             break;
                         case DocumentTypeEnum.kAssemblyDocumentObject:
-                            Face fp1 = (((Edge)edge1).Faces[1].SurfaceType == SurfaceTypeEnum.kPlaneSurface) ? ((EdgeProxy)edge1).Faces[1] : ((Edge)edge1).Faces[2];
-                            Face fp2 = (((Edge)edge1).Faces[1].SurfaceType == SurfaceTypeEnum.kCylinderSurface) ? ((Edge)edge1).Faces[1] : ((Edge)edge1).Faces[2];
-                            iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(fp2, 0, InferredTypeEnum.kInferredLine);
+                            f2 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f2.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                f2 = u.get<Face>(f2.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20);
+                            }
+                            else { iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f2, r / 20, InferredTypeEnum.kInferredLine); }
                             objs.Add(iMateDef);
-                            iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(fp1, 0);
+                            f3 = u.get<Face>(this.edge2.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kCylinderSurface);
+                            if (f3.TangentiallyConnectedFaces.Count != 0)
+                            {
+                                Cylinder c = (Cylinder)f3.Geometry;
+                                f3 = u.get<Face>(f3.TangentiallyConnectedFaces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                                iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f3, c.Radius);
+                            }
+                            else { iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f3, r / 20, InferredTypeEnum.kInferredLine); }
+                            objs.Add(iMateDef);
+                            f1 = u.get<Face>(this.edge1.Faces, fi => fi.SurfaceType == SurfaceTypeEnum.kPlaneSurface);
+                            iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(f1, offset / 10);
                             objs.Add(iMateDef);
                             addName(AsmCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
                             break;
@@ -312,8 +729,8 @@ namespace InvAddIn
                         case DocumentTypeEnum.kAssemblyDocumentObject:
                             iMateDef = iMate__(edge1, AsmCompDef, offset);
                             objs.Add(iMateDef);
-                            iMateDef = (((Edge)edge1).Faces[1].SurfaceType == SurfaceTypeEnum.kPlaneSurface) ? PartCompDef.iMateDefinitions.AddMateiMateDefinition(((Edge)edge1).Faces[1], offset / 10, BiasPoint: ((Edge)edge1).PointOnEdge) :
-                                PartCompDef.iMateDefinitions.AddMateiMateDefinition(((Edge)edge1).Faces[2], offset / 10, BiasPoint: ((Edge)edge1).PointOnEdge);
+                            iMateDef = (((Edge)edge1).Faces[1].SurfaceType == SurfaceTypeEnum.kPlaneSurface) ? AsmCompDef.iMateDefinitions.AddMateiMateDefinition(((Edge)edge1).Faces[1], offset / 10, BiasPoint: ((Edge)edge1).PointOnEdge) :
+                                AsmCompDef.iMateDefinitions.AddMateiMateDefinition(((Edge)edge1).Faces[2], offset / 10, BiasPoint: ((Edge)edge1).PointOnEdge);
                             objs.Add(iMateDef);
                             iMateDef = iMate__(edge2, AsmCompDef, offset);
                             objs.Add(iMateDef);
@@ -365,6 +782,26 @@ namespace InvAddIn
                             break;
                     }
                 }
+                else if (str == "Колодка")
+                {
+                    switch (Doc.DocumentType)
+                    {
+                        case DocumentTypeEnum.kAssemblyDocumentObject:
+                            insIMateDef = iMate_(edge1, AsmCompDef, offset);
+                            objs.Add(insIMateDef);
+                            iMateDef = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(pl, 0, InferredTypeEnum.kInferredLine);
+                            objs.Add(iMateDef);
+                            addName(AsmCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
+                            break;
+                        case DocumentTypeEnum.kPartDocumentObject:
+                            insIMateDef = iMate_(edge1, PartCompDef, offset);
+                            objs.Add(insIMateDef);
+                            iMateDef = PartCompDef.iMateDefinitions.AddMateiMateDefinition(pl, 0, InferredTypeEnum.kInferredLine);
+                            objs.Add(iMateDef);
+                            addName(PartCompDef.iMateDefinitions.AddCompositeiMateDefinition(objs), name);
+                            break;
+                    }
+                }
                 else if (str == "DIN-рейка")
                 {
                     switch (Doc.DocumentType)
@@ -389,6 +826,48 @@ namespace InvAddIn
                             break;
                     }
                 }
+                else if (str == "Основные плоскости")
+                {
+                    var spl = IMateBtn.offset.Split(';');
+                    iMateDefinitions ims = null;
+
+                    string o = "с:0";
+                    switch (Doc.DocumentType)
+                    {
+                        case DocumentTypeEnum.kAssemblyDocumentObject:
+                            ims = AsmCompDef.iMateDefinitions;
+                            break;
+                        case DocumentTypeEnum.kPartDocumentObject:
+                            ims = PartCompDef.iMateDefinitions;
+                            break;
+                    }
+                    int i = 0;
+                    foreach (var item in pls)
+                    {
+                        if (spl.Length >= i) o = spl[i];
+                        var t = o.Split(':');
+                        if (t[0] == "с")
+                            objs.Add(ims.AddMateiMateDefinition(item, t[1]));
+                        else objs.Add(ims.AddFlushiMateDefinition(item, t[1]));
+                        i++;
+                    }
+                    addName(ims.AddCompositeiMateDefinition(objs), name);
+                }
+                else if (str == "Ответные отверстия")
+                {
+                    IMates ism = new IMates(Doc, ePr);
+                }
+                else if (str == "Эскиз для отверстий")
+                {
+                    if (Doc.DocumentType == DocumentTypeEnum.kPartDocumentObject)
+                    {
+                        SketchInMB sk = new SketchInMB((PartDocument)Doc, (Edge)edge1, vals);
+                    }     
+                }
+                else if (str == "Массив отверстий")
+                {
+                    arrayMirror(vals, str);
+                }    
                 objs.Clear();
             }
             catch (Exception ex)
@@ -409,7 +888,81 @@ namespace InvAddIn
                 }
             }
         }
+        public void arrayMirror(string [] vals, string type)
+        {
+            var doc = I.aDoc();
+            var compDef = I.getPCD(doc);
+            var smf = I.getSMF(doc);
+            var ss = I.getSS(doc);
+            if (ss.Count != 0) ss.Delete();
+            ss.Select(edge1);
+            SketchInMB sk = null;
+            RectangularPatternFeature rpf = null;
+            if (type == "Массив отверстий")
+            {
+                sk = new SketchInMB(doc, vals);
+            }
+            else if (type == "Отверстия")
+            {
+                sk = new SketchInMB(doc as PartDocument, edge1, vals);
+            }    
+            var ps = compDef.Sketches[compDef.Sketches.Count];
 
+            if (ss.Count != 0)
+                ss.Delete();
+            ss.Select(ps);
+            IMates ims = new IMates(I.aDoc());
+            if (type == "Массив отверстий")
+            {
+                string sp = $"{sk.par[0].Name} - 2* {sk.par[2].Name}";
+                bool dir = sk.isDir();
+                var pat = smf.RectangularPatternFeatures.CreateDefinition(ims.feats, sk.dir, dir, vals[2], sp);
+                pat.XDirectionSpacingType = PatternSpacingTypeEnum.kFitted;
+                ims.setBodies();
+                pat.AffectedBodies = ims.bodies;
+                rpf = smf.RectangularPatternFeatures.AddByDefinition(pat);
+            }
+            if (wp != null)
+            {
+                if (type == "Массив отверстий")
+                    ims.feats.Add(rpf);
+                var mirDef = smf.MirrorFeatures.CreateDefinition(ims.feats, wp, PatternComputeTypeEnum.kIdenticalCompute);
+                var bodies = u.findBodies(compDef, mirDef);
+                if (bodies.Count != 0)
+                    mirDef.AffectedBodies = bodies;
+                var mir = smf.MirrorFeatures.AddByDefinition(mirDef);
+            }
+        }
+        private MateiMateDefinition addWPl(object o, Face f2)
+        {
+            var pDef = o as PartComponentDefinition;
+            var aDef = o as AssemblyComponentDefinition;
+            if (f2.SurfaceType == SurfaceTypeEnum.kCylinderSurface) {
+                return pDef != null ? pDef.iMateDefinitions.AddMateiMateDefinition(f2, 0, InferredTypeEnum.kInferredLine) :
+                    aDef.iMateDefinitions.AddMateiMateDefinition(f2, 0, InferredTypeEnum.kInferredLine);
+            }
+            Edge e = u.get<Edge>(f2.Vertices[1].Edges, fi => fi.CurveType == CurveTypeEnum.kLineCurve);
+            MateiMateDefinition m;
+            if (pDef != null)
+            {
+
+                var wp = pDef.WorkPoints.AddByMidPoint(e, true);
+                var wpl = pDef.WorkPlanes.AddByNormalToCurve(e, wp); wpl.Visible = false;
+                m = PartCompDef.iMateDefinitions.AddMateiMateDefinition(wpl, 0);
+            }
+            else
+            {
+                var ep = e as EdgeProxy;
+                var wpl = aDef.WorkPlanes.AddFixed(I.CP(), I.CUV(1, 0, 0), I.CUV(0, 1, 0));
+                aDef.Constraints.AddMateConstraint(wpl, ep.StartVertex, -u.getLenght(e) / 2, InferredTypeEnum.kNoInference,
+                    InferredTypeEnum.kInferredPoint);
+                //wpl.AutoResize = true;
+                wpl.Visible = false;
+                aDef.Constraints.AddAngleConstraint(wpl, e, 0, AngleConstraintSolutionTypeEnum.kUndirectedSolution);
+                m = AsmCompDef.iMateDefinitions.AddMateiMateDefinition(wpl, 0);
+            }
+            return m;
+        }
         private MateiMateDefinition findAxis(PartComponentDefinition def ,Edge ed)
         {
             if (ed.TangentiallyConnectedEdges.Count == 1)
@@ -499,12 +1052,12 @@ namespace InvAddIn
             return null;
         }
 
-        public Inventor.InsertiMateDefinition iMate_(object oEdge, PartComponentDefinition compDef, double offset = 0)
+        public static Inventor.InsertiMateDefinition iMate_(object oEdge, PartComponentDefinition compDef, double offset = 0)
         {
             return compDef.iMateDefinitions.AddInsertiMateDefinition(oEdge, true, offset / 10) ;
         }
 
-        public Inventor.InsertiMateDefinition iMate_(object oEdge, AssemblyComponentDefinition compDef, double offset = 0)
+        public static Inventor.InsertiMateDefinition iMate_(object oEdge, AssemblyComponentDefinition compDef, double offset = 0)
         {
             return compDef.iMateDefinitions.AddInsertiMateDefinition(oEdge, true, offset / 10);
         }
@@ -608,6 +1161,7 @@ namespace InvAddIn
         private void IMate_Load(object sender, EventArgs e)
         {
             tr = invApp.TransactionManager.StartTransaction((_Document)Doc, "Конструктивные пары");
+            setInit();
         }
 
         public void selOp(ref List<Edge> edgeCmp)
@@ -672,6 +1226,23 @@ namespace InvAddIn
             if (KeyASCII == 32)
             {
                 Edge ed = (Edge)sel.SelectedEntities[sel.SelectedEntities.Count];
+                if (ed.Faces.Count == 1)
+                {
+                    SurfaceBody sb = ed.Parent;
+                    var g = ed.Geometry as Arc3d;
+                    var pl = I.app.TransientGeometry.CreatePlane(g.Center, g.Normal.AsVector());
+                    foreach (Edge item in sb.Edges)
+                    {
+                        var g1 = item.Geometry as Arc3d;
+                        if (g1 == null) continue;
+                        var d =  u.distToPlane(pl, g1.Center);
+                        if (d == 0)
+                        {
+                            sel.AddToSelectedEntities(item);
+                        }
+                    }
+                    return;
+                }
                 double r = ((Circle)ed.Geometry).Radius;
                 Inventor.Face f = (ed.Faces[1].SurfaceType == SurfaceTypeEnum.kPlaneSurface) ? ed.Faces[1] : ed.Faces[2];
                 foreach (Edge e in f.Edges)
@@ -681,6 +1252,7 @@ namespace InvAddIn
                         sel.AddToSelectedEntities(e);
                     }
                 }
+                
             }
             else if (KeyASCII == 13)
             {
@@ -693,16 +1265,29 @@ namespace InvAddIn
             ComboBox cb = sender as ComboBox;
             if (cb.Text == "По элементу")
             {
-                checkBox1.Visible = true;  
+                checkBox1.Visible = true;           
             }
+            else
+            {
+                changeCB(data, cb.Text);
+            }
+        }
+
+        private void IMate_KeyDown(object sender, KeyEventArgs e)
+        {
+            //if (e.KeyCode == Keys.W) this.Close();
         }
     }
 
     internal class IMateBtn : Button
     {
         public static IMate m_IMate;
-        public static string name = "", typ = "", offset = "";
+        public static string name = "", typ = "", offset = "", count = "", d = "";
         public Inventor.Document pDoc { get; set; }
+        InteractionEvents interEvts;
+        Inventor.MouseEvents mouseEvts;
+        Inventor.Point2d pos;
+        double x = 0, y = 0;
         public static IMate getIMate
         {
             get
@@ -719,15 +1304,28 @@ namespace InvAddIn
 
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
+            //interEvts = I.app.CommandManager.CreateInteractionEvents();
+            //mouseEvts = interEvts.MouseEvents;
+            //mouseEvts.MouseMoveEnabled = true;
+            //mouseEvts.OnMouseMove += new MouseEventsSink_OnMouseMoveEventHandler(MouseInvMove);
+            //interEvts.Start();
+
             //InvAddIn.Tables tbl = new Tables(InventorApplication.ActiveDocument, InventorApplication, "fsdf");
             //tbl.addLeader(true);
-            m_IMate = new InvAddIn.IMate(InventorApplication.ActiveDocument, name, typ, offset);      
+            m_IMate = new InvAddIn.IMate(InventorApplication.ActiveDocument, name, typ, offset, x, y);      
             Macros.StandardAddInServer.forms.Add(m_IMate);
             //InterfaceDll.MyEvents ev = new InterfaceDll.MyEvents(m_IMate);
             //ev.addKeyEvent();
             if (Macros.StandardAddInServer.activeteForm()) System.Windows.Forms.Application.Run(m_IMate);
         }
 
+        private void MouseInvMove(MouseButtonEnum Button, ShiftStateEnum ShiftKeys,
+            Inventor.Point ModelPosition, Point2d ViewPosition, Inventor.View View)
+        {
+            x = ViewPosition.X; y = ViewPosition.Y;
+            mouseEvts.OnMouseMove -= new MouseEventsSink_OnMouseMoveEventHandler(MouseInvMove);
+            interEvts.Stop();
+        }
         #endregion
     }
 }

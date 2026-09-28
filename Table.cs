@@ -24,26 +24,28 @@ namespace InvAddIn
         private Inventor.BOM m_BOM;
         private Inventor.BOMView m_BOMView;
         private Inventor.TransientGeometry m_TG;
-        private Inventor.SketchedSymbolDefinition m_SketchDef;
-        private Inventor.DrawingSketch m_DrwSketch;
-        private Inventor.SketchLine m_SketchLine;
-        private VariableDataForSpec varForSpec;
+        //private Inventor.SketchedSymbolDefinition m_SketchDef;
         public Dictionary<string, string> dic;
-        private bool m_first;
         private string path, value;
         private string[] strs;
         private List<Inventor.Point2d> pts = new List<Point2d>();
         //BindingSource bs;
         public static System.Drawing.Point point = new System.Drawing.Point();
         public int pos = 0;
+        public double offsetRow = 0;
         public double scale = 50;
+        public bool addFormat = false;
         int start = 0;
+        public CheckBox check1, check2, check3, check4;
         //public int maxWidth, maxHeigth;
         public Rectangle boundsScreen;
                                 
         public Table(Inventor.Document pDoc, Inventor.Application m_InvApp)
         {
-            boundsScreen = Screen.PrimaryScreen.WorkingArea;
+            boundsScreen = get_min_size().WorkingArea;
+            //string txt = boundsScreen.Height.ToString() + " " + get_min_size().Bounds.X;
+            //MessageBox.Show(txt);
+            //boundsScreen.Width = 1920; boundsScreen.Height = 1080;
             scale = boundsScreen.Width * 0.465 / 16.5;
             m_TG = m_InvApp.TransientGeometry;
             switch (pDoc.DocumentType)
@@ -69,7 +71,15 @@ namespace InvAddIn
               //    m_BOM.StructuredViewFirstLevelOnly = false;
             m_BOMView = m_BOM.BOMViews["Структурированный"];
             InitializeComponent();
-            this.ClientSize = Screen.PrimaryScreen.WorkingArea.Size;
+            //this.Size = new Size(1920, 1080);
+            //this.WindowState = FormWindowState.Normal;
+            //getMessage();
+            //var secScreen = Screen.AllScreens[0];
+            //this.Location = new System.Drawing.Point(secScreen.Bounds.Left, secScreen.Bounds.Top);
+            //this.StartPosition = FormStartPosition.Manual;
+            //this.Location = new System.Drawing.Point(40, 80);
+            //this.WindowState = FormWindowState.;
+            this.ClientSize = get_min_size().WorkingArea.Size;
             this.Format.Width = (int)(0.6 * scale);
             this.Zone.Width = (int)(0.6 * scale);
             this.Position.Width = (int)(0.8 * scale);
@@ -109,12 +119,66 @@ namespace InvAddIn
             this.button2.Location = new System.Drawing.Point(button3.Bounds.Left, button3.Bounds.Bottom + offset);
             this.lbl.Location = new System.Drawing.Point(button2.Bounds.Left, button2.Bounds.Bottom + offset);
             this.txtBox.Location = new System.Drawing.Point(button2.Bounds.Left, lbl.Bounds.Bottom + offset);
+
+            check1 = new CheckBox(); check1.Name = "firstSheet"; check1.Text = "1 лист"; check1.Parent = this;
+            check2 = new CheckBox(); check2.Name = "ElAdd"; check2.Text = "Эл. схема"; check2.Parent = this;
+            check3 = new CheckBox(); check3.Name = "PassportAdd"; check3.Text = "Паспорт"; check3.Parent = this;
+            //check4 = new CheckBox(); check4.Name = "Sb"; check4.Text = "СБ"; check4.Parent = this;
+            
+
+            check1.Location = new System.Drawing.Point(button2.Bounds.Left, txtBox.Bounds.Bottom + offset);
+            check2.Location = new System.Drawing.Point(button2.Bounds.Left, check1.Bounds.Bottom + offset);
+            check3.Location = new System.Drawing.Point(button2.Bounds.Left, check2.Bounds.Bottom + offset);
+            //check4.Location = new System.Drawing.Point(button2.Bounds.Left, check3.Bounds.Bottom + offset);
+
+            check1.CheckedChanged += Check1_CheckedChanged; check2.CheckedChanged += Check1_CheckedChanged;
+            check3.CheckedChanged += Check1_CheckedChanged;
+            //check4.CheckedChanged += Check1_CheckedChanged;
+
             //this.lbl3.Location = new System.Drawing.Point(button2.Bounds.Left, txtBox.Bounds.Bottom + offset);
-            //this.txtBox3.Location = new System.Drawing.Point(button2.Bounds.Left, lbl3.Bounds.Bottom + offset);
+            //this.txtBox3.Location = new System.Drawing.Point(button2.Bounds.Left, lbl3.Bounds.Bottom + offset); fd
 
-            //initSpec(dgv);
+            //initSpec(dgv);в
 
-            tbl = tbl ?? new TableInv(m_DrwDoc, @"C:\ProgramData\Autodesk\Inventor Addins\Sequence.xml");
+            tbl = tbl ?? new TableInv(m_DrwDoc, I.p() + @"\Sequence.xml");
+
+            check1.Checked = tbl.addToFirstSheet; check2.Checked = tbl.electric; check3.Checked = tbl.passport;
+
+            check1.Checked = (m_DrwDoc.Sheets.Count > 1) ? false : true;
+            //check4.Checked = tbl.format;
+            redrawTable();
+            dgv.RowHeaderMouseClick += dataGridView1_RowHeaderMouseClick;
+            this.KeyPreview = true;
+            this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.Prop_KeyPress);
+        }
+        static public Screen get_min_size()
+        {
+            var ie = Screen.AllScreens.OrderBy(s => s.Bounds.Height);
+            return ie.ElementAt(0);
+        }
+        public void getMessage()
+        {
+            string txt  = "";
+            foreach (var item in Screen.AllScreens)
+            {
+                txt += item.DeviceName;
+                txt += @"\n" + item.Bounds.Width + " " + item.Bounds.Height;
+            }
+            MessageBox.Show(txt);
+        }
+        public void redrawTable()
+        {
+            //tbl.addToFirstSheet = check1.Checked; tbl.electric = check2.Checked; tbl.passport = check3.Checked;
+            //tbl.format = check4.Checked;
+            if (tbl.addFormat)
+            {
+                string fn = m_DrwDoc.Sheets[1].Border.Name;
+                var spl = fn.Split('-');
+                if (spl.Length == 2)
+                {
+                    tbl.formatStr = spl[1].Trim();
+                }
+            }
             //if (txtBox.Text != "") tbl.split = txtBox.Text;
             //VariableDataForSpec vd = new VariableDataForSpec((Document)m_AsmDoc);
             //List<string> lst = vd.AttribLoad("Split");
@@ -125,20 +189,78 @@ namespace InvAddIn
 
                 if (attSet.Count != 0) txtBox.Text = attSet[1].Value.ToString();
             }
-
             tbl.addTable(m_BOMView);
             if (tbl.countPerf == 0)
-                tbl.showTable(dgv,0,100, tbl.group, varData:false);
+                tbl.showTable(dgv, 0, 100, tbl.group, varData: false);
             else
             {
-                tbl.showTable(dgv, 0, 100, tbl.group,varData:false);
-                tbl.showTable(dgvVar, 100, 5000, tbl.group,varData:true);
+                tbl.showTable(dgv, 0, 100, tbl.group, varData: false);
+                tbl.showTable(dgvVar, 100, 5000, tbl.group, varData: true);
                 dgvVar.Visible = true;
             }
             //tbl.asmDoc = m_AsmDoc;
             balloon();
-            dgv.RowHeaderMouseClick += dataGridView1_RowHeaderMouseClick;
-            dgv.KeyDown += dgv_KeyDown;
+        }
+        private void Check1_CheckedChanged(object sender, EventArgs e)
+        {
+            bool save = false, ch;
+            XAttribute att = null;
+            InterfaceDll.MyXML xml = new InterfaceDll.MyXML("Sequence.xml", "head");
+            CheckBox cb = sender as CheckBox;
+            ch = cb.Checked;
+            var el = InterfaceDll.MyXML.getEl(xml.elem, "Table");
+            if (el == null) return;
+            switch (cb.Name)
+            {
+                case "firstSheet":
+                    att = el.Attribute("addToFirstSheet");
+                    break;
+                case "PassportAdd":
+                    att = el.Attribute("passport");
+                    break;
+                case "ElAdd":
+                    att = el.Attribute("electric");
+                    break;
+                case "Sb":
+                    att = el.Attribute("sb");
+                    break;
+                default:
+                    break;
+            }
+            if (att == null) return;
+            if (bool.Parse(att.Value) != ch) {
+                save = true; att.Value = cb.Checked.ToString();
+                if (cb.Name == "firstSheet")
+                {
+                    el.Attribute("sb").Value = (!cb.Checked).ToString();
+                }
+            }
+            if (save)
+            {
+                xml.save();
+                tbl = new TableInv(m_DrwDoc, I.p() + @"\Sequence.xml");
+                tbl.saveInAsm();
+                redrawTable();
+            }
+        }
+
+        void Prop_KeyPress(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.W)
+            {
+                this.Close();
+            }
+            else if (e.Control && e.KeyCode == Keys.D)
+            {
+                tbl.clearPerf();
+                tbl.saveInAsm();
+                this.Close();
+            }
+            else if (e.Control && e.KeyCode == Keys.A)
+            {
+                toDrawing();
+                this.Close();
+            }
         }
 
         private void balloon()
@@ -437,43 +559,39 @@ namespace InvAddIn
 
         private void button1_Click(object sender, EventArgs e)
         {
-            //drawTable("Spec",m_TG.CreatePoint2d(0, 0), new double[] { 0.6, 0.6, 0.8, 7, 6.3, 1, 2.2}, dataGridView1.Rows.Count - 1,
-            //    intArr2: new int[] {3,4,6}, _dgv: dataGridView1,heigthRow: 0.8);
+            toDrawing();
+        }
 
-            tbl = tbl ?? new TableInv(m_DrwDoc, @"C:\ProgramData\Autodesk\Inventor Addins\Sequence.xml");
+        public void toDrawing()
+        {
+            string asm = "";
+            tbl = tbl ?? new TableInv(m_DrwDoc, I.p() + @"\Sequence.xml");
+            tbl.addToFirstSheet = check1.Checked; tbl.electric = check2.Checked; 
+            tbl.passport = check3.Checked; 
+            //tbl.format = check4.Checked;
+            if (tbl.addToFirstSheet) { asm = ""; }
+            else {
+                asm = "СБ";
+                foreach (SketchedSymbol item in m_DrwDoc.Sheets[1].SketchedSymbols)
+                {
+                    if (item.Name.ToLower().StartsWith("spec"))
+                    {
+                        item.Delete();
+                    }
+                }
+            }
+            var prop = m_AsmDoc.PropertySets[2][1];
+            prop.Value = asm;
+            offsetRow = tbl.offsetRow;
+            var fs = tbl.addToFirstSheet;
             if (tbl.countPerf != 0) tbl.saveInAsm();
             int[] arr = txtBox.Text.Split(';').Select(s => int.Parse(s)).ToArray();
             VariableDataForSpec vd = new VariableDataForSpec((Document)m_AsmDoc);
             vd.AttribDelete("Split");
             if (txtBox.Text != "") vd.AttribAdd<string>("Split", txtBox.Text, ValueTypeEnum.kStringType);
-            tbl.addToSheet("Spec",arr);
-            //tbl.addTable(dgv);
-            //tbl.drawTable("Спецификация", 0, dataGridView1.RowCount, m_TG.CreatePoint2d());
-            //string[] tmp = txtBox.Text.Split(new char[]{';'});
-            //int[] spl = new int[tmp.Count()/*+1*/]; int sum = 1;
-            //foreach (Inventor.SketchedSymbol ss in m_DrwDoc.ActiveSheet.SketchedSymbols)
-            //{
-            //    if (ss.Name.StartsWith("Spec"))
-            //    {
-            //        pts.Add(ss.Position);
-            //        ss.Delete();
-            //    }
-            //}
-            //for (int i = 0; i < tmp.Count(); i++)
-            //{
-            //        sum += Convert.ToInt16(tmp[i]);
-            //    if (sum > dataGridView1.RowCount) {
-            //        spl[i] = dataGridView1.RowCount;
-            //        Array.Resize(ref spl, i+1);
-            //        break;
-            //        }
-            //        spl[i] = sum;
-            //}
-            ////spl[spl.Count()-1] = 100;
-            //Inventor.Application invApp = (Inventor.Application)m_DrwDoc.Parent;
-            //invApp.ScreenUpdating = false;
-            //drawTables(dataGridView1, spl);
-            //invApp.ScreenUpdating = true;
+            tbl.addToSheet("Spec", arr, fs);
+            //TableInv.bvs.Clear();
+            tbl.setCountList();
         }
 
         private void Variable_Click(object sender, System.EventArgs e)
@@ -742,7 +860,7 @@ namespace InvAddIn
                 m_BOM.StructuredViewFirstLevelOnly = false;
             BOMView m_BOMView = m_BOM.BOMViews["Структурированный"];
             TableInv tbl = null;
-            tbl = new TableInv(m_AsmDoc, @"C:\ProgramData\Autodesk\Inventor Addins\Sequence.xml");
+            tbl = new TableInv(m_AsmDoc, I.p() + @"\Sequence.xml");
             tbl.addTable(m_BOMView);
             tbl.saveDataInXML(xd, "Data", name, false);
         }
@@ -791,6 +909,26 @@ namespace InvAddIn
             //tbl.showTable(dgv, 0, 99, tbl.group, varData: false);
             //tbl.showTable(dgvVar, 100, 5000, tbl.groupVar, varData: true);
             //balloon();
+        }
+
+        private void удалитьДокументациюToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+//             DataGridViewRow dgvr;   dgv.Rows.
+//             dgvr = dgv.CurrentRow;
+//             tbl.addVarRows(dgvr.Cells[3].Value.ToString(), dgvr.Cells[4].Value.ToString(), tbl.countPerf);
+//             dgv.Rows.Remove(dgvr);
+//             tbl.showTable(dgv, 0, 99, tbl.group, varData: false);
+//             tbl.showTable(dgvVar, 100, 5000, tbl.group, varData: true);
+
+//             if (dgvVar.Visible == true && tbl.countPerf == 0) { dgvVar.Visible = false; label2.Visible = false; }
+//             if (tbl.countPerf > 0)
+//             {
+               // tbl.removePerf();
+                tbl.removeRow(2, 10);
+                tbl.showTable(dgv, 0, 100, tbl.group, varData: false);
+                tbl.showTable(dgvVar, 100, 5000, tbl.group, varData: true);
+            //}
         }
     }
 }

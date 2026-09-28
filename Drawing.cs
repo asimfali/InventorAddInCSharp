@@ -23,23 +23,28 @@ namespace InvAddIn
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
             if (I.getSS().Count == 0)
-            m_Drw = new Drawings((DrawingDocument)InventorApplication.ActiveDocument);
+                m_Drw = new Drawings((DrawingDocument)InventorApplication.ActiveDocument);
             else
             {
-                DrawingView dv = I.getSS().OfType<DrawingView>().FirstOrDefault();
-                if (dv == null) return;
-                List<LinearGeneralDimension> dims = I.getSS().OfType<LinearGeneralDimension>().ToList();
-                if (dims == null) return;
-                OrderDims dimsL = new OrderDims(dv, dims, poz.left);
-                dimsL.add();
-                dimsL = new OrderDims(dv, dims, poz.right);
-                dimsL.add();
-                dimsL = new OrderDims(dv, dims, poz.top);
-                dimsL.add();
-                dimsL = new OrderDims(dv, dims, poz.bottom);
-                dimsL.add();
+                MyXML xml = new MyXML("sheet.xml", "head");
+                var el = xml.getEl("Arrange");
+                if (el != null)
+                {
+                    DimBox.bOffset = u.convToDouble(el.Attribute("boffset").Value) * 0.1;
+                    DimBox.offset = u.convToDouble(el.Attribute("offset").Value) * 0.1;
+                }
+                DrawingDocument drw = I.aDoc() as DrawingDocument;
+                var ss = drw.SelectSet;
+                if (!(ss[1] is DrawingView)) return;
+                var boxes = new MyBoxes(ss[1] as DrawingView);
+                boxes.setBox();
+                var x = boxes.getGrid(1, I.CV2d(1, 0));
+                var y = boxes.getGrid(1, I.CV2d(0, 1));
+                boxes.create(x, y);
+                boxes.fill();
+                boxes.arrange();
             }
-    
+
         }
     }
 
@@ -47,7 +52,7 @@ namespace InvAddIn
     {
         //public static Drawings m_Drw;
         //public static Drawings getDrw { get { return m_Drw; } }
-        public ListBtn(string displayName, string internalName, string clientId, string description,string tooltip, 
+        public ListBtn(string displayName, string internalName, string clientId, string description, string tooltip,
             ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
             : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
@@ -62,22 +67,23 @@ namespace InvAddIn
 
     internal class SketchInModel : Button
     {
-        PartDocument doc, refDoc; PartComponentDefinition compDef; PlanarSketch ps; Face f; SelectSet ss; HoleFeature hf;
+        PartDocument doc, refDoc; PartComponentDefinition compDef; PlanarSketch ps; Face f; SelectSet ss; HoleFeature hf; ObjectCollection col;
         public SketchInModel(string displayName, string internalName, string clientId, string description, string tooltip,
             ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
             : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
-            Document d = Macros.StandardAddInServer.m_inventorApplication.ActiveEditDocument;
+            Document d = Macros.StandardAddInServer.m_inventorApplication.ActiveEditObject as Document;
+            hf = null;
             if (!(d is PartDocument)) return;
             compDef = (doc = d as PartDocument).ComponentDefinition;
-            ss = d.SelectSet;
-            if (ss[1] is HoleFeature) { hf = ss[1] as HoleFeature; holeDiamForm(); }
-            f = (ss[1] is Face) ? ss[1] as Face:(ss[1] as FaceProxy).NativeObject;
-            ObjectCollection col = I.objs.CreateObjectCollection();
+            ss = I.aDoc().SelectSet;
+            //if (ss[1] is HoleFeature) { hf = ss[1] as HoleFeature; holeDiamForm(); }
+            f = u.getFace(ss[1]);
+            col = I.objs.CreateObjectCollection();
             foreach (var item in ss)
             {
-                col.Add(item); 
+                col.Add(item);
             }
             ps = compDef.Sketches.Add(f);
             if (col.Count > 1)
@@ -85,7 +91,10 @@ namespace InvAddIn
                 //ps.Edit();
                 for (int i = 1; i < col.Count; i++)
                 {
-                    ps.AddByProjectingEntity(col[i+1]);
+                    SketchPoint sp = u.getSketchPoint(col[i + 1]);
+                    if (sp != null) ps.AddByProjectingEntity(sp);
+                    u.addSketchPoints(col[i + 1], ps);
+                    //se.CenterSketchPoint.HoleCenter = true;
                 }
                 holeDiamForm();
                 //ps.ExitEdit();
@@ -93,45 +102,80 @@ namespace InvAddIn
         }
         public void holeDiamForm()
         {
-            int offsetY = 30, offsetX = 10;
-            Form f = new Form();
-            f.Height = 150; f.Width = 400; f.WindowState = FormWindowState.Normal; f.Text = "Шипы"; f.StartPosition = FormStartPosition.CenterScreen;
-            f.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink; f.AutoSize = true;
-            System.Drawing.Point insPt = new System.Drawing.Point(5, 5);
-            InterfaceDll.CB cbs;
-            InterfaceDll.Lbl lbs;
-            lbs = new InterfaceDll.Lbl(offsetX, offsetY, 100, 15, insPt, f, "Диаметр ");
-            cbs = new InterfaceDll.CB(offsetX, offsetY, 200, 15, insPt, f);
-            cbs.position(lbs.last(), true);
-            ComboBox cb = cbs[0];
+            MyForm F = new MyForm("ArrayInterface.xml", "Открыть");
+            MyXML exc = new MyXML("PathFilter.xml");
+            ComboBox cb = F.cbs[0];
+            cb.Items.Clear();
+            cb.Text = "";
             MyXML xml = new MyXML("Parameters.xml");
             foreach (var item in xml.elem.Elements())
             {
                 if (item.Attribute("Name") != null)
-                    cb.Items.Add(item.Attribute("Name").Value); 
+                    cb.Items.Add(item.Attribute("Name").Value);
             }
-//             foreach (UserParameter p in doc.ComponentDefinition.Parameters.UserParameters)
-//             {
-//                 cb.Items.Add(p.Name);  
-//             }
             if (doc.ReferencedDocuments.Count == 1 && doc.ReferencedDocuments[1] is PartDocument)
             {
                 refDoc = doc.ReferencedDocuments[1] as PartDocument;
-//                 foreach (UserParameter p in (refDoc = doc.ReferencedDocuments[1] as PartDocument).ComponentDefinition.Parameters.UserParameters)
-//                 {
-//                     cb.Items.Add(p.Name);
-//                 }
             }
+            F.f.ShowDialog();
+            if (F.close) return;
+            string s = F.cbs[0].Text, s1 = F.cbs[1].Text, s2 = F.cbs[2].Text;
+            XElement el = xml.find("Name", s, 1);
+            if (doc != null && refDoc != null)
+            {
+                if (!InvDoc.u.findParameter(doc as Document, s, true, el))
+                {
+                    InvDoc.u.findParameter(doc as Document, s);
+                }
+                //CreateComponent.addLinkParam(s, doc as Document);
+                //CreateComponent.addLinkParam(doc as Document, refDoc as Document, new string[] {s});
+            }
+            else if (doc != null && el != null)
+            {
+                u.addParameter(doc as Document, el);
+            }
+            if (hf != null)
+            {
+                hf.HoleDiameter.Expression = s;
+            }
+            else hf = CreateComponent.hole(compDef, s, ps);
 
-            InterfaceDll.Btn btns = new InterfaceDll.Btn(offsetX, offsetY, 100, 20, insPt, f, spike_Click, "Добавить");
-            btns.center(cbs.last(), offsetY + 5);
-            f.Show();
+            string iName = XMLDoc.getAttributeValue(el, "IMate");
+            string d = XMLDoc.getAttributeValue(el, "d");
+            PartComponentDefinition def = hf.Parent as PartComponentDefinition;
+            if (d != null && iName != null)
+            {
+                addIMate(def, hf, iName, u.convToDouble(d, 0.1, 3));
+            }
+            addMF(col, hf, iName, def, d, 0);
+            string c = "2", len = "1";
+            if (doc != null && refDoc != null)
+            {
+                if (s1 != "")
+                {
+                    el = addXEl(s1, "ul");
+                    c = el.Attribute("Name").Value;
+                    if (!InvDoc.u.findParameter(doc as Document, c, true, el))
+                        InvDoc.u.findParameter(doc as Document, c);
+                }
+                if (s2 != "")
+                {
+                    el = addXEl(s2);
+                    len = el.Attribute("Name").Value;
+                    if (!InvDoc.u.findParameter(doc as Document, len, true, el))
+                        InvDoc.u.findParameter(doc as Document, len);
+                }
+            }
+            addRPF(col, hf, iName, def, d, 0, c, len);
+            F.f.Close();
         }
 
         private void spike_Click(object arg1, EventArgs arg2)
         {
             Form f = (arg1 as System.Windows.Forms.Button).Parent as Form;
             string s = f.Controls[1].Text;
+            string s1 = f.Controls[3].Text;
+            string s2 = f.Controls[5].Text;
             MyXML xml = new MyXML("Parameters.xml");
             XElement el = xml.find("Name", s, 1);
             if (doc != null && refDoc != null)
@@ -151,106 +195,203 @@ namespace InvAddIn
             {
                 hf.HoleDiameter.Expression = s;
             }
-            else CreateComponent.hole(compDef, s, ps);
+            else hf = CreateComponent.hole(compDef, s, ps);
+
+            string iName = XMLDoc.getAttributeValue(el, "IMate");
+            string d = XMLDoc.getAttributeValue(el, "d");
+            PartComponentDefinition def = hf.Parent as PartComponentDefinition;
+            if (d != null && iName != null)
+            {
+                addIMate(def, hf, iName, u.convToDouble(d, 0.1, 3));
+            }
+            addMF(col, hf, iName, def, d, 0);
+            string c = "2", len = "1";
+            if (doc != null && refDoc != null)
+            {
+                if (s1 != "")
+                {
+                    el = addXEl(s1, "ul");
+                    c = el.Attribute("Name").Value;
+                    if (!InvDoc.u.findParameter(doc as Document, c, true, el))
+                    {
+                        InvDoc.u.findParameter(doc as Document, c);
+                    }
+                }
+                if (s2 != "")
+                {
+                    el = addXEl(s2);
+                    len = el.Attribute("Name").Value;
+                    if (!InvDoc.u.findParameter(doc as Document, len, true, el))
+                    {
+                        InvDoc.u.findParameter(doc as Document, len);
+                    }
+                }
+                //CreateComponent.addLinkParam(s, doc as Document);
+                //CreateComponent.addLinkParam(doc as Document, refDoc as Document, new string[] {s});
+            }
+            addRPF(col, hf, iName, def, d, 0, c, len);
             f.Close();
         }
+        public XElement addXEl(string s, string t = "mm")
+        {
+            var spl = s.Split('=');
+            XElement el = new XElement("Parameter");
+            XMLDoc.addXAttributes(el, new Dictionary<string, string>() { { "Name", spl[0].Trim() }, { "Value", spl[1].Trim() }, { "Type", t } });
+            return el;
+        }
+        public MirrorFeature addMF(ObjectCollection col, HoleFeature hf, string iName, PartComponentDefinition def, string d, int ind)
+        {
+            var wp = this.col[this.col.Count - ind] as WorkPlane;
+            MirrorFeature mf = null;
+            if (wp != null)
+            {
+                ObjectCollection mcol = I.COC();
+                mcol.Add(hf);
+                mf = def.Features.MirrorFeatures.Add(mcol, wp);
+                if (iName != null)
+                    addIMate(def, mf, iName, u.convToDouble(d, 0.1, 3));
+            }
+            return mf;
+        }
+        public RectangularPatternFeature addRPF(ObjectCollection col, HoleFeature hf, string iName, PartComponentDefinition def, string d, int ind, object c, object l)
+        {
+            var wa = this.col[this.col.Count] as WorkAxis;
+            RectangularPatternFeature rpf = null;
+            if (wa != null)
+            {
+                ObjectCollection mcol = I.COC();
+                mcol.Add(hf);
+                MirrorFeature mf = addMF(col, hf, iName, def, d, 1);
+                if (mf != null) mcol.Add(mf);
+                rpf = def.Features.RectangularPatternFeatures.Add(mcol, wa, false, c, l);
+                if (iName != null)
+                    addIMate(def, rpf, iName, u.convToDouble(d, 0.1, 3));
+            }
+            return rpf;
+        }
+        public void addIMate(PartComponentDefinition def, HoleFeature hf, string name, double d = 0)
+        {
+            foreach (Face f in hf.Faces)
+            {
+                InsertiMateDefinition ins = def.iMateDefinitions.AddInsertiMateDefinition(f.Edges[1], false, d);
+                ins.Name = name;
+            }
+        }
+        public void addIMate(PartComponentDefinition def, MirrorFeature hf, string name, double d = 0)
+        {
+            foreach (Face f in hf.Faces)
+            {
+                InsertiMateDefinition ins = def.iMateDefinitions.AddInsertiMateDefinition(f.Edges[1], false, d);
+                ins.Name = name;
+            }
+        }
+        public void addIMate(PartComponentDefinition def, RectangularPatternFeature hf, string name, double d = 0)
+        {
+            foreach (Face f in hf.Faces)
+            {
+                InsertiMateDefinition ins = def.iMateDefinitions.AddInsertiMateDefinition(f.Edges[1], false, d);
+                ins.Name = name;
+            }
+        }
     }
-
-    internal class SurfaceBtn : Button
+    public class RaRz
     {
         DrawingView dv;
+        DrawingCurve dc1, dc2;
+        public RaRz(DrawingView dv)
+        {
+            this.dv = dv;
+        }
+        public void add(DrawingCurve dc)
+        {
+            if (dc.Parent.Parent.SurfaceTextureSymbols.Count > 1) return;
+            if (dc == null) return;
+            dc1 = gets(dc.StartPoint, dc);
+            dc2 = gets(dc.EndPoint, dc);
+            if (dc1.Equals(dc2)) return;
+            Vector2d v = dir(dc, dc1.MidPoint);
+            v.ScaleBy(-1);
+            double offset = 1.5;
+            int o = u.octant(v);
+            if (o >= 2 && o <= 5) offset = 1.4;
+            var dim = u.addDim(dv, dc1, dc2, DimensionTypeEnum.kAlignedDimensionType, v, "", true, null, offset, dc);
+            dim.Text.FormattedText = dim.Text.FormattedText + "*";
+            Drawings.addSurfaceTextureSymbol(dim, 0.3, true);
+            Drawings.addSurfaceTextureSymbol(dim, 0.3, false);
+        }
+        public DrawingCurve gets(Point2d pt, DrawingCurve dc)
+        {
+            var dcs = u.get<DrawingCurveSegment>(dv.Parent.FindUsingPoint(pt, 0.001), fi => !(fi.Parent.Equals(dc)));
+            return dcs == null ? null : dcs.Parent;
+        }
+        public Vector2d dir(DrawingCurve dc, Point2d pt)
+        {
+            //var v = dc.StartPoint.VectorTo(dc.EndPoint);
+            var vec = pt.VectorTo(dc.StartPoint);
+            vec.Normalize();
+            //vec.ScaleBy(-1);
+            return vec;
+        }
+    }
+    internal class SurfaceBtn : Button
+    {
         DrawingDocument drw;
-        DrawingCurve dc, dc1, dc2;
-        LinearGeneralDimension dim;
-        public SurfaceBtn(string displayName, string internalName, string clientId, string description, string tooltip, 
+        DrawingCurveSegment dcs;
+        SelectSet ss;
+        RaRz surf;
+        public SurfaceBtn(string displayName, string internalName, string clientId, string description, string tooltip,
             ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
             : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
-            drw = (DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
-            if (drw.SelectSet.Count == 0)
-            dv = (DrawingView)Macros.StandardAddInServer.m_inventorApplication.CommandManager.Pick(SelectionFilterEnum.kDrawingViewFilter, "Выберите вид");
-            else if (drw.SelectSet[1] is DrawingCurveSegment)
-            {
-                dv = ((DrawingCurveSegment)drw.SelectSet[1]).Parent.Parent;
-            }
-            if (drw.SelectSet.Count == 1 && drw.SelectSet[1] is DrawingCurveSegment)
-            {
-                dc = ((DrawingCurveSegment)drw.SelectSet[1]).Parent;
-            }
-            else if (drw.SelectSet.Count == 2 && drw.SelectSet[1] is DrawingCurveSegment && drw.SelectSet[2] is DrawingCurveSegment)
-            {
-                dc1 = ((DrawingCurveSegment)drw.SelectSet[1]).Parent;
-                dc2 = ((DrawingCurveSegment)drw.SelectSet[2]).Parent;
-            }
-            add();
-        }
-        private void add()
-        {
-            if (dv == null) return;
-            if (dc != null)
-            {
-                ObjectCollection col = I.objs.CreateObjectCollection();
-                foreach (DrawingCurveSegment item in dv.Parent.FindUsingPoint(dc.StartPoint))
-                {
-                    if (!item.Parent.Equals(dc))
-                        col.Add(item); 
-                }
-                if (col.Count == 0) return;
-                dc1 = (col[1] as DrawingCurveSegment).Parent;
-                Vector2d v = (dc.StartPoint.IsEqualTo(dc1.StartPoint)) ? dc1.EndPoint.VectorTo(dc.StartPoint): dc1.StartPoint.VectorTo(dc.StartPoint);
-                dim = Drawings.addDim(dc, v);
-                dim.Text.FormattedText = dim.Text.FormattedText + "*";
-                Drawings.addSurfaceTextureSymbol(dim, 0.3, true);
-                Drawings.addSurfaceTextureSymbol(dim, 0.3, false);
-            }
-//             if (dv != null)
-//             {
-//                 if (dc1 == null && dc2 == null)
-//                 {
-//                     Drawings.surfCurve(dv, ref dc, ref dc1, ref dc2);
-//                     dim = Drawings.addDim(dc, -15);
-//                 }
-//                 else
-//                 {
-//                     dim = Drawings.addDim(dc1, dc2, -15, 7);
-//                 }
-//                 dim.Text.FormattedText = dim.Text.FormattedText + "*";
-//                 double val = 0.5; Vector2d vec;
-//                 if (dc1 != null)
-//                 {
-//                     vec = dc2.MidPoint.VectorTo(dc1.MidPoint); vec.Normalize(); vec.ScaleBy(0.1);
-//                     Drawings.addSurfaceTextureSymbol(dv, dc1, val, vec);
-//                 }
-//                 if (dc2 != null)
-//                 {
-//                     vec = dc1.MidPoint.VectorTo(dc2.MidPoint); vec.Normalize(); vec.ScaleBy(0.1);
-//                     Drawings.addSurfaceTextureSymbol(dv, dc2, val, vec);
-//                 }
-//             }
+            drw = I.aDoc() as DrawingDocument;
+            if (drw == null) return;
+            ss = drw.SelectSet;
+            if (ss.Count == 0) return;
+            dcs = ss[1] as DrawingCurveSegment;
+            if (dcs == null) return;
+            surf = new RaRz(dcs.Parent.Parent);
+            surf.add(dcs.Parent);
         }
     }
 
-        internal class GabButton : Button
+    internal class GabButton : Button
     {
         //public static Drawings m_Drw;
         //public static Drawings getDrw { get { return m_Drw; } }
-            public GabButton(string displayName, string internalName, string clientId, string description, string tooltip, 
-            ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
+        public GabButton(string displayName, string internalName, string clientId, string description, string tooltip,
+        ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
+        : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
         protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
             DrawingDocument drw = (DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
             DrawingView dv = null;
-            if (drw.SelectSet.Count == 0)
-            dv = (DrawingView)Macros.StandardAddInServer.m_inventorApplication.CommandManager.Pick(SelectionFilterEnum.kDrawingViewFilter, "Выберите вид");
+            if (I.app.ActiveEditObject is Sheet && drw.SelectSet.Count == 0)
+            {
+                Sheet sh = I.app.ActiveEditObject as Sheet;
+                DimBends bends = new DimBends(sh);
+                bends.fill();
+                bends.addDims();
+            }
+            else if (drw.SelectSet.Count > 0 && drw.SelectSet[1] is Centerline)
+            {
+                Centerline cl = drw.SelectSet[1] as Centerline;
+                dv = u.findDV(cl);
+                if (dv == null) return;
+                clDraw dcl = new clDraw(dv, cl);
+                var vec = cl.StartPoint.VectorTo(cl.EndPoint);
+                dcl.draw();
+                dv = null;
+            }
+            else if (drw.SelectSet.Count == 0)
+                dv = (DrawingView)Macros.StandardAddInServer.m_inventorApplication.CommandManager.Pick(SelectionFilterEnum.kDrawingViewFilter, "Выберите вид");
             else if (drw.SelectSet[1] is DrawingView)
             {
                 dv = (DrawingView)drw.SelectSet[1];
                 gabs.add(dv); gabs.set();
                 if (dv != null) { new CheckReflect(dv, I.CV2d(1)); new CheckReflect(dv, I.CV2d(0, 1)); }
             }
-            else if (drw.SelectSet[1] is DrawingCurveSegment && ((drw.SelectSet[1] as DrawingCurveSegment).Parent.CurveType == CurveTypeEnum.kCircleCurve || 
+            else if (drw.SelectSet[1] is DrawingCurveSegment && ((drw.SelectSet[1] as DrawingCurveSegment).Parent.CurveType == CurveTypeEnum.kCircleCurve ||
                 (drw.SelectSet[1] as DrawingCurveSegment).Parent.CurveType == CurveTypeEnum.kCircularArcCurve))
             {
                 //util.transactStart(drw as Document, "Массив размеры");
@@ -266,7 +407,7 @@ namespace InvAddIn
                     DrwArr dims = new DrwArr(dc, e => e.CurveType == CurveTypeEnum.kCircularArcCurve);
                     dims.add();
                 }
-   
+
                 //util.transactEnd();
             }
             if (dv != null)
@@ -278,809 +419,1106 @@ namespace InvAddIn
         }
     }
 
-        internal class SplineButton : Button
+    internal class SplineButton : Button
+    {
+        public List<Point2d> pts = new List<Point2d>();
+        InventorEvents ev;
+        ObjectCollection col;
+        Point2d vp;
+        Point mp;
+        DrawingView dv;
+
+        public SplineButton(string displayName, string internalName, string clientId, string description, string tooltip,
+        ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
+        : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
+        protected override void ButtonDefinition_OnExecute(NameValueMap context)
         {
-            public List<Point2d> pts = new List<Point2d>();
-            InventorEvents ev;
-            ObjectCollection col;
-            Point2d vp;
-            Point mp;
-            DrawingView dv;
+            col = I.objs.CreateObjectCollection();
+            dv = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument.SelectSet[1] as DrawingView;
+            if (dv == null) return;
+            ev = new InventorEvents();
+            ev.createEvents();
+            ev.iEv.MouseEvents.OnMouseClick += MouseEvents_OnMouseClick;
+            ev.iEv.KeyboardEvents.OnKeyUp += KeyboardEvents_OnKeyUp;
+            ev.iEv.StatusBarText = "Выберите точки для контура";
+            ev.iEv.Start();
+        }
 
-            public SplineButton(string displayName, string internalName, string clientId, string description, string tooltip, 
-            ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
-            protected override void ButtonDefinition_OnExecute(NameValueMap context)
+        void KeyboardEvents_OnKeyUp(int Key, ShiftStateEnum ShiftKeys)
+        {
+            if (Key == 32)
             {
-                col = I.objs.CreateObjectCollection();
-                dv = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument.SelectSet[1] as DrawingView;
-                if (dv == null) return;
-                ev = new InventorEvents();
-                ev.createEvents();
-                ev.iEv.MouseEvents.OnMouseClick += MouseEvents_OnMouseClick;
-                ev.iEv.KeyboardEvents.OnKeyUp += KeyboardEvents_OnKeyUp;
-                ev.iEv.StatusBarText = "Выберите точки для контура";
-                ev.iEv.Start();
-            }
-
-            void KeyboardEvents_OnKeyUp(int Key, ShiftStateEnum ShiftKeys)
-            {
-                if (Key == 32)
-                {
-                    ev.iEv.Stop();
-                    ev.iEv.MouseEvents.OnMouseClick -= MouseEvents_OnMouseClick;
-                    ev.iEv.KeyboardEvents.OnKeyUp -= KeyboardEvents_OnKeyUp;
-                    addSpline(dv);
-                    col.Clear();
-                }
-            }
-
-//             void MouseEvents_OnMouseDoubleClick(MouseButtonEnum Button, ShiftStateEnum ShiftKeys, Point ModelPosition, Point2d ViewPosition, Inventor.View View)
-//             {
-//                 
-//             }
-
-            void MouseEvents_OnMouseClick(MouseButtonEnum Button, ShiftStateEnum ShiftKeys, Point ModelPosition, Point2d ViewPosition, Inventor.View View)
-            {
-                if (Button == MouseButtonEnum.kLeftMouseButton)
-                {
-                    mp = ModelPosition;
-                    vp = ViewPosition;
-                    //Point2d p = dv.ModelToDrawingViewSpace(ModelPosition)
-                    vp.X = mp.X - dv.Position.X; vp.Y = mp.Y - dv.Position.Y;
-                    Matrix2d mtx = I.tg.CreateMatrix2d();
-                    //Vector2d v = I.tg.CreatePoint2d().VectorTo(dv.Position);
-                    //v.ScaleBy(1/dv.Scale);
-                    //vp.TranslateBy(v);
-                    mtx.Cell[1, 1] = 1/dv.Scale;
-                    mtx.Cell[2, 2] = 1/dv.Scale;
-                    //mtx.Cell[3, 1] = dv.Position.X;
-                    //mtx.Cell[3, 2] = dv.Position.Y;
-                    vp.TransformBy(mtx);
-                    //vp = p;
-                    col.Add(vp);
-                }
-            }
-            public void addSpline(DrawingView dv)
-            {
-                if (col.Count < 2) return;
-                Macros.StandardAddInServer.m_inventorApplication.SilentOperation = true;
-                Macros.StandardAddInServer.m_inventorApplication.ScreenUpdating = false;
-                DrawingSketch ds = dv.Sketches.Add();
-                ds.Edit();
-                SketchSpline spl = ds.SketchSplines.Add(col, SplineFitMethodEnum.kSmoothSplineFit);
-                spl.Closed = true;
-                ds.ExitEdit();
-                Macros.StandardAddInServer.m_inventorApplication.SilentOperation = false;
-                Macros.StandardAddInServer.m_inventorApplication.ScreenUpdating = true;
-                addCut(ds, dv);
-            }
-            public void addCut(DrawingSketch ds, DrawingView dv)
-            {
-                Profile pr = ds.Profiles.AddForSolid();
-                ComponentOccurrence occ = findOcc("Крышка", dv);
-                if (occ != null)
-                    dv.BreakOutOperations.Add(pr, occ);
-
-            }
-            public ComponentOccurrence findOcc(string nameForSearch, DrawingView dv)
-            {
-                Document doc = dv.ReferencedDocumentDescriptor.ReferencedDocument as Document;
-                if (doc.DocumentType != DocumentTypeEnum.kAssemblyDocumentObject) return null;
-                AssemblyComponentDefinition compDef = (doc as AssemblyDocument).ComponentDefinition;
-                foreach (ComponentOccurrence occ in compDef.Occurrences)
-                {
-                    if (occ.ReferencedDocumentDescriptor.FullDocumentName.IndexOf("(" + nameForSearch + ")") != -1)
-                        return occ;
-                }
-                return null;
+                ev.iEv.Stop();
+                ev.iEv.MouseEvents.OnMouseClick -= MouseEvents_OnMouseClick;
+                ev.iEv.KeyboardEvents.OnKeyUp -= KeyboardEvents_OnKeyUp;
+                addSpline(dv);
+                col.Clear();
             }
         }
 
-        internal class BreakButton : Button
+        //             void MouseEvents_OnMouseDoubleClick(MouseButtonEnum Button, ShiftStateEnum ShiftKeys, Point ModelPosition, Point2d ViewPosition, Inventor.View View)
+        //             {
+        //                 
+        //             }
+
+        void MouseEvents_OnMouseClick(MouseButtonEnum Button, ShiftStateEnum ShiftKeys, Point ModelPosition, Point2d ViewPosition, Inventor.View View)
         {
-            public BreakButton(string displayName, string internalName, string clientId, string description, string tooltip, 
-            ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
-            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
-            protected override void ButtonDefinition_OnExecute(NameValueMap context)
+            if (Button == MouseButtonEnum.kLeftMouseButton)
             {
-                brOp();
+                mp = ModelPosition;
+                vp = ViewPosition;
+                //Point2d p = dv.ModelToDrawingViewSpace(ModelPosition)
+                vp.X = mp.X - dv.Position.X; vp.Y = mp.Y - dv.Position.Y;
+                Matrix2d mtx = I.tg.CreateMatrix2d();
+                //Vector2d v = I.tg.CreatePoint2d().VectorTo(dv.Position);
+                //v.ScaleBy(1/dv.Scale);
+                //vp.TranslateBy(v);
+                mtx.Cell[1, 1] = 1 / dv.Scale;
+                mtx.Cell[2, 2] = 1 / dv.Scale;
+                //mtx.Cell[3, 1] = dv.Position.X;
+                //mtx.Cell[3, 2] = dv.Position.Y;
+                vp.TransformBy(mtx);
+                //vp = p;
+                col.Add(vp);
             }
-            public void brOp()
-            {
-                XMLDoc xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\break.xml","head");
-                List<string> lst = new List<string>();
-                foreach (var el in xmlDoc.El.Elements())
-	            {
-		           lst.Add(el.Attribute("name").Value.ToString());
-	            }
-                int offsetY = 30, offsetX = 10;
-                Form f = new Form();
-                f.Height = 150; f.Width = 400; f.WindowState = FormWindowState.Normal; f.Text = "Разрывы"; f.StartPosition = FormStartPosition.CenterScreen;
-                f.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink; f.AutoSize = true;
-                System.Drawing.Point insPt = new System.Drawing.Point(5, 5);
-                InterfaceDll.Lbl lbs = new InterfaceDll.Lbl(offsetX, offsetY, 100, 15, insPt, f, "Тип");
-                InterfaceDll.CB cbs = new InterfaceDll.CB(offsetX, offsetY, 200, 15, insPt, f); 
-                cbs.position(lbs.last(), true);
-                cbs.last().Items.AddRange(lst.ToArray());
-                InterfaceDll.Btn btns = new InterfaceDll.Btn(offsetX, offsetY, 100, 20, insPt, f, break_Click, "Добавить");
-                btns.center(cbs.last(), offsetY + 5);
-                f.Show();
+        }
+        public void addSpline(DrawingView dv)
+        {
+            if (col.Count < 2) return;
+            Macros.StandardAddInServer.m_inventorApplication.SilentOperation = true;
+            Macros.StandardAddInServer.m_inventorApplication.ScreenUpdating = false;
+            DrawingSketch ds = dv.Sketches.Add();
+            ds.Edit();
+            SketchSpline spl = ds.SketchSplines.Add(col, SplineFitMethodEnum.kSmoothSplineFit);
+            spl.Closed = true;
+            ds.ExitEdit();
+            Macros.StandardAddInServer.m_inventorApplication.SilentOperation = false;
+            Macros.StandardAddInServer.m_inventorApplication.ScreenUpdating = true;
+            addCut(ds, dv);
+        }
+        public void addCut(DrawingSketch ds, DrawingView dv)
+        {
+            Profile pr = ds.Profiles.AddForSolid();
+            ComponentOccurrence occ = findOcc("Крышка", dv);
+            if (occ != null)
+                dv.BreakOutOperations.Add(pr, occ);
 
-               
+        }
+        public ComponentOccurrence findOcc(string nameForSearch, DrawingView dv)
+        {
+            Document doc = dv.ReferencedDocumentDescriptor.ReferencedDocument as Document;
+            if (doc.DocumentType != DocumentTypeEnum.kAssemblyDocumentObject) return null;
+            AssemblyComponentDefinition compDef = (doc as AssemblyDocument).ComponentDefinition;
+            foreach (ComponentOccurrence occ in compDef.Occurrences)
+            {
+                if (occ.ReferencedDocumentDescriptor.FullDocumentName.IndexOf("(" + nameForSearch + ")") != -1)
+                    return occ;
             }
+            return null;
+        }
+    }
 
-            private void break_Click(object arg1, EventArgs arg2)
+    internal class BreakButton : Button
+    {
+        public BreakButton(string displayName, string internalName, string clientId, string description, string tooltip,
+        ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
+        : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
+        protected override void ButtonDefinition_OnExecute(NameValueMap context)
+        {
+            brOp();
+        }
+        public void brOp()
+        {
+            XMLDoc xmlDoc = new XMLDoc(I.p() + @"\break.xml", "head");
+            List<string> lst = new List<string>();
+            foreach (var el in xmlDoc.El.Elements())
             {
-                Form f = (Form)((System.Windows.Forms.Button)arg1).Parent;
-                string name = f.Controls.OfType<ComboBox>().ElementAt(0).Text;
-                DrawingDocument drw = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as DrawingDocument;
-                XMLDoc xmlDoc = new XMLDoc(@"C:\ProgramData\Autodesk\Inventor Addins\break.xml","head");
-                XElement el = xmlDoc.getXElement(name, "name", "breakOp");
-                DrawingView dv; double w, h, cx, cy, gap = 0.2, wb, hb, l, b, minus = 0;
-                int i = 0;
-                if (!el.HasElements && el.Attribute("name") != null && el.Attribute("name").Value == "по данным чертежа горизонтально")
-                {
-                    //SelectSet ss = drw.SelectSet;
-                    List<DrawingCurveSegment> ss = drw.SelectSet.OfType<DrawingCurveSegment>().ToList();
-                    if (ss.Count > 1)
-                    {
-                        dv = (ss[0]).Parent.Parent;
-                        double mn = 2;
-                        wb = dv.Width;
-                        for (int j = 0; j < ss.Count-1; j++)
-                        {
-                            if (j == 0 || j == ss.Count - 2) mn = 1;
-                            else mn = 2;
-                            DrawingCurveSegment seg1 = ss[j] as DrawingCurveSegment, seg2 = ss[j+1] as DrawingCurveSegment;
-                            DrawingCurve dc1 = seg1.Parent, dc2 = seg2.Parent;
-                            double x1 = (dc1.Evaluator2D.RangeBox.MaxPoint.X - dc1.Evaluator2D.RangeBox.MinPoint.X),
-                                x2 = (dc2.Evaluator2D.RangeBox.MaxPoint.X - dc2.Evaluator2D.RangeBox.MinPoint.X),
-                                c1 = (dc1.Evaluator2D.RangeBox.MaxPoint.X + dc1.Evaluator2D.RangeBox.MinPoint.X)/2,
-                                c2 = (dc2.Evaluator2D.RangeBox.MaxPoint.X + dc2.Evaluator2D.RangeBox.MinPoint.X)/2;
-                            w = (x1 + x2)*mn;
-                            if (w < 1.2) w = 1.2;
-                            cx = (c1 + c2)/2;
-                            w = (c2-c1) - w;
-                            dv.BreakOperations.Add(BreakOrientationEnum.kHorizontalBreakOrientation, I.tg.CreatePoint2d((cx - minus) - w / 2, 0),
-                            I.tg.CreatePoint2d((cx - minus) + w / 2, 0), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
-                            minus = (wb - dv.Width)/2;
-                        }
-                    }
-                    return;
-                }
-                else if (!el.HasElements && el.Attribute("name") != null && el.Attribute("name").Value == "по данным чертежа вертикально")
-                {
-                    //SelectSet ss = drw.SelectSet;
-                    List<DrawingCurveSegment> ss = drw.SelectSet.OfType<DrawingCurveSegment>().ToList();
-                    if (ss.Count > 1)
-                    {
-                        dv = (ss[0]).Parent.Parent;
-                        double mn = 2;
-                        hb = dv.Height;
-                        for (int j = 0; j < ss.Count - 1; j++)
-                        {
-                            if (j == 0 || j == ss.Count - 2) mn = 1;
-                            else mn = 2;
-                            DrawingCurveSegment seg1 = ss[j] as DrawingCurveSegment, seg2 = ss[j + 1] as DrawingCurveSegment;
-                            DrawingCurve dc1 = seg1.Parent, dc2 = seg2.Parent;
-                            double y1 = (dc1.Evaluator2D.RangeBox.MaxPoint.Y - dc1.Evaluator2D.RangeBox.MinPoint.Y),
-                                y2 = (dc2.Evaluator2D.RangeBox.MaxPoint.Y - dc2.Evaluator2D.RangeBox.MinPoint.Y),
-                                c1 = (dc1.Evaluator2D.RangeBox.MaxPoint.Y + dc1.Evaluator2D.RangeBox.MinPoint.Y) / 2,
-                                c2 = (dc2.Evaluator2D.RangeBox.MaxPoint.Y + dc2.Evaluator2D.RangeBox.MinPoint.Y) / 2;
-                            h = (y1 + y2) * mn;
-                            if (h < 1.2) h = 1.2;
-                            cy = (c1 + c2) / 2;
-                            h = (c2 - c1) - h;
-                            dv.BreakOperations.Add(BreakOrientationEnum.kVerticalBreakOrientation, I.tg.CreatePoint2d(0, (cy - minus) - h / 2),
-                            I.tg.CreatePoint2d(0, (cy - minus) + h / 2), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
-                            minus = (hb - dv.Height) / 2;
-                        }
-                    }
-                    return;
-                }
-                dv = drw.SelectSet[1] as DrawingView;
+                lst.Add(el.Attribute("name").Value.ToString());
+            }
+            int offsetY = 30, offsetX = 10;
+            Form f = new Form();
+            f.Height = 150; f.Width = 400; f.WindowState = FormWindowState.Normal; f.Text = "Разрывы"; f.StartPosition = FormStartPosition.CenterScreen;
+            f.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink; f.AutoSize = true;
+            System.Drawing.Point insPt = new System.Drawing.Point(5, 5);
+            InterfaceDll.Lbl lbs = new InterfaceDll.Lbl(offsetX, offsetY, 100, 15, insPt, f, "Тип");
+            InterfaceDll.CB cbs = new InterfaceDll.CB(offsetX, offsetY, 200, 15, insPt, f);
+            cbs.position(lbs.last(), true);
+            cbs.last().Items.AddRange(lst.ToArray());
+            InterfaceDll.Btn btns = new InterfaceDll.Btn(offsetX, offsetY, 100, 20, insPt, f, break_Click, "Добавить");
+            btns.center(cbs.last(), offsetY + 5);
+            f.Show();
 
-                wb = dv.Width; hb = dv.Height;
-                l = dv.Left; b = dv.Top - dv.Height;
-                minus = 0;
-                
-                foreach (var item in el.Elements())
+
+        }
+
+        private void break_Click(object arg1, EventArgs arg2)
+        {
+            Form f = (Form)((System.Windows.Forms.Button)arg1).Parent;
+            string name = f.Controls.OfType<ComboBox>().ElementAt(0).Text;
+            DrawingDocument drw = Macros.StandardAddInServer.m_inventorApplication.ActiveDocument as DrawingDocument;
+            XMLDoc xmlDoc = new XMLDoc(I.p() + @"\break.xml", "head");
+            XElement el = xmlDoc.getXElement(name, "name", "breakOp");
+            DrawingView dv; double w, h, cx, cy, gap = 0.2, wb, hb, l, b, minus = 0;
+            int i = 0;
+            if (!el.HasElements && el.Attribute("name") != null && el.Attribute("name").Value == "по данным чертежа горизонтально")
+            {
+                //SelectSet ss = drw.SelectSet;
+                List<DrawingCurveSegment> ss = drw.SelectSet.OfType<DrawingCurveSegment>().ToList();
+                if (ss.Count > 1)
                 {
-                    w = InvDoc.u.convToDouble(item.Attribute("W").Value);
-                    h = InvDoc.u.convToDouble(item.Attribute("H").Value);
-                    cx = InvDoc.u.convToDouble(item.Attribute("CX").Value);
-                    cy = InvDoc.u.convToDouble(item.Attribute("CY").Value);
-                    if (w != 0)
+                    dv = (ss[0]).Parent.Parent;
+                    double mn = 2;
+                    wb = dv.Width;
+                    for (int j = 0; j < ss.Count - 1; j++)
                     {
-                        w *= wb;
-                        cx *= wb;
-                        dv.BreakOperations.Add(BreakOrientationEnum.kHorizontalBreakOrientation, I.tg.CreatePoint2d((l + cx + i*gap -minus/2) -w/2, 0),
-                        I.tg.CreatePoint2d((l + cx + i*gap - minus/2) + w / 2, 0), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
-                        minus += w;
+                        if (j == 0 || j == ss.Count - 2) mn = 1;
+                        else mn = 2;
+                        DrawingCurveSegment seg1 = ss[j] as DrawingCurveSegment, seg2 = ss[j + 1] as DrawingCurveSegment;
+                        DrawingCurve dc1 = seg1.Parent, dc2 = seg2.Parent;
+                        double x1 = (dc1.Evaluator2D.RangeBox.MaxPoint.X - dc1.Evaluator2D.RangeBox.MinPoint.X),
+                            x2 = (dc2.Evaluator2D.RangeBox.MaxPoint.X - dc2.Evaluator2D.RangeBox.MinPoint.X),
+                            c1 = (dc1.Evaluator2D.RangeBox.MaxPoint.X + dc1.Evaluator2D.RangeBox.MinPoint.X) / 2,
+                            c2 = (dc2.Evaluator2D.RangeBox.MaxPoint.X + dc2.Evaluator2D.RangeBox.MinPoint.X) / 2;
+                        w = (x1 + x2) * mn;
+                        if (w < 1.2) w = 1.2;
+                        cx = (c1 + c2) / 2;
+                        w = (c2 - c1) - w;
+                        dv.BreakOperations.Add(BreakOrientationEnum.kHorizontalBreakOrientation, I.tg.CreatePoint2d((cx - minus) - w / 2, 0),
+                        I.tg.CreatePoint2d((cx - minus) + w / 2, 0), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
+                        minus = (wb - dv.Width) / 2;
                     }
-                    else if (h != 0)
+                }
+                return;
+            }
+            else if (!el.HasElements && el.Attribute("name") != null && el.Attribute("name").Value == "по данным чертежа вертикально")
+            {
+                //SelectSet ss = drw.SelectSet;
+                List<DrawingCurveSegment> ss = drw.SelectSet.OfType<DrawingCurveSegment>().ToList();
+                if (ss.Count > 1)
+                {
+                    dv = (ss[0]).Parent.Parent;
+                    double mn = 2;
+                    hb = dv.Height;
+                    for (int j = 0; j < ss.Count - 1; j++)
                     {
-                        h *= hb;
-                        cy *= hb;
-                        dv.BreakOperations.Add(BreakOrientationEnum.kVerticalBreakOrientation, I.tg.CreatePoint2d(0, (b + cy + i * gap - minus / 2) - h / 2),
-                        I.tg.CreatePoint2d(0, (b + cy + i * gap - minus / 2) + h / 2), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
-                        minus += h;
+                        if (j == 0 || j == ss.Count - 2) mn = 1;
+                        else mn = 2;
+                        DrawingCurveSegment seg1 = ss[j] as DrawingCurveSegment, seg2 = ss[j + 1] as DrawingCurveSegment;
+                        DrawingCurve dc1 = seg1.Parent, dc2 = seg2.Parent;
+                        double y1 = (dc1.Evaluator2D.RangeBox.MaxPoint.Y - dc1.Evaluator2D.RangeBox.MinPoint.Y),
+                            y2 = (dc2.Evaluator2D.RangeBox.MaxPoint.Y - dc2.Evaluator2D.RangeBox.MinPoint.Y),
+                            c1 = (dc1.Evaluator2D.RangeBox.MaxPoint.Y + dc1.Evaluator2D.RangeBox.MinPoint.Y) / 2,
+                            c2 = (dc2.Evaluator2D.RangeBox.MaxPoint.Y + dc2.Evaluator2D.RangeBox.MinPoint.Y) / 2;
+                        h = (y1 + y2) * mn;
+                        if (h < 1.2) h = 1.2;
+                        cy = (c1 + c2) / 2;
+                        h = (c2 - c1) - h;
+                        dv.BreakOperations.Add(BreakOrientationEnum.kVerticalBreakOrientation, I.tg.CreatePoint2d(0, (cy - minus) - h / 2),
+                        I.tg.CreatePoint2d(0, (cy - minus) + h / 2), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
+                        minus = (hb - dv.Height) / 2;
                     }
-                    i=1;
+                }
+                return;
+            }
+            dv = drw.SelectSet[1] as DrawingView;
+
+            wb = dv.Width; hb = dv.Height;
+            l = dv.Left; b = dv.Top - dv.Height;
+            minus = 0;
+
+            foreach (var item in el.Elements())
+            {
+                w = InvDoc.u.convToDouble(item.Attribute("W").Value);
+                h = InvDoc.u.convToDouble(item.Attribute("H").Value);
+                cx = InvDoc.u.convToDouble(item.Attribute("CX").Value);
+                cy = InvDoc.u.convToDouble(item.Attribute("CY").Value);
+                if (w != 0)
+                {
+                    w *= wb;
+                    cx *= wb;
+                    dv.BreakOperations.Add(BreakOrientationEnum.kHorizontalBreakOrientation, I.tg.CreatePoint2d((l + cx + i * gap - minus / 2) - w / 2, 0),
+                    I.tg.CreatePoint2d((l + cx + i * gap - minus / 2) + w / 2, 0), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
+                    minus += w;
+                }
+                else if (h != 0)
+                {
+                    h *= hb;
+                    cy *= hb;
+                    dv.BreakOperations.Add(BreakOrientationEnum.kVerticalBreakOrientation, I.tg.CreatePoint2d(0, (b + cy + i * gap - minus / 2) - h / 2),
+                    I.tg.CreatePoint2d(0, (b + cy + i * gap - minus / 2) + h / 2), BreakStyleEnum.kRectangularBreakStyle, 10, gap, 1);
+                    minus += h;
+                }
+                i = 1;
+            }
+        }
+    }
+
+    public enum orient { horizontal, vertical, none }
+    public enum action { add, remove, none }
+
+    abstract public class DrwBase
+    {
+
+        abstract public void set();
+        abstract public void add();
+    }
+
+    public class BendsDrw
+    {
+        public List<BendDrw> bends = new List<BendDrw>();
+        DimensionStyle st2 = null;
+        public BendsDrw(List<DrawingCurve> dcs)
+        {
+            while (dcs.Count > 0)
+            {
+                DrawingCurve tmp = dcs[0];
+                DrawingCurve dc = u.findAtPoint<DrawingCurve>(dcs, a => !a.Equals(tmp) && u.eq(a.CenterPoint, tmp.CenterPoint));
+                dcs.Remove(tmp);
+                if (dc != null)
+                {
+                    bends.Add(new BendDrw(tmp, dc));
+                    dcs.Remove(dc);
                 }
             }
         }
-
-        public enum orient { horizontal, vertical, none }
-        public enum action { add, remove, none}
-
-        abstract public class DrwBase
+        public void setStyle(DimensionStyle st)
         {
+            st2 = st;
+        }
+        public void add(System.Collections.IEnumerable ie)
+        {
+            List<DrawingCurve> dcs = ie.OfType<DrawingCurve>().ToList();
+            foreach (var b in bends)
+            {
+                b.set(dcs);
+            }
+        }
+        public void draw(DrawingView dv)
+        {
+            List<DrawingCurve> dcs = dv.DrawingCurves.OfType<DrawingCurve>().ToList();
+            //int num = 0;
+            foreach (var b in bends)
+            {
+                //num++;
+                //b.addSketch(dv, num);
+                b.add(dv, st2, dcs);
+            }
+        }
+    }
 
-            abstract public void set();
-            abstract public void add();
+    public class BendDrw
+    {
+        Point2d pt1 = null, pt2 = null, start;
+        //Vector2d vstart, vend;
+        Tuple<Point2d, Vector2d, Point2d, Vector2d> tup;
+        public KeyValuePair<Arc2d, DrawingCurve> a1, a2, a;
+        static protected List<BendDrw> bns = null;
+        static protected Sheet sht = null;
+        protected bool use = false;
+        static protected double spike;
+        protected BendDrw endBend = null;
+        //DrawingCurve r1 = null, r2 = null; 
+        //Arc2d a1 = null, a2 = null;
+        DrawingCurve dc1 = null, dc2 = null;
+        double d = 100000000;
+        bool first;
+        public BendDrw(DrawingCurve dc1, DrawingCurve dc2)
+        {
+            a1 = new KeyValuePair<Arc2d, DrawingCurve>(dc1.Segments[1].Geometry as Arc2d, dc1);
+            a2 = new KeyValuePair<Arc2d, DrawingCurve>(dc2.Segments[1].Geometry as Arc2d, dc2);
+            a = a1.Key.Radius > a2.Key.Radius ? a1 : a2;
+            this.dc1 = a.Value;
+            tup = u.getTangentMinMax(a.Value);
+        }
+        public void addSketch(DrawingView dv, int num)
+        {
+            Sheet sh = dv.Parent;
+            if (sh.Sketches.Count == 0)
+            {
+                sh.Sketches.Add();
+            }
+            DrawingSketch ds = sh.Sketches[1];
+            ds.Edit();
+            Point2d spt1 = I.CP2d(tup.Item1);
+            spt1.TranslateBy(tup.Item2);
+            ds.SketchLines.AddByTwoPoints(tup.Item1, spt1);
+            Point2d spt2 = I.CP2d(tup.Item3);
+            spt2.TranslateBy(tup.Item4);
+            ds.SketchLines.AddByTwoPoints(tup.Item3, spt2);
+            ds.TextBoxes.AddFitted(tup.Item1, num.ToString());
+            ds.ExitEdit();
+        }
+        static public void setBends(List<BendDrw> b)
+        {
+            bns = b;
+        }
+        static public void setSheet(Sheet sh)
+        {
+            sht = sh;
+        }
+        static public void setSpike(double v)
+        {
+            spike = v;
+        }
+        static public void removeStatic()
+        {
+            bns = null; sht = null; spike = 0;
+        }
+        protected bool check(Point2d pt, DrawingCurve dc, DrawingCurve dc1, Vector2d v)
+        {
+            if (dc == null || dc.StartPoint == null || dc.EndPoint == null) return false;
+            if (dc.Equals(dc1)) return false;
+            if ((dc.StartPoint.IsEqualTo(pt, 0.05) || dc.EndPoint.IsEqualTo(pt, 0.05)) && dc.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d)
+            {
+                //pt = u.maxDist(pt, dc);
+                if (first)
+                {
+                    first = false;
+                    return true;
+                }
+                return par(dc, v);
+            }
+            else return false;
+        }
+        protected bool check(Point2d pt, DrawingCurve dc)
+        {
+            if (dc == null || dc.StartPoint == null || dc.EndPoint == null) return false;
+            if ((dc.StartPoint.IsEqualTo(pt) || dc.EndPoint.IsEqualTo(pt)))
+            {
+                return true;
+            }
+            else return false;
+        }
+        protected bool check(DrawingCurve dc, Func<DrawingCurve, bool> f)
+        {
+            return f(dc);
+        }
+        protected DrawingCurve find(Point2d spt, List<DrawingCurve> dcs, Vector2d v, out Point2d pt2)
+        {
+            Point2d pt = I.CP2d(spt);
+            first = true;
+            v.Normalize();
+            v.ScaleBy(spike);
+            DrawingCurve dc = dcs.Find(el => el.ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d);
+            DrawingCurve lastc = null;
+            while (dc != null)
+            {
+                dc = u.findAtPoint<DrawingCurve>(dcs, e => check(pt, e, dc, v));
+                if (dc == null)
+                {
+                    Point2d tmppt = I.CP2d(pt.X, pt.Y);
+                    tmppt.TranslateBy(v);
+                    dc = u.findAtPoint<DrawingCurve>(dcs, e => check(tmppt, e, dc, v));
+                }
+                if (dc != null)
+                {
+                    pt = nonPt(dc, pt);
+                    lastc = dc;
+                }
+            }
+            first = true;
+            dc = u.findAtPoint<DrawingCurve>(dcs, e => check(pt, e) && e.ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d && !e.Equals(lastc));
+            if (dc == null)
+                dc = u.findAtPoint<DrawingCurve>(dcs, e => check(pt, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d && !e.Equals(lastc));
+            else if (set(dc.CenterPoint))
+            {
+            }
+            //if (dc == null) dc = lastc;
+            pt2 = pt;
+            return dc;
+        }
+        protected Point2d nonPt(DrawingCurve dc, Point2d pt)
+        {
+            return u.eq(dc.StartPoint, pt) ? dc.EndPoint : dc.StartPoint;
+        }
+        protected bool par(DrawingCurve dc1, DrawingCurve dc2, Point2d pt)
+        {
+            var d1 = u.getTangent(dc1.Evaluator2D, 0.1, pt);
+            var d2 = u.getTangent(dc2.Evaluator2D, 0.1, pt);
+            Vector2d v1 = I.CV2d(d1[0], d1[1]), v2 = I.CV2d(d2[0], d2[1]);
+            return v1.IsParallelTo(v2);
+        }
+        protected bool par(DrawingCurve dc2, Point2d pt)
+        {
+            var d1 = u.getTangent(a.Value.Evaluator2D, 0.1, start);
+            var d2 = u.getTangent(dc2.Evaluator2D, 0.1, pt);
+            Vector2d v1 = I.CV2d(d1[0], d1[1]), v2 = I.CV2d(d2[0], d2[1]);
+            return v1.IsParallelTo(v2);
+        }
+        protected bool par(DrawingCurve dc, Vector2d v)
+        {
+            return v.IsParallelTo(dc.StartPoint.VectorTo(dc.EndPoint));
+        }
+        public void set(List<DrawingCurve> dcs)
+        {
+            start = a.Key.StartPoint;
+            if (set(dcs, a.Key.EndPoint, tup.Item4))
+            {
+                pt1 = start;
+                //dc1 = a.Value;
+                //                     dc1 = u.findAtPoint<DrawingCurve>(dcs, e => check(pt1, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d && !e.Equals(a.Value));
+                //                     if (dc1 == null)
+                //                     {
+                //                         dc1 = a.Value;
+                //                     }
+            }
+            start = a.Key.EndPoint;
+            if (set(dcs, a.Key.StartPoint, tup.Item2))
+            {
+                pt1 = start;
+                //dc1 = a.Value;
+                //                     dc1 = u.findAtPoint<DrawingCurve>(dcs, e => check(pt1, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d && !e.Equals(a.Value));
+                //                     if (dc1 == null)
+                //                     {
+                //                         dc1 = a.Value;
+                //                     }
+            }
+        }
+        protected bool set(List<DrawingCurve> dcs, Point2d pt, Vector2d v)
+        {
+            Point2d tmppt;
+            DrawingCurve dc = find(pt, dcs, v, out tmppt);
+            double tmpd = pt.DistanceTo(tmppt);
+            if (tmpd < 0.7) return false;
+            if (endBend != null && u.eq(tmpd, endBend.d)) return false;
+            if (tmpd < d)
+            {
+                dc2 = dc; d = tmpd; pt2 = tmppt;
+                return true;
+            }
+            return false;
+        }
+        protected bool set(Point2d pt)
+        {
+            foreach (var b in bns)
+            {
+                if (u.eq(b.a.Key.Center, pt))
+                {
+                    endBend = b;
+                    return true;
+                }
+            }
+            return false;
+        }
+        public void add(DrawingView dv, DimensionStyle st, List<DrawingCurve> dcs)
+        {
+            if (dc1 != null && dc2 != null)
+            {
+                double ang1 = tup.Item2.AngleTo(tup.Item4), ang2 = 0;
+                DrawingCurve dca, dca1, dca2;
+                PointIntentEnum pi1, pi2;
+                if (dc2.ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d && endBend != null)
+                {
+                    pt2 = u.maxDist(pt1, endBend.a.Key);
+                    dc2 = u.findAtPoint<DrawingCurve>(dcs, e => check(pt2, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
+                    ang2 = endBend.tup.Item2.AngleTo(endBend.tup.Item4);
+                    //pi2 = pie(dc2, ang2, pt2, pt1);
+                }
+                if (!u.eq(ang1, Math.PI / 2))
+                {
+                    dca = dc1.Equals(a1.Value) ? a2.Value : a1.Value;
+                    dca1 = u.findAtPoint<DrawingCurve>(dcs, e => check(dca.StartPoint, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
+                    dca2 = u.findAtPoint<DrawingCurve>(dcs, e => check(dca.EndPoint, e) && e.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
+                    var ad = u.addDim<AngularGeneralDimension>(dv, dca1, dca2);
+                    ad.Style = st;
+                }
+                pi1 = pie(dc1, ang1, pt1, pt2);
+                pi2 = u.checkPIE(dc2, pt2);
+
+                Tuple<DrawingCurve, DrawingCurve, PointIntentEnum, PointIntentEnum, Point2d, Point2d> dim =
+                    new Tuple<DrawingCurve, DrawingCurve, PointIntentEnum, PointIntentEnum, Point2d, Point2d>(dc1, dc2, pi1, pi2, mid(), null);
+                u.addDim<LinearGeneralDimension>(dv, dim, 0, 1, st);
+                //u.addDim(dv, dc1, dc2, pt1, pt2, 0, 1, st);
+            }
+        }
+        Point2d mid()
+        {
+            Point2d mpt1 = a.Key.Center;
+            Vector2d va, norm = mpt1.VectorTo(nonPt(a.Value, pt1));
+            va = tup.Item2.IsPerpendicularTo(norm) ? tup.Item2 : tup.Item4;
+            mpt1.TranslateBy(norm);
+            norm.Normalize();
+            norm.ScaleBy(1);
+            mpt1.TranslateBy(norm);
+            va.Normalize();
+            va.ScaleBy(d / 2);
+            mpt1.TranslateBy(va);
+            return mpt1;
+        }
+        public PointIntentEnum pie(DrawingCurve dc, double a, Point2d sp, Point2d ep)
+        {
+            if (u.eq(a, Math.PI / 2)) return u.checkPIE(dc, sp);
+            if (a < Math.PI / 2) return PointIntentEnum.kMidPointIntent;
+            Point2d tmppt = u.maxDist(ep, dc);
+            return u.checkPIE(dc, tmppt);
+        }
+    }
+
+    public class DrwArr
+    {
+        List<ArrDim> dims = new List<ArrDim>();
+        List<ArrDim> draw = new List<ArrDim>();
+        //List<gab> gabs = new List<gab>();
+        //gab gv = null, gh = null;
+        ArrDim origin;
+        /*            double min;*/
+        DrawingView dv;
+        int num = 1;
+        public DrwArr(DrawingCurve dc, Func<DrawingCurve, bool> check)
+        {
+            if (dc == null) return;
+            dv = dc.Parent;
+            origin = new ArrDim(dc);
+            dims.Add(origin);
+            draw.Add(origin);
+            if (dc.CurveType == CurveTypeEnum.kCircularArcCurve)
+            {
+                ObjectsEnumerator col = dc.Parent.Parent.FindUsingPoint(dc.StartPoint);
+                foreach (DrawingCurveSegment item in col)
+                {
+                    if (!item.Parent.Equals(dc))
+                    {
+                        ArrDim.dist = u.getLenght(item.Parent);
+                        ArrDim.v = (u.eq(item.StartPoint.X, item.EndPoint.X)) ? orient.vertical : orient.horizontal;
+                    }
+                }
+            }
+            u.action<DrawingCurve>(u.gets<DrawingCurve>(dv.DrawingCurves, check), a =>
+            {
+                if (!a.Equals(dc) && this.check(a, dc))
+                    dims.Add(new ArrDim(a));
+            });
         }
 
-        public class DrwArr
+        public bool check(DrawingCurve a, DrawingCurve b)
         {
-            List<ArrDim> dims = new List<ArrDim>();
-            List<ArrDim> draw = new List<ArrDim>();
-            //List<gab> gabs = new List<gab>();
-            //gab gv = null, gh = null;
-            ArrDim origin;
-/*            double min;*/
-            DrawingView dv;
-            int num = 1;
-            public DrwArr(DrawingCurve dc, Func<DrawingCurve,bool> check)
-            {
-                if (dc == null) return;
-                dv = dc.Parent;
-                origin = new ArrDim(dc);
-                dims.Add(origin);
-                //draw.Add(origin);
-//                 if (dc.CurveType == CurveTypeEnum.kCircularArcCurve)
-//                 {
-//                     ObjectsEnumerator col = dc.Parent.Parent.FindUsingPoint(dc.StartPoint);
-//                     foreach (DrawingCurveSegment item in col)
-// 	                {
-//                         if (!item.Parent.Equals(dc))
-//                         {
-//                             ArrDim.dist = util.getLenght(item.Parent);
-//                             ArrDim.v = (util.eq(item.StartPoint.X, item.EndPoint.X)) ? orient.vertical : orient.horizontal;
-//                         }
-// 	                }
-//                 }
-                u.action<DrawingCurve>(u.gets<DrawingCurve>(dv.DrawingCurves, check), a => { 
-                    if (!a.Equals(dc) && this.check(a,dc)) 
-                        dims.Add(new ArrDim(a));
-                });
-            }
-            
-            public bool check(DrawingCurve a, DrawingCurve b)
-            {
-                if (a.CurveType == CurveTypeEnum.kCircleCurve) return true;
-                Vector2d s = a.StartPoint.VectorTo(a.EndPoint), e = b.StartPoint.VectorTo(b.EndPoint);
-                e.SubtractVector(s);
-                return u.isNullVector(e);
-            }
-            public void remove()
-            {
-                u.action<ArrDim>(dims, a => a.rem = action.add, f => f.check(origin));
-                array();      
-                check();
-                //if (ArrDim.dist != 0 && ArrDim.o == ArrDim.v) check();
-            }
-            public void add()
-            {
-                gabs.draw(origin.get(), I.CV2d(1));
-                ArrDim.min = gabs.min;
-                ArrDim.direct = gabs.pt; /*I.CV2d(1);*/
-                ArrDim.set();
-                remove();
-                add(num);
+            if (a.CurveType == CurveTypeEnum.kCircleCurve) return true;
+            Vector2d s = a.StartPoint.VectorTo(a.EndPoint), e = b.StartPoint.VectorTo(b.EndPoint);
+            e.SubtractVector(s);
+            return u.isNullVector(e);
+        }
+        public void remove()
+        {
+            u.action<ArrDim>(dims, a => a.rem = action.add, f => f.check(origin));
+            array();
+            check();
+            //if (ArrDim.dist != 0 && ArrDim.o == ArrDim.v) check();
+        }
+        public void add()
+        {
+            gabs.draw(origin.get(), I.CV2d(1));
+            ArrDim.min = gabs.min;
+            ArrDim.direct = gabs.pt; /*I.CV2d(1);*/
+            ArrDim.set();
+            remove();
+            add(num);
 
-                draw.Clear(); //draw.Add(origin);
-                u.action<ArrDim>(dims, a => a.clear());
-                num = 1;
-                gabs.draw(origin.get(), I.CV2d(0, 1));
-                ArrDim.min = gabs.min;
-                ArrDim.direct = gabs.pt;/*I.CV2d(0, 1);*/
-                ArrDim.set();
-                remove();
-                add(num);
-            }
+            if (draw == null) draw = new List<ArrDim>();
+            else draw.Clear();
+            draw.Add(origin);
+            u.action<ArrDim>(dims, a => a.clear());
+            num = 1;
+            gabs.draw(origin.get(), I.CV2d(0, 1));
+            ArrDim.min = gabs.min;
+            ArrDim.direct = gabs.pt;/*I.CV2d(0, 1);*/
+            ArrDim.set();
+            remove();
+            add(num);
+        }
 
-            void add(int num)
+        void add(int num)
+        {
+            if (draw == null) return;
+            if (num <= 2)
             {
-                if (num <= 2)
-                {
-                    double center = 1;
-                    if (gabs.centerX && ArrDim.direct.Y == 0) center = 0.5;
-                    else if (gabs.centerY && ArrDim.direct.X == 0) center = 0.5;
-                    u.actionFor<ArrDim>(draw, (a, b) => a.add(dv, b),center: center);
-                }
-                else
-                {
-                    LinearGeneralDimension m, d;
-                    if (draw[0].Equals(origin))
+                double center = 1;
+                if (gabs.centerX && ArrDim.direct.Y == 0) center = 0.5;
+                else if (gabs.centerY && ArrDim.direct.X == 0) center = 0.5;
+                u.actionFor<ArrDim>(draw, (a, b) => a.add(dv, b), center: center);
+            }
+            else
+            {
+                LinearGeneralDimension m, d;
+                if (draw[0].Equals(origin))
                     m = draw[0].add(dv, draw[1]);
-                    else m = draw[draw.Count-2].add(dv, draw[draw.Count-1]);
-                    d = draw[0].add(dv, draw[draw.Count - 1], 1.5);
-                    d.Text.FormattedText = m.Text.Text + "x" + (draw.Count - 1) + "=" + d.Text.FormattedText;
-                }
-            }
-
-            void array()
-            {
-                draw = u.actionFor<ArrDim>(dims, (a, b) => v(), f => f.rem == action.add);
-                draw.Sort();
-                u.actionFor<ArrDim>(draw, (a, b) => setL(a,b)); 
-            }
-
-            void setL(ArrDim a, ArrDim b)
-            {
-                a.l = a.pt.DistanceTo(b.pt);
-//                 if (num == 1) a.l = ArrDim.direct.Y == 0 ? Math.Abs(b.x - a.x) : Math.Abs(b.y - a.y); 
-//                 b.l = ArrDim.direct.X == 0 ? Math.Abs(b.x - a.x) : Math.Abs(b.y - a.y);
-            }
-
-            void v() { }
-
-            public void check(ArrDim a, ArrDim b)
-            {
-                //Point2d p1 = I.tg.CreatePoint2d(a.x, a.y), p2 = I.tg.CreatePoint2d(b.x, b.y);
-                if (a.l != 0 && u.eq(a.l, b.l)) 
-                {
-                    num++; //b.rem = true; 
-                };
-                //if (util.eq(p1.DistanceTo(p2), ArrDim.dist)) b.rem = true;
-            }
-
-            public void check()
-            {
-                u.actionFor<ArrDim>(draw, (a, b) => check(a,b)); 
+                else m = draw[draw.Count - 2].add(dv, draw[draw.Count - 1]);
+                d = draw[0].add(dv, draw[draw.Count - 1], 1.5);
+                d.Text.FormattedText = m.Text.Text + "x" + (draw.Count - 1) + "=" + d.Text.FormattedText;
             }
         }
 
-        public class ArrDim : IComparable<ArrDim> 
+        void array()
         {
-            DrawingCurve dc;
-            readonly public double x,y;
-            readonly public Point2d pt;
-            public action rem = action.none;
-            static public double min = 0;
-            static public Vector2d direct;
-            static public double dist = 0;
-            static public orient v = orient.none;
-            public double l = 0;
-            static public DimensionTypeEnum al = DimensionTypeEnum.kAlignedDimensionType;
-            public ArrDim (DrawingCurve dc)
-            {
-                this.dc = dc; pt = dc.CenterPoint;
-                x = dc.CenterPoint.X; y = dc.CenterPoint.Y;
-            }
+            draw = u.actionFor<ArrDim>(dims, (a, b) => v(), f => f.rem == action.add);
+            if (draw == null) return;
+            draw.Sort();
+            u.actionFor<ArrDim>(draw, (a, b) => setL(a, b));
+        }
 
-            static public void unset()
-            {
-                min = 0; direct = null; dist = 0; v = orient.none; al = DimensionTypeEnum.kAlignedDimensionType;
-            }
+        void setL(ArrDim a, ArrDim b)
+        {
+            a.l = a.pt.DistanceTo(b.pt);
+            //                 if (num == 1) a.l = ArrDim.direct.Y == 0 ? Math.Abs(b.x - a.x) : Math.Abs(b.y - a.y); 
+            //                 b.l = ArrDim.direct.X == 0 ? Math.Abs(b.x - a.x) : Math.Abs(b.y - a.y);
+        }
 
-            public bool check(ArrDim d)
+        void v() { }
+
+        public void check(ArrDim a, ArrDim b)
+        {
+            //Point2d p1 = I.tg.CreatePoint2d(a.x, a.y), p2 = I.tg.CreatePoint2d(b.x, b.y);
+            if (a.l != 0 && u.eq(a.l, b.l))
             {
-                bool r = false;
-                if(u.eq(I.multiPV(pt, direct), I.multiPV(d.pt, direct))) r = !r; 
-//                 switch (o)
-//                 {
-//                     case orient.horizontal:
-//                         if (util.eq(d.y, y)) r = !r;
-//                         break;
-//                     case orient.vertical:
-//                         if (util.eq(d.x, x)) r = !r;
-//                         break;
-//                     default:
-//                         break;
-//                 }
-                return r;
+                num++; //b.rem = true; 
+            };
+            //if (util.eq(p1.DistanceTo(p2), ArrDim.dist)) b.rem = true;
+        }
+
+        public void check()
+        {
+            if (draw == null) return;
+            u.actionFor<ArrDim>(draw, (a, b) => check(a, b));
+        }
+    }
+
+    public class ArrDim : IComparable<ArrDim>
+    {
+        DrawingCurve dc;
+        readonly public double x, y;
+        readonly public Point2d pt;
+        public action rem = action.none;
+        static public double min = 0;
+        static public Vector2d direct;
+        static public double dist = 0;
+        static public orient v = orient.none;
+        public double l = 0;
+        static public DimensionTypeEnum al = DimensionTypeEnum.kAlignedDimensionType;
+        public ArrDim(DrawingCurve dc)
+        {
+            this.dc = dc; pt = dc.CenterPoint;
+            x = dc.CenterPoint.X; y = dc.CenterPoint.Y;
+        }
+
+        static public void unset()
+        {
+            min = 0; direct = null; dist = 0; v = orient.none; al = DimensionTypeEnum.kAlignedDimensionType;
+        }
+
+        public bool check(ArrDim d)
+        {
+            bool r = false;
+            if (u.eq(I.multiPV(pt, direct), I.multiPV(d.pt, direct))) r = !r;
+            //                 switch (o)
+            //                 {
+            //                     case orient.horizontal:
+            //                         if (util.eq(d.y, y)) r = !r;
+            //                         break;
+            //                     case orient.vertical:
+            //                         if (util.eq(d.x, x)) r = !r;
+            //                         break;
+            //                     default:
+            //                         break;
+            //                 }
+            return r;
+        }
+        public static void set()
+        {
+            if (direct.X == 0)
+            {
+                al = DimensionTypeEnum.kHorizontalDimensionType;
             }
-            public static void set()
+            else if (direct.Y == 0)
             {
-                if (direct.X == 0)
+                al = DimensionTypeEnum.kVerticalDimensionType;
+            }
+        }
+        public void clear()
+        {
+            rem = action.none;
+        }
+        public DrawingCurve get()
+        {
+            return dc;
+        }
+        public LinearGeneralDimension add(DrawingView dv, ArrDim d, double offset = 1)
+        {
+            return u.addDim<LinearGeneralDimension>(dv, dc, d.dc, offset, al, min, direct.X + direct.Y);
+        }
+        public LinearGeneralDimension add(DrawingView dv, DrawingCurve d, double min, int direct, double offset = 1)
+        {
+            return u.addDim<LinearGeneralDimension>(dv, dc, d, offset, al, min, direct);
+        }
+
+        //             public override bool Equals(object obj)
+        //             {
+        //                 return util.eq(pt, (obj as ArrDim).pt);
+        //             }
+
+        public int CompareTo(ArrDim other)
+        {
+            if (rem != action.add) return 1;
+            if (direct.X == 0) return (this.x - other.x) * direct.Y > 0 ? -1 : 1;
+            else if (direct.Y == 0) return (this.y - other.y) * direct.X > 0 ? -1 : 1;
+            else return -1;
+            //                 if (util.eq(this.x, other.x)) return this.y < other.y ? -1 : util.eq(this.y, other.y) ? 0 : 1;
+            //                 return this.x < other.x ? -1 : 1;
+        }
+    }
+
+
+    static public class gabs
+    {
+        static public List<gab> gbs = new List<gab>();
+        static public DrawingView dv;
+        static public double l, r, t, b;
+        static public Point2d c;
+        static public bool centerX = false, centerY = false;
+        static public double min = 0;
+        static public Vector2d pt;
+        static public bool exist = false;
+
+        static public void set()
+        {
+            if (!gabs.exist)
+            {
+                IEnumerable<DrawingCurve> linesX, linesY; double minLenght = 3;
+                linesX = u.gets<DrawingCurve>(dv.DrawingCurves, f => check(f));
+                linesY = u.gets<DrawingCurve>(dv.DrawingCurves, f => check(f, false));
+                //linesX = linesX.OrderBy(e => e.StartPoint.X); linesY = linesY.OrderBy(e => e.StartPoint.Y);
+                DrawingCurve minx = linesX.FirstOrDefault(e => e.StartPoint.X == linesX.Min(m => m.StartPoint.X)),
+                    miny = linesY.FirstOrDefault(e => e.StartPoint.Y == linesY.Min(m => m.StartPoint.Y)),
+                    maxx = linesX.FirstOrDefault(e => e.StartPoint.X == linesX.Max(m => m.StartPoint.X)),
+                    maxy = linesY.FirstOrDefault(e => e.StartPoint.Y == linesY.Max(m => m.StartPoint.Y));
+
+                new gab(minx, I.CV2d(-1));
+                new gab(maxx, I.CV2d(1));
+                new gab(miny, I.CV2d(0, -1));
+                new gab(maxy, I.CV2d(0, 1));
+            }
+        }
+        static bool check(DrawingCurve dc, bool x = true)
+        {
+            if (dc.CurveType != CurveTypeEnum.kLineSegmentCurve) return false;
+            if (dc.EdgeType != DrawingEdgeTypeEnum.kUnknownEdge) return false;
+            if (x && !u.eq(dc.StartPoint.X, dc.EndPoint.X)) return false;
+            if (!x && !u.eq(dc.StartPoint.Y, dc.EndPoint.Y)) return false;
+            return true;
+        }
+        public static void add(gab g)
+        {
+            gabs.gbs.Add(g);
+        }
+        public static void add(DrawingView d)
+        {
+            if (dv != null && dv.Equals(d)) { exist = true; return; }
+            gabs.dv = d;
+            l = dv.Left; r = dv.Left + dv.Width; t = dv.Top; b = dv.Top - dv.Height;
+            c = dv.Position;
+            center();
+        }
+        static public void unset()
+        {
+            gbs.Clear(); dv = null; min = 0; exist = false; pt = null;
+        }
+        static public void center()
+        {
+            Sheet sh = dv.Parent;
+            ObjectsEnumerator col = sh.FindUsingPoint(c);
+            foreach (var item in col)
+            {
+                if (!(item is Centerline)) return;
+                Centerline l = item as Centerline;
+                Vector2d v = l.StartPoint.VectorTo(l.EndPoint);
+                if (u.eq(v.X, 0) && v.Length > dv.Height)
                 {
-                    al = DimensionTypeEnum.kHorizontalDimensionType;
+                    centerY = true;
                 }
-                else if (direct.Y == 0)
+                else if (u.eq(v.Y, 0) && v.Length > dv.Width)
                 {
-                    al = DimensionTypeEnum.kVerticalDimensionType;
+                    centerX = true;
                 }
             }
-            public void clear()
-            {
-                rem = action.none;
-            }
-            public DrawingCurve get()
-            {
-                return dc;
-            }
-            public LinearGeneralDimension add(DrawingView dv ,ArrDim d, double offset = 1)
-            {
-                return u.addDim<LinearGeneralDimension>(dv, dc, d.dc, offset, al, min, direct.X + direct.Y);
-            }
-            public LinearGeneralDimension add(DrawingView dv, DrawingCurve d, double min, int direct, double offset = 1)
-            {
-                return u.addDim<LinearGeneralDimension>(dv, dc, d, offset, al, min, direct);
-            }
+        }
+        static public LinearGeneralDimension draw(DrawingCurve dc, Vector2d v, double o = 1)
+        {
+            pt = I.CV2d((dc.CenterPoint.X - c.X), (dc.CenterPoint.Y - c.Y));
+            gab g = check(pt, v);
+            DimensionTypeEnum al = v.X == 0 ? DimensionTypeEnum.kVerticalDimensionType : DimensionTypeEnum.kHorizontalDimensionType;
 
-//             public override bool Equals(object obj)
-//             {
-//                 return util.eq(pt, (obj as ArrDim).pt);
-//             }
-
-            public int CompareTo(ArrDim other)
+            if (al == DimensionTypeEnum.kVerticalDimensionType) min = pt.X < 0 ? l : r;
+            else if (al == DimensionTypeEnum.kHorizontalDimensionType) min = pt.Y < 0 ? b : t;
+            if (g == null) return null;
+            pt = I.CV2d(pt.X * v.Y, pt.Y * v.X);
+            pt.Normalize();
+            LinearGeneralDimension dim = u.addDim<LinearGeneralDimension>(dv, dc, g.dc, o, al, min, pt.X + pt.Y);
+            if (g.p == poz.bottom || g.p == poz.left) offsetN(dim, -1);
+            else offsetN(dim);
+            return dim;
+        }
+        static public void offsetN(LinearGeneralDimension dim, int dir = 1)
+        {
+            Vector2d v = dim.Text.RangeBox.MinPoint.VectorTo(dim.Text.RangeBox.MaxPoint);
+            LineSegment2d dl = dim.DimensionLine as LineSegment2d;
+            UnitVector2d d = dl.Direction;
+            if (v.Length > dl.StartPoint.VectorTo(dl.EndPoint).Length)
             {
-                if (rem != action.add) return 1;
-                if (direct.X == 0) return (this.x - other.x) * direct.Y > 0 ? -1 : 1;
-                else if (direct.Y == 0) return (this.y - other.y) * direct.X > 0 ? -1 : 1;
-                    else return -1;
-//                 if (util.eq(this.x, other.x)) return this.y < other.y ? -1 : util.eq(this.y, other.y) ? 0 : 1;
-//                 return this.x < other.x ? -1 : 1;
+                dim.Text.Origin = I.CP2d(Math.Abs(d.X) * dir * v.Length + dim.Text.Origin.X, Math.Abs(d.Y) * dir * v.Length + dim.Text.Origin.Y);
+            }
+        }
+        static public gab get(poz pz)
+        {
+            return gbs.FirstOrDefault(e => e.p == pz);
+        }
+        static public gab check(Vector2d pt, Vector2d d)
+        {
+            Point2d p = I.CP2d(pt.X * d.X, pt.Y * d.Y);
+            if (p.X == 0) return p.Y < 0 ? gabs.get(poz.bottom) : gabs.get(poz.top);
+            if (p.Y == 0) return p.X < 0 ? gabs.get(poz.left) : gabs.get(poz.right);
+            return null;
+        }
+    }
+
+    public class gab
+    {
+        public DrawingCurve dc = null;
+        public poz p;
+        public Vector2d direct;
+        public double min;
+        public gab(DrawingCurve c, Vector2d direct)
+        {
+            dc = c; this.direct = direct;
+            if (direct.X == 0 && direct.Y < 0) p = poz.bottom;
+            else if (direct.X == 0 && direct.Y > 0) p = poz.top;
+            else if (direct.Y == 0 && direct.X < 0) p = poz.left;
+            else if (direct.Y == 0 && direct.X > 0) p = poz.right;
+            gabs.add(this);
+        }
+
+    }
+
+    public class CheckReflect
+    {
+        public List<DrawingCurve> curves = new List<DrawingCurve>();
+        public List<DrawingCurve> curvesReflect = new List<DrawingCurve>();
+        public List<DrawingCurve> curvesIntent = new List<DrawingCurve>();
+        Point2d center;
+        DrawingView dv;
+        Vector2d vs, direct;
+
+        public CheckReflect(DrawingView dv, Vector2d d)
+        {
+            this.dv = dv; center = dv.Center; direct = d;
+            curves = getCurves(); d.ScaleBy(-1);
+            curvesReflect = getCurves();
+            curvesIntent = u.gets<DrawingCurve>(dv.DrawingCurves, cur => check(cur)).ToList();
+            if (curves.Count != curvesReflect.Count) return;
+            if (!check(CurveTypeEnum.kCircleCurve)) return;
+            if (!check(CurveTypeEnum.kLineSegmentCurve)) return;
+            if (curvesIntent.Count > 1)
+            {
+                sort(curvesIntent);
+                DrawingCurve min = curvesIntent[0], max = curvesIntent[curvesIntent.Count - 1];
+                u.addCenterLine(dv, min, max);
             }
         }
 
-
-        static public class gabs 
+        public void sort(List<DrawingCurve> curves)
         {
-            static public List<gab> gbs = new List<gab>();
-            static public DrawingView dv;
-            static public double l, r, t, b;
-            static public Point2d c;
-            static public bool centerX = false, centerY = false;
-            static public double min = 0;
-            static public Vector2d pt;
-            static public bool exist = false;
-
-            static public void set()
+            if (direct.X == 0)
             {
-                if (!gabs.exist)
+                curves.Sort(new CurveComparerX());
+            }
+            else if (direct.Y == 0)
+            {
+                curves.Sort(new CurveComparerY());
+            }
+        }
+
+        public void sort(List<DrawingCurve> curves, List<DrawingCurve> curvesReflect)
+        {
+            sort(curves); sort(curvesReflect);
+        }
+
+        public bool check(DrawingCurve c)
+        {
+            if (!(c.EdgeType == DrawingEdgeTypeEnum.kUnknownEdge && c.CurveType == CurveTypeEnum.kLineSegmentCurve)) return false;
+            if (curves.Exists(e => e.Equals(c)) || curvesReflect.Exists(e => e.Equals(c))) return false;
+            return true;
+        }
+        public List<DrawingCurve> getCurves()
+        {
+            return u.gets<DrawingCurve>(dv.DrawingCurves, c =>
+            {
+                return get(c);
+            }).ToList();
+        }
+        public bool get(DrawingCurve c)
+        {
+            if (c.EdgeType != DrawingEdgeTypeEnum.kUnknownEdge) return false;
+            if (c.CurveType == CurveTypeEnum.kCircleCurve || c.CurveType == CurveTypeEnum.kCircularArcCurve)
+            {
+                return get(c.CenterPoint);
+            }
+            else if (c.CurveType == CurveTypeEnum.kLineSegmentCurve)
+            {
+                return (get(c.StartPoint) && get(c.EndPoint));
+            }
+            return false;
+        }
+        public bool get(Point2d pt)
+        {
+            vs = pt.VectorTo(dv.Center);
+            if (vs.DotProduct(direct) > 0) return true;
+            return false;
+        }
+        public bool check(CurveTypeEnum typ)
+        {
+            List<DrawingCurve> cL = u.gets<DrawingCurve>(curves, c => c.CurveType == typ).ToList();
+            List<DrawingCurve> cLR = u.gets<DrawingCurve>(curvesReflect, c => c.CurveType == typ).ToList();
+            if (cL.Count != cLR.Count) return false;
+            sort(cL, cLR);
+            for (int i = 0; i < cL.Count; i++)
+            {
+                if (!check(cL[i], cLR[i])) return false;
+            }
+            return true;
+        }
+        public bool check(Point2d a, Point2d b)
+        {
+            Vector2d x = a.VectorTo(center), y = b.VectorTo(center);
+            if (u.eq(0.1, -x.DotProduct(direct), y.DotProduct(direct))) return true;
+            return false;
+        }
+        public bool check(DrawingCurve a, DrawingCurve b)
+        {
+            if ((a.CurveType == CurveTypeEnum.kCircleCurve && b.CurveType == CurveTypeEnum.kCircleCurve) ||
+                (a.CurveType == CurveTypeEnum.kCircularArcCurve && b.CurveType == CurveTypeEnum.kCircularArcCurve))
+            {
+                return check(a.CenterPoint, b.CenterPoint);
+            }
+            else if (a.CurveType == CurveTypeEnum.kLineSegmentCurve && b.CurveType == CurveTypeEnum.kLineSegmentCurve)
+            {
+                return (check(a.MidPoint, b.MidPoint));
+            }
+            return false;
+        }
+    }
+
+    public class CurveComparerX : IComparer<DrawingCurve>
+    {
+        public int Compare(DrawingCurve x, DrawingCurve y)
+        {
+            Point2d mpx = null, mpy = null;
+            if (x.CurveType == CurveTypeEnum.kCircleCurve || x.CurveType == CurveTypeEnum.kCircularArcCurve) mpx = x.CenterPoint;
+            else if (x.CurveType == CurveTypeEnum.kLineSegmentCurve) mpx = x.MidPoint;
+            if (y.CurveType == CurveTypeEnum.kCircleCurve || y.CurveType == CurveTypeEnum.kCircularArcCurve) mpy = y.CenterPoint;
+            else if (y.CurveType == CurveTypeEnum.kLineSegmentCurve) mpy = y.MidPoint;
+
+            return u.eq(mpx.X, mpy.X) ? 0 : mpx.X < mpy.X ? -1 :
+                mpx.X == mpy.X ? mpx.Y <= mpy.Y ? -1 : 1 : 1;
+        }
+    }
+
+    public class CurveComparerY : IComparer<DrawingCurve>
+    {
+        public int Compare(DrawingCurve x, DrawingCurve y)
+        {
+            Point2d mpx = null, mpy = null;
+            if (x.CurveType == CurveTypeEnum.kCircleCurve || x.CurveType == CurveTypeEnum.kCircularArcCurve) mpx = x.CenterPoint;
+            else if (x.CurveType == CurveTypeEnum.kLineSegmentCurve) mpx = x.MidPoint;
+            if (y.CurveType == CurveTypeEnum.kCircleCurve || y.CurveType == CurveTypeEnum.kCircularArcCurve) mpy = y.CenterPoint;
+            else if (y.CurveType == CurveTypeEnum.kLineSegmentCurve) mpy = y.MidPoint;
+
+            return u.eq(mpx.Y, mpy.Y) ? 0 : mpx.Y < mpy.Y ? -1 :
+                mpx.Y == mpy.Y ? mpx.X <= mpy.X ? -1 : 1 : 1;
+        }
+    }
+
+    internal class DrwArrBtn : Button
+    {
+        DrawingDocument drw;
+        DrawingCurveSegment dcs = null;
+        DrawingCurve dc = null;
+        DrawingView dv = null;
+        public DrwArrBtn(string displayName, string internalName, string clientId, string description, string tooltip,
+        ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
+            : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
+        protected override void ButtonDefinition_OnExecute(NameValueMap context)
+        {
+            drw = (DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
+            u.transactStart(drw as Document, "Массив размеры");
+
+            //                 if (drw.SelectSet.Count == 0)
+            //                     dcs = (DrawingCurveSegment)Macros.StandardAddInServer.m_inventorApplication.CommandManager.Pick(SelectionFilterEnum.kDrawingCurveSegmentFilter, "Выберите отверстие");
+            //                 else if (drw.SelectSet[1] is DrawingCurveSegment)
+            //                 {
+            //                     dcs = (DrawingCurveSegment)drw.SelectSet[1];
+            //                 }
+            //                 add(dcs);
+            u.transactEnd();
+        }
+        private void add(DrawingCurveSegment dcs)
+        {
+            if (dcs != null)
+            {
+                dc = dcs.Parent as DrawingCurve;
+                dv = dc.Parent as DrawingView;
+                List<DrawingCurve> dcX, dcY;
+                LinearGeneralDimension dim;
+                string oldText = ""; double dist = 0, distX = 0, distY = 0;
+                u.getCurvesToArray(dv, dc, out dcX, out dcY);
+                Point2d retPt = null; Vector2d vx = null, vy = null; double x = 1, y = 1;
+                object ob = u.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distY, 25, true), obx = null, oby = null;
+                //ob = util.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distX, 25, false);
+                obx = u.findAtVector(dv, dc.CenterPoint, ref retPt, ref distX, ref vy, 2, false);
+                oby = u.findAtVector(dv, dc.CenterPoint, ref retPt, ref distY, ref vx, 2, true);
+                if (obx != null)
                 {
-                    IEnumerable<DrawingCurve> linesX, linesY; double minLenght = 3;
-                    linesX = u.gets<DrawingCurve>(dv.DrawingCurves, f => check(f));
-                    linesY = u.gets<DrawingCurve>(dv.DrawingCurves, f => check(f, false));
-                    //linesX = linesX.OrderBy(e => e.StartPoint.X); linesY = linesY.OrderBy(e => e.StartPoint.Y);
-                    DrawingCurve minx = linesX.FirstOrDefault(e => e.StartPoint.X == linesX.Min(m => m.StartPoint.X)),
-                        miny = linesY.FirstOrDefault(e => e.StartPoint.Y == linesY.Min(m => m.StartPoint.Y)),
-                        maxx = linesX.FirstOrDefault(e => e.StartPoint.X == linesX.Max(m => m.StartPoint.X)),
-                        maxy = linesY.FirstOrDefault(e => e.StartPoint.Y == linesY.Max(m => m.StartPoint.Y));
-
-                    new gab(minx, I.CV2d(-1));
-                    new gab(maxx, I.CV2d(1));
-                    new gab(miny, I.CV2d(0, -1));
-                    new gab(maxy, I.CV2d(0, 1));
+                    ob = (obx as DrawingCurveSegment).Parent;
+                    vy.Normalize(); vy.ScaleBy(x);
+                    u.addDim<LinearGeneralDimension>(dv, dc, (ob as DrawingCurve));
+                    //util.addDim(dv, dc, ob, PointIntentEnum.kCenterPointIntent, null, dc.CenterPoint, retPt, util.sumDist(-1, distY), align: DimensionTypeEnum.kVerticalDimensionType);
                 }
-            }
-            static bool check(DrawingCurve dc, bool x = true)
-            {
-                if (dc.CurveType != CurveTypeEnum.kLineSegmentCurve) return false;
-                if (dc.EdgeType != DrawingEdgeTypeEnum.kUnknownEdge) return false;
-                if (x && !u.eq(dc.StartPoint.X, dc.EndPoint.X)) return false;
-                if (!x && !u.eq(dc.StartPoint.Y, dc.EndPoint.Y)) return false;
-                return true;
-            }
-            public static void add(gab g)
-            {
-                gabs.gbs.Add(g);
-            }
-            public static void add(DrawingView d)
-            {
-                if (dv != null && dv.Equals(d)) { exist = true; return; }
-                gabs.dv = d;
-                l = dv.Left; r = dv.Left + dv.Width; t = dv.Top; b = dv.Top - dv.Height;
-                c = dv.Position;
-                center();
-            }
-            static public void unset()
-            {
-                gbs.Clear(); dv = null; min = 0; exist = false; pt = null;
-            }
-            static public void center()
-            {
-                Sheet sh = dv.Parent;
-                ObjectsEnumerator col = sh.FindUsingPoint(c);
-                foreach (var item in col)
-	            {
-		            if (!(item is Centerline)) return;
-                    Centerline l = item as Centerline;
-                    Vector2d v = l.StartPoint.VectorTo(l.EndPoint);     
-                    if (u.eq(v.X, 0) && v.Length > dv.Height)
+                //ob = util.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distY, 25, true);
+                if (oby != null)
+                {
+                    ob = (oby as DrawingCurveSegment).Parent;
+                    vx.Normalize(); vx.ScaleBy(y);
+                    u.addDim<LinearGeneralDimension>(dv, dc, ((ob as DrawingCurve))/*, vx, retPt*/);
+                    //util.addDim(dv, dc, ob, PointIntentEnum.kCenterPointIntent, null, dc.CenterPoint, retPt, -util.sumDist(-1, distX), align: DimensionTypeEnum.kHorizontalDimensionType);
+                }
+
+                if (dcX.Count > 1)
+                {
+                    dcX = dcX.OrderBy(e => e.CenterPoint.X).ToList();
+                    dim = u.addDim(dv, dcX[0], dcX[dcX.Count - 1], PointIntentEnum.kCenterPointIntent, PointIntentEnum.kCenterPointIntent,
+                        dcX[0].CenterPoint, dcX[dcX.Count - 1].CenterPoint, u.sumDist(-1, distX), DimensionTypeEnum.kHorizontalDimensionType);
+                    if (dcX.Count > 2)
                     {
-                       centerY = true;
+                        dist = dcX[0].CenterPoint.DistanceTo(dcX[1].CenterPoint);
+                        oldText = dim.Text.FormattedText;
+                        dim.Text.FormattedText = dcX.Count - 1 + "x" + (dist * 10 / dv.Scale).ToString("#.#") + "=" + oldText;
                     }
-                    else if (u.eq(v.Y , 0) && v.Length > dv.Width)
+                    else dim.Delete();
+                }
+                if (dcY.Count > 1)
+                {
+                    dcY = dcY.OrderBy(e => e.CenterPoint.Y).ToList();
+                    dim = u.addDim(dv, dcY[0], dcY[dcY.Count - 1], PointIntentEnum.kCenterPointIntent, PointIntentEnum.kCenterPointIntent,
+                        dcY[0].CenterPoint, dcY[dcY.Count - 1].CenterPoint, -u.sumDist(-1, distY), DimensionTypeEnum.kVerticalDimensionType);
+                    if (dcY.Count > 2)
                     {
-                       centerX = true;
+                        dist = dcY[0].CenterPoint.DistanceTo(dcY[1].CenterPoint);
+                        oldText = dim.Text.FormattedText;
+                        dim.Text.FormattedText = dcY.Count - 1 + "x" + (dist * 10 / dv.Scale).ToString("#.#") + "=" + oldText;
                     }
-	            }
-            }
-            static public LinearGeneralDimension draw(DrawingCurve dc, Vector2d v, double o = 1)
-            {
-                pt = I.CV2d((dc.CenterPoint.X - c.X), (dc.CenterPoint.Y - c.Y));
-                gab g = check(pt, v);
-                DimensionTypeEnum al = v.X == 0 ? DimensionTypeEnum.kVerticalDimensionType : DimensionTypeEnum.kHorizontalDimensionType;
-                
-                if (al == DimensionTypeEnum.kVerticalDimensionType) min = pt.X < 0 ? l : r;
-                else if (al == DimensionTypeEnum.kHorizontalDimensionType) min = pt.Y < 0 ? b : t;
-                if (g == null) return null;
-                pt = I.CV2d(pt.X * v.Y, pt.Y * v.X);
-                pt.Normalize();
-                LinearGeneralDimension dim = u.addDim<LinearGeneralDimension>(dv, dc, g.dc, o, al, min, pt.X + pt.Y);
-                if (g.p == poz.bottom || g.p == poz.left) offsetN(dim, -1);
-                else offsetN(dim);
-                return dim;
-            }
-            static public void offsetN(LinearGeneralDimension dim, int dir = 1)
-            {
-                Vector2d v = dim.Text.RangeBox.MinPoint.VectorTo(dim.Text.RangeBox.MaxPoint);
-                LineSegment2d dl = dim.DimensionLine as LineSegment2d;
-                UnitVector2d d = dl.Direction;
-                if (v.Length > dl.StartPoint.VectorTo(dl.EndPoint).Length)
-                {
-                    dim.Text.Origin = I.CP2d(Math.Abs(d.X) * dir * v.Length + dim.Text.Origin.X, Math.Abs(d.Y) * dir * v.Length + dim.Text.Origin.Y);
-                }
-            }
-            static public gab get(poz pz)
-            {
-                return gbs.FirstOrDefault(e => e.p == pz);
-            }
-            static public gab check(Vector2d pt, Vector2d d)
-            {
-                Point2d p = I.CP2d(pt.X * d.X, pt.Y * d.Y);
-                if (p.X == 0) return p.Y < 0 ? gabs.get(poz.bottom) : gabs.get(poz.top);
-                if (p.Y == 0) return p.X < 0 ? gabs.get(poz.left) : gabs.get(poz.right);
-                return null;
-            }
-        }
-
-        public class gab
-        {
-            public DrawingCurve dc = null;
-            public poz p;
-            public Vector2d direct;
-            public double min;
-            public gab(DrawingCurve c, Vector2d direct)
-            {
-                dc = c; this.direct = direct;
-                if (direct.X == 0 && direct.Y < 0) p = poz.bottom;
-                else if (direct.X == 0 && direct.Y > 0) p = poz.top;
-                else if (direct.Y == 0 && direct.X < 0) p = poz.left;
-                else if (direct.Y == 0 && direct.X > 0) p = poz.right;
-                gabs.add(this);
-            }
-
-        }
-
-        public class CheckReflect
-        {
-            public List<DrawingCurve> curves = new List<DrawingCurve>();
-            public List<DrawingCurve> curvesReflect = new List<DrawingCurve>();
-            public List<DrawingCurve> curvesIntent = new List<DrawingCurve>();
-            Point2d center;
-            DrawingView dv;
-            Vector2d vs, direct;
-
-            public CheckReflect(DrawingView dv, Vector2d d)
-            {
-                this.dv = dv; center = dv.Center; direct = d;
-                curves = getCurves(); d.ScaleBy(-1);
-                curvesReflect = getCurves();
-                curvesIntent = u.gets<DrawingCurve>(dv.DrawingCurves, cur => check(cur)).ToList();
-                if (curves.Count != curvesReflect.Count) return;
-                if (!check(CurveTypeEnum.kCircleCurve)) return; 
-                if (!check(CurveTypeEnum.kLineSegmentCurve)) return;
-                if (curvesIntent.Count > 1)
-                {
-                    sort(curvesIntent);
-                    DrawingCurve min = curvesIntent[0], max = curvesIntent[curvesIntent.Count - 1];
-                    u.addCenterLine(dv, min, max);
-                }
-            }
-
-            public void sort(List<DrawingCurve> curves)
-            {
-                if (direct.X == 0)
-                {
-                    curves.Sort(new CurveComparerX());
-                }
-                else if (direct.Y == 0)
-                {
-                    curves.Sort(new CurveComparerY());
-                }
-            }
-
-            public void sort(List<DrawingCurve> curves, List<DrawingCurve> curvesReflect)
-            {
-                sort(curves); sort(curvesReflect);
-            }
-
-            public bool check(DrawingCurve c)
-            {
-                if (!(c.EdgeType == DrawingEdgeTypeEnum.kUnknownEdge && c.CurveType == CurveTypeEnum.kLineSegmentCurve)) return false;
-                if (curves.Exists(e => e.Equals(c)) || curvesReflect.Exists(e => e.Equals(c))) return false;
-                return true;
-            }
-            public List<DrawingCurve> getCurves()
-            {
-                return u.gets<DrawingCurve>(dv.DrawingCurves, c =>
-                {
-                    return get(c); 
-                }).ToList();
-            }
-            public bool get(DrawingCurve c)
-            {
-                if (c.EdgeType != DrawingEdgeTypeEnum.kUnknownEdge) return false;
-                if (c.CurveType == CurveTypeEnum.kCircleCurve || c.CurveType == CurveTypeEnum.kCircularArcCurve)
-                {
-                    return get(c.CenterPoint);
-                }
-                else if (c.CurveType == CurveTypeEnum.kLineSegmentCurve)
-                {
-                    return (get(c.StartPoint) && get(c.EndPoint));
-                }
-                return false;
-            }
-            public bool get(Point2d pt)
-            {
-                vs = pt.VectorTo(dv.Center);
-                if (vs.DotProduct(direct) > 0) return true;
-                return false;
-            }
-            public bool check(CurveTypeEnum typ)
-            {
-                List<DrawingCurve> cL = u.gets<DrawingCurve>(curves, c => c.CurveType == typ).ToList();
-                List<DrawingCurve> cLR = u.gets<DrawingCurve>(curvesReflect, c => c.CurveType == typ).ToList();
-                if (cL.Count != cLR.Count) return false;
-                sort(cL, cLR);
-                for (int i = 0; i < cL.Count; i++)
-                {
-                    if (!check(cL[i], cLR[i])) return false; 
-                }
-                return true;
-            }
-            public bool check(Point2d a, Point2d b)
-            {
-                Vector2d x = a.VectorTo(center), y = b.VectorTo(center);
-                if (u.eq(0.1,-x.DotProduct(direct),y.DotProduct(direct))) return true;
-                return false;
-            }
-            public bool check(DrawingCurve a, DrawingCurve b)
-            {
-                if ((a.CurveType == CurveTypeEnum.kCircleCurve && b.CurveType == CurveTypeEnum.kCircleCurve) ||
-                    (a.CurveType == CurveTypeEnum.kCircularArcCurve && b.CurveType == CurveTypeEnum.kCircularArcCurve))
-                {
-                    return check(a.CenterPoint, b.CenterPoint);
-                }
-                else if (a.CurveType == CurveTypeEnum.kLineSegmentCurve && b.CurveType == CurveTypeEnum.kLineSegmentCurve)
-                {
-                    return (check(a.MidPoint, b.MidPoint));
-                }
-                return false;
-            }
-        }
-
-        public class CurveComparerX : IComparer<DrawingCurve>
-        {
-            public int Compare(DrawingCurve x, DrawingCurve y)
-            {
-                Point2d mpx = null, mpy = null;
-                if (x.CurveType == CurveTypeEnum.kCircleCurve || x.CurveType == CurveTypeEnum.kCircularArcCurve) mpx = x.CenterPoint;
-                else if (x.CurveType == CurveTypeEnum.kLineSegmentCurve) mpx = x.MidPoint;
-                if (y.CurveType == CurveTypeEnum.kCircleCurve || y.CurveType == CurveTypeEnum.kCircularArcCurve) mpy = y.CenterPoint;
-                else if (y.CurveType == CurveTypeEnum.kLineSegmentCurve) mpy = y.MidPoint;
-
-                return u.eq(mpx.X, mpy.X) ? 0 : mpx.X < mpy.X ? -1 : 
-                    mpx.X == mpy.X ? mpx.Y <= mpy.Y ? -1: 1 : 1;
-            }
-        }
-
-        public class CurveComparerY : IComparer<DrawingCurve>
-        {
-            public int Compare(DrawingCurve x, DrawingCurve y)
-            {
-                Point2d mpx = null, mpy = null;
-                if (x.CurveType == CurveTypeEnum.kCircleCurve || x.CurveType == CurveTypeEnum.kCircularArcCurve) mpx = x.CenterPoint;
-                else if (x.CurveType == CurveTypeEnum.kLineSegmentCurve) mpx = x.MidPoint;
-                if (y.CurveType == CurveTypeEnum.kCircleCurve || y.CurveType == CurveTypeEnum.kCircularArcCurve) mpy = y.CenterPoint;
-                else if (y.CurveType == CurveTypeEnum.kLineSegmentCurve) mpy = y.MidPoint;
-
-                return u.eq(mpx.Y, mpy.Y) ? 0 : mpx.Y < mpy.Y ? -1 :
-                    mpx.Y == mpy.Y ? mpx.X <= mpy.X ? -1 : 1 : 1;
-            }
-        }
-
-        internal class DrwArrBtn : Button
-        {
-            DrawingDocument drw;
-            DrawingCurveSegment dcs = null;
-            DrawingCurve dc = null;
-            DrawingView dv = null;
-            public DrwArrBtn(string displayName, string internalName, string clientId, string description, string tooltip,
-            ButtonDisplayEnum buttonDisplayType = ButtonDisplayEnum.kDisplayTextInLearningMode, CommandTypesEnum commandType = CommandTypesEnum.kNonShapeEditCmdType)
-                : base(displayName, internalName, commandType, clientId, description, tooltip, buttonDisplayType) { }
-            protected override void ButtonDefinition_OnExecute(NameValueMap context)
-            {
-                drw = (DrawingDocument)Macros.StandardAddInServer.m_inventorApplication.ActiveDocument;
-                u.transactStart(drw as Document, "Массив размеры");
-                
-//                 if (drw.SelectSet.Count == 0)
-//                     dcs = (DrawingCurveSegment)Macros.StandardAddInServer.m_inventorApplication.CommandManager.Pick(SelectionFilterEnum.kDrawingCurveSegmentFilter, "Выберите отверстие");
-//                 else if (drw.SelectSet[1] is DrawingCurveSegment)
-//                 {
-//                     dcs = (DrawingCurveSegment)drw.SelectSet[1];
-//                 }
-//                 add(dcs);
-                u.transactEnd();
-            }
-            private void add(DrawingCurveSegment dcs)
-            {
-                if (dcs != null)
-                {
-                    dc = dcs.Parent as DrawingCurve;
-                    dv = dc.Parent as DrawingView;
-                    List<DrawingCurve> dcX, dcY;
-                    LinearGeneralDimension dim;
-                    string oldText = ""; double dist = 0, distX = 0, distY = 0;
-                    u.getCurvesToArray(dv, dc, out dcX, out dcY);
-                    Point2d retPt = null; Vector2d vx = null, vy = null; double x = 1, y = 1;
-                    object ob = u.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distY, 25, true), obx = null, oby = null;
-                    //ob = util.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distX, 25, false);
-                    obx = u.findAtVector(dv, dc.CenterPoint, ref retPt, ref distX, ref vy, 2, false);
-                    oby = u.findAtVector(dv, dc.CenterPoint, ref retPt, ref distY, ref vx, 2, true);
-                    if (obx != null)
-                    {
-                        ob = (obx as DrawingCurveSegment).Parent;
-                        vy.Normalize(); vy.ScaleBy(x);
-                        u.addDim<LinearGeneralDimension>(dv, dc, (ob as DrawingCurve)); 
-                        //util.addDim(dv, dc, ob, PointIntentEnum.kCenterPointIntent, null, dc.CenterPoint, retPt, util.sumDist(-1, distY), align: DimensionTypeEnum.kVerticalDimensionType);
-                    }
-                    //ob = util.findAtPoint(dv.Parent, dc.CenterPoint, ref retPt, ref distY, 25, true);
-                    if (oby != null)
-                    {
-                        ob = (oby as DrawingCurveSegment).Parent;
-                        vx.Normalize(); vx.ScaleBy(y);
-                        u.addDim<LinearGeneralDimension>(dv, dc, ((ob as DrawingCurve))/*, vx, retPt*/);
-                        //util.addDim(dv, dc, ob, PointIntentEnum.kCenterPointIntent, null, dc.CenterPoint, retPt, -util.sumDist(-1, distX), align: DimensionTypeEnum.kHorizontalDimensionType);
-                    }
-
-                    if (dcX.Count > 1)
-                    {
-                        dcX = dcX.OrderBy(e => e.CenterPoint.X).ToList();
-                        dim = u.addDim(dv, dcX[0], dcX[dcX.Count - 1], PointIntentEnum.kCenterPointIntent, PointIntentEnum.kCenterPointIntent,
-                            dcX[0].CenterPoint, dcX[dcX.Count - 1].CenterPoint, u.sumDist(-1, distX), DimensionTypeEnum.kHorizontalDimensionType);
-                        if (dcX.Count > 2)
-                        {
-                            dist = dcX[0].CenterPoint.DistanceTo(dcX[1].CenterPoint);
-                            oldText = dim.Text.FormattedText;
-                            dim.Text.FormattedText = dcX.Count - 1 + "x" + (dist * 10 / dv.Scale).ToString("#.#") + "=" + oldText;
-                        }
-                        else dim.Delete();
-                    }
-                    if (dcY.Count > 1)
-                    {
-                        dcY = dcY.OrderBy(e => e.CenterPoint.Y).ToList();
-                        dim = u.addDim(dv, dcY[0], dcY[dcY.Count - 1], PointIntentEnum.kCenterPointIntent, PointIntentEnum.kCenterPointIntent,
-                            dcY[0].CenterPoint, dcY[dcY.Count - 1].CenterPoint, -u.sumDist(-1, distY), DimensionTypeEnum.kVerticalDimensionType);
-                        if (dcY.Count > 2)
-                        {
-                            dist = dcY[0].CenterPoint.DistanceTo(dcY[1].CenterPoint);
-                            oldText = dim.Text.FormattedText;
-                            dim.Text.FormattedText = dcY.Count - 1 + "x" + (dist * 10 / dv.Scale).ToString("#.#") + "=" + oldText;
-                        }
-                        else dim.Delete();
-                    }
+                    else dim.Delete();
                 }
             }
         }
+    }
 
-        public enum poz { left, right, bottom, top}
+    public enum poz { left, right, bottom, top }
 
     public class drawingCurves
     {
@@ -1130,7 +1568,7 @@ namespace InvAddIn
             {
                 double r = ((Arc2d)(item.Segments[1].Geometry)).Radius; Point2d cen = ((Arc2d)(item.Segments[1].Geometry)).Center;
                 double[] pts = new double[4];
-                pts = Dimensions.intersect(item); 
+                pts = Dimensions.intersect(item);
                 minX = (pts[0] != 0) ? cen.X - r : (item.StartPoint.X < item.EndPoint.X) ? item.StartPoint.X : item.EndPoint.X;
                 minY = (pts[1] != 0) ? cen.Y - r : (item.StartPoint.Y < item.EndPoint.Y) ? item.StartPoint.Y : item.EndPoint.Y;
                 maxX = (pts[2] != 0) ? cen.X + r : (item.StartPoint.X > item.EndPoint.X) ? item.StartPoint.X : item.EndPoint.X;
@@ -1146,11 +1584,11 @@ namespace InvAddIn
             Vector2d axis;
             if (X)
             {
-               axis = I.tg.CreateVector2d(1,0);
+                axis = I.tg.CreateVector2d(1, 0);
             }
             else axis = I.tg.CreateVector2d(0, 1);
             double angle = vec.AngleTo(axis);
-            if (Math.Round(Math.Abs(angle), 4) == Math.Round(Math.PI/2, 4))
+            if (Math.Round(Math.Abs(angle), 4) == Math.Round(Math.PI / 2, 4))
             {
                 setRev(!X);
             }
@@ -1168,26 +1606,26 @@ namespace InvAddIn
             Point2d pt = null;
             setVert();
             switch (p)
-	        {
-		        case poz.left:
-                    pt = (rev)? curve.EndPoint: curve.StartPoint;
+            {
+                case poz.left:
+                    pt = (rev) ? curve.EndPoint : curve.StartPoint;
                     if (vert) return;
-                 break;
+                    break;
                 case poz.right:
-                    pt = (rev)? curve.StartPoint: curve.EndPoint;
+                    pt = (rev) ? curve.StartPoint : curve.EndPoint;
                     if (vert) return;
-                 break;
+                    break;
                 case poz.bottom:
-                    pt = (rev)? curve.EndPoint: curve.StartPoint;
+                    pt = (rev) ? curve.EndPoint : curve.StartPoint;
                     if (!vert) return;
-                 break;
+                    break;
                 case poz.top:
-                    pt = (rev)? curve.StartPoint: curve.EndPoint;
+                    pt = (rev) ? curve.StartPoint : curve.EndPoint;
                     if (!vert) return;
-                 break;
+                    break;
                 default:
-                 break;
-	        }
+                    break;
+            }
             col = sh.FindUsingPoint(pt, tol);
             if (col != null || col.Count > 1)
             {
@@ -1215,7 +1653,7 @@ namespace InvAddIn
         readonly poz direction;
         double min;
         const double offset = 0.7;
-        
+
         public OrderDims(DrawingView dv, IEnumerable<LinearGeneralDimension> d, poz direction)
         {
             this.direction = direction;
@@ -1224,7 +1662,7 @@ namespace InvAddIn
             {
                 case poz.left:
                     Order.direction = -1;
-                    min = dv.Center.X - dv.Width/2 - offset;
+                    min = dv.Center.X - dv.Width / 2 - offset;
                     break;
                 case poz.right:
                     Order.direction = 1;
@@ -1232,7 +1670,7 @@ namespace InvAddIn
                     break;
                 case poz.bottom:
                     Order.direction = -1;
-                    min = dv.Center.Y - dv.Height / 2 + offset/2;
+                    min = dv.Center.Y - dv.Height / 2 + offset / 2;
                     break;
                 case poz.top:
                     Order.direction = 1;
@@ -1261,7 +1699,7 @@ namespace InvAddIn
                         break;
                     default:
                         break;
-                } 
+                }
             }
             dims.Sort();
             setMinPt();
@@ -1294,20 +1732,20 @@ namespace InvAddIn
             dims[0].setOrigin();
 
 
-//             foreach (var item in dims)
-//             {
-//                 item.draw();
-//             }
+            //             foreach (var item in dims)
+            //             {
+            //                 item.draw();
+            //             }
         }
     }
 
-    public class Order: IComparable<Order>
+    public class Order : IComparable<Order>
     {
         public Box2d box;
         public DimensionAlignmentTypeEnum al = DimensionAlignmentTypeEnum.kDefaultAlignmentType;
         public double l = 0;
         LineSegment2d dl;
-        Point2d pt;
+        //Point2d pt;
         public double offsetN = 0, b = 0.35;
         readonly double offset = 0.85, tboffset = 0;
         static public int direction = 1;
@@ -1321,24 +1759,24 @@ namespace InvAddIn
         public Order(LinearGeneralDimension dim, poz p = poz.bottom)
         {
             this.dim = dim;
-//             el1 = dim.ExtensionLineOne as LineSegment2d;
-//             el2 = dim.ExtensionLineTwo as LineSegment2d;
+            //             el1 = dim.ExtensionLineOne as LineSegment2d;
+            //             el2 = dim.ExtensionLineTwo as LineSegment2d;
             dl = dim.DimensionLine as LineSegment2d;
             al = dl.Direction.Y == 0 ? DimensionAlignmentTypeEnum.kHorizontalAlignmentType :
-                dl.Direction.X == 0 ? DimensionAlignmentTypeEnum.kVerticalAlignmentType : 
+                dl.Direction.X == 0 ? DimensionAlignmentTypeEnum.kVerticalAlignmentType :
                 DimensionAlignmentTypeEnum.kAlignedAlignmentType;
             if (check(dl, dim.Text.Origin))
             {
                 //Point2d mp = util.midPt(dl.StartPoint, dl.EndPoint);
                 Point2d sp = dim.Text.Origin;
                 dim.CenterText();
-                if (al == DimensionAlignmentTypeEnum.kHorizontalAlignmentType) 
-                { 
-                    offsetN = - dim.Text.Origin.X + sp.X;
-                }
-                else if (al == DimensionAlignmentTypeEnum.kVerticalAlignmentType) 
+                if (al == DimensionAlignmentTypeEnum.kHorizontalAlignmentType)
                 {
-                    offsetN = - dim.Text.Origin.Y + sp.Y;
+                    offsetN = -dim.Text.Origin.X + sp.X;
+                }
+                else if (al == DimensionAlignmentTypeEnum.kVerticalAlignmentType)
+                {
+                    offsetN = -dim.Text.Origin.Y + sp.Y;
                 }
             }
             box = dim.Text.RangeBox;
@@ -1353,16 +1791,16 @@ namespace InvAddIn
                         box = I.Box(dl.StartPoint.X + tol, 1, dl.EndPoint.X - tol, 0);
                     else
                         box = I.Box(dl.EndPoint.X - tol, 0, dl.StartPoint.X + tol, 1);
-                    x1 = box.MinPoint.X; x2 = box.MaxPoint.X; 
+                    x1 = box.MinPoint.X; x2 = box.MaxPoint.X;
                     l = x2 - x1;
                     break;
                 case DimensionAlignmentTypeEnum.kVerticalAlignmentType:
                     o = box.MaxPoint.X - box.MinPoint.X;
                     if (tol > 0)
-                        box = I.Box(1, dl.StartPoint.Y + tol, 0, dl.EndPoint.Y-tol);
+                        box = I.Box(1, dl.StartPoint.Y + tol, 0, dl.EndPoint.Y - tol);
                     else
-                        box = I.Box(0, dl.EndPoint.Y - tol,1, dl.StartPoint.Y + tol);
-                    x1 = box.MinPoint.Y; x2 = box.MaxPoint.Y; 
+                        box = I.Box(0, dl.EndPoint.Y - tol, 1, dl.StartPoint.Y + tol);
+                    x1 = box.MinPoint.Y; x2 = box.MaxPoint.Y;
                     l = x2 - x1;
                     break;
                 default:
@@ -1375,7 +1813,7 @@ namespace InvAddIn
                 tboffset += -0.142;
                 //tboffset = offset / 2;
             }
-//             else tboffset = -offset / 2;
+            //             else tboffset = -offset / 2;
             //if (p == poz.left || p == poz.top) leftTop -= offset/2;
         }
 
@@ -1427,7 +1865,7 @@ namespace InvAddIn
 
         public int CompareTo(Order other)
         {
-            return u.eq(this.l, other.l) ? 0 : this.l < other.l ? 1 : 0; 
+            return u.eq(this.l, other.l) ? 0 : this.l < other.l ? 1 : 0;
         }
     }
 
@@ -1460,8 +1898,11 @@ namespace InvAddIn
                     //I.screenSilent(true);
                     //u.setSilence();
                     //u.setUpdate();
-                    tangent();
-                    radius();
+                    //!!!Temporary
+
+                    //tangent();
+                    //radius();
+
                     //I.screenSilent(false);
                     //u.setSilence();
                     //u.setUpdate();
@@ -1469,9 +1910,9 @@ namespace InvAddIn
             }
             uvecV = tg.CreateUnitVector2d(0, 1);
             uvecH = tg.CreateUnitVector2d(1, 0);
-            rangeMin = tg.CreatePoint2d(dv.Position.X - dv.Width/2, dv.Position.Y - dv.Height/2);
+            rangeMin = tg.CreatePoint2d(dv.Position.X - dv.Width / 2, dv.Position.Y - dv.Height / 2);
             rangeMax = tg.CreatePoint2d(rangeMin.X + dv.Width, rangeMin.Y + dv.Height);
-            box = I.tg.CreateBox2d();   
+            box = I.tg.CreateBox2d();
             box.MaxPoint = rangeMax; box.MinPoint = rangeMin;
             cenLeft = tg.CreatePoint2d(dv.Position.X - dv.Width / 2, dv.Position.Y);
             cenRight = tg.CreatePoint2d(dv.Position.X + dv.Width / 2, dv.Position.Y);
@@ -1487,20 +1928,20 @@ namespace InvAddIn
 
         public void radius()
         {
-            t = t == 0 ? u.getPar(dv, e => e.Thickness.Value):t;
+            t = t == 0 ? u.getPar(dv, e => e.Thickness.Value) : t;
             List<DrawingCurve> dcs = u.getCurves<DrawingCurve>(dv, e => check(e, a => a.Radius > 2.1));
             if (dcs.Count() == 0) return;
             DrawingSketch ds = dv.Sketches.Add();
             ds.Edit();
             List<SketchLine> lines = new List<SketchLine>();
-            for (int i = 1; i < dcs.Count(); i+=2)
+            for (int i = 1; i < dcs.Count(); i += 2)
             {
                 SketchArc arc = ds.AddByProjectingEntity(dcs[i]) as SketchArc;
                 lines.Add(ds.SketchLines.AddByTwoPoints(arc.CenterSketchPoint, arc.EndSketchPoint));
                 lines[lines.Count - 1].Centerline = true;
                 lines.Add(ds.SketchLines.AddByTwoPoints(arc.CenterSketchPoint, arc.StartSketchPoint));
                 lines[lines.Count - 1].Centerline = true;
-                
+
             }
             ds.ExitEdit();
 
@@ -1508,60 +1949,137 @@ namespace InvAddIn
 
             for (int i = startInt; i < dcs.Count(); i += 2)
             {
-                u.addDim<RadiusGeneralDimension>(dv, dcs[i], 0, st: st1);      
-                u.addDim<AngularGeneralDimension>(dv, ls[i-1], ls[i], st: st2);
+                u.addDim<RadiusGeneralDimension>(dv, dcs[i], 0, st: st1);
+                u.addDim<AngularGeneralDimension>(dv, ls[i - 1], ls[i], st: st2);
             }
         }
+
+        //         public DrawingCurve findDC(Point2d pt, Vector2d prev)
+        //         {
+        //             var obs = dv.Parent.FindUsingPoint(pt);
+        //             var curv = u.get<DrawingCurveSegment>(obs, el => el.StartPoint.VectorTo(pt).IsParallelTo(prev));
+        //         }
+
 
         public void tangent()
         {
             HashSet<DrawingCurve> exp = new HashSet<DrawingCurve>();
             r = u.getPar(dv, e => e.BendRadius.Value);
-            t = t == 0 ? u.getPar(dv, e => e.Thickness.Value):t;
-            List<DrawingCurve> dcs = u.getCurves<DrawingCurve>(dv, e => check(e, a => u.eq(a.Radius, r)));
-            foreach (DrawingCurve dc in dcs)
-            {
-                DrawingCurve start = u.findAtPoint<DrawingCurve>
-                    (dv, e => check(e,dc.StartPoint));
-                DrawingCurve end = u.findAtPoint<DrawingCurve>
-                    (dv, e => check(e, dc.EndPoint));
-                bool f = check(dc);
-                if (start == null) start = add(dc, f);
-                if (end == null) end = add(dc, !f); 
-                DrawingCurve [] cs = {start,end};
-                if (except(exp, cs  /*start != null && end != null*/))
-                {
-                    if (!u.eq(u.scalar(start, end), 0))
-                    {
-                        if (start.ModelGeometry is Edge) { 
-                            u.addDim<LinearGeneralDimension>(dv, start, st: st1);
-                            exp.Add(start);}
-                        if (end.ModelGeometry is Edge)
-                        {
-                            u.addDim<LinearGeneralDimension>(dv, end, st: st1);
-                            exp.Add(end);
-                        }
-                        u.addDim<AngularGeneralDimension>(dv, start, end, st: st2);
-                    }
-                    else
-                    {
-                        double scale = dv.Scale;
-                        DrawingCurve mn = u.min<DrawingCurve>(cs, e => u.getLenght(e));
-                        DrawingCurve mx = u.max<DrawingCurve>(cs, e => u.getLenght(e));
-                        DrawingCurve i = u.findAtPoint(dv, dc.CenterPoint, (r+t)*scale/10, e => u.eq(u.getLenght(e),u.getLenght(mx)) && !mx.Equals(e));
-                        Point2d ip = u.max<Point2d>(new Point2d[] { mn.EndPoint, mn.StartPoint }, pt => pt.VectorTo(dc.CenterPoint).Length);
-                        LinearGeneralDimension dim = u.addDim(dv, i, mn, null, ip, mn.StartPoint, mn.EndPoint);
-                        dim.Style = st2;
-                        //if (!check(dim)) dim.Delete();
-                        exp.Add(mn); exp.Add(i);
-                    }
-                }
-            }
+            t = t == 0 ? u.getPar(dv, e => e.Thickness.Value) : t;
+            double eps = 0.2;
+            List<DrawingCurve> dcs = u.getCurves<DrawingCurve>(dv, e => check(e, a => a.Radius >= r - eps && a.Radius <= r + t + eps));
+            BendsDrw bends = new BendsDrw(dcs);
+            BendDrw.setBends(bends.bends); BendDrw.setSheet(dv.Parent);
+            BendDrw.setSpike(0.5 * dv.Scale);
+            bends.setStyle(st2);
+            bends.add(dv.DrawingCurves);
+            bends.draw(dv);
+            BendDrw.removeStatic();
+            //             foreach (DrawingCurve dc in dcs)
+            //             {
+            //                 DrawingCurve start = u.findAtPoint<DrawingCurve>
+            //                     (dv, e => check(e, dc.StartPoint));
+            //                 if (start != null && checkPar(start, dc, dc.StartPoint))
+            //                     start = u.findAtPoint<DrawingCurve>
+            //                     (dv, e => check(e, nonPt(start, dc.StartPoint)));
+            //                 DrawingCurve end = u.findAtPoint<DrawingCurve>
+            //                     (dv, e => check(e, dc.EndPoint));
+            //                 if (end != null && checkPar(end, dc, dc.EndPoint))
+            //                     end = u.findAtPoint<DrawingCurve>
+            //                     (dv, e => check(e, nonPt(end, dc.EndPoint)));
+            // 
+            //                 bool f = check(dc);
+            //                 if (start == null) start = add(dc, f);
+            //                 if (end == null) end = add(dc, !f);
+            //                 DrawingCurve[] cs = { start, end };
+            //                 if (except(exp, cs  /*start != null && end != null*/))
+            //                 {
+            //                     if (!u.eq(u.scalar(start, end), 0))
+            //                     {
+            //                         if (start.ModelGeometry is Edge)
+            //                         {
+            //                             u.addDim<LinearGeneralDimension>(dv, start, st: st1);
+            //                             exp.Add(start);
+            //                         }
+            //                         if (end.ModelGeometry is Edge)
+            //                         {
+            //                             u.addDim<LinearGeneralDimension>(dv, end, st: st1);
+            //                             exp.Add(end);
+            //                         }
+            //                         u.addDim<AngularGeneralDimension>(dv, start, end, st: st2);
+            //                     }
+            //                     else
+            //                     {
+            //                         double scale = dv.Scale;
+            //                         DrawingCurve mn = u.min<DrawingCurve>(cs, e => u.getLenght(e));
+            //                         DrawingCurve mx = u.max<DrawingCurve>(cs, e => u.getLenght(e));
+            //                         DrawingCurve i = u.findAtPoint(dv, dc.CenterPoint, (r + t) * scale / 10, e => u.eq(u.getLenght(e), u.getLenght(mx)) && !mx.Equals(e));
+            //                         Point2d ip = u.max<Point2d>(new Point2d[] { mn.EndPoint, mn.StartPoint }, pt => pt.VectorTo(dc.CenterPoint).Length);
+            //                         LinearGeneralDimension dim = u.addDim(dv, i, mn, null, ip, mn.StartPoint, mn.EndPoint);
+            //                         dim.Style = st2;
+            //                         //if (!check(dim)) dim.Delete();
+            //                         exp.Add(mn); exp.Add(i);
+            //                     }
+            //                 }
+            //             }
         }
+        // 
+        //         public void tangent()
+        //         {
+        //             HashSet<DrawingCurve> exp = new HashSet<DrawingCurve>();
+        //             r = u.getPar(dv, e => e.BendRadius.Value);
+        //             t = t == 0 ? u.getPar(dv, e => e.Thickness.Value):t;
+        //             List<DrawingCurve> dcs = u.getCurves<DrawingCurve>(dv, e => check(e, a => u.eq(a.Radius, r)));
+        //             foreach (DrawingCurve dc in dcs)
+        //             {
+        //                 DrawingCurve start = u.findAtPoint<DrawingCurve>
+        //                     (dv, e => check(e, dc.StartPoint));
+        //                 if (start != null && checkPar(start, dc, dc.StartPoint))
+        //                     start = u.findAtPoint<DrawingCurve>
+        //                     (dv, e => check(e, nonPt(start, dc.StartPoint)));
+        //                 DrawingCurve end = u.findAtPoint<DrawingCurve>
+        //                     (dv, e => check(e, dc.EndPoint));
+        //                 if (end != null && checkPar(end, dc, dc.EndPoint))
+        //                     end = u.findAtPoint<DrawingCurve>
+        //                     (dv, e => check(e, nonPt(end, dc.EndPoint)));
+        // 
+        //                 bool f = check(dc);
+        //                 if (start == null) start = add(dc, f);
+        //                 if (end == null) end = add(dc, !f); 
+        //                 DrawingCurve [] cs = {start,end};
+        //                 if (except(exp, cs  /*start != null && end != null*/))
+        //                 {
+        //                     if (!u.eq(u.scalar(start, end), 0))
+        //                     {
+        //                         if (start.ModelGeometry is Edge) { 
+        //                             u.addDim<LinearGeneralDimension>(dv, start, st: st1);
+        //                             exp.Add(start);}
+        //                         if (end.ModelGeometry is Edge)
+        //                         {
+        //                             u.addDim<LinearGeneralDimension>(dv, end, st: st1);
+        //                             exp.Add(end);
+        //                         }
+        //                         u.addDim<AngularGeneralDimension>(dv, start, end, st: st2);
+        //                     }
+        //                     else
+        //                     {
+        //                         double scale = dv.Scale;
+        //                         DrawingCurve mn = u.min<DrawingCurve>(cs, e => u.getLenght(e));
+        //                         DrawingCurve mx = u.max<DrawingCurve>(cs, e => u.getLenght(e));
+        //                         DrawingCurve i = u.findAtPoint(dv, dc.CenterPoint, (r+t)*scale/10, e => u.eq(u.getLenght(e),u.getLenght(mx)) && !mx.Equals(e));
+        //                         Point2d ip = u.max<Point2d>(new Point2d[] { mn.EndPoint, mn.StartPoint }, pt => pt.VectorTo(dc.CenterPoint).Length);
+        //                         LinearGeneralDimension dim = u.addDim(dv, i, mn, null, ip, mn.StartPoint, mn.EndPoint);
+        //                         dim.Style = st2;
+        //                         //if (!check(dim)) dim.Delete();
+        //                         exp.Add(mn); exp.Add(i);
+        //                     }
+        //                 }
+        //             }
+        //         }
 
         public DrawingCurve add(DrawingCurve dc, bool end)
         {
-            
+
             double inc = 0;
             DrawingSketch ds = dv.Sketches.Add();
             ds.Edit();
@@ -1571,7 +2089,7 @@ namespace InvAddIn
             Vector2d v = u.getTangentVec(se.Geometry.Evaluator, inc, pt);
             v.Normalize(); //v.ScaleBy(-1);
             pt2.TranslateBy(v);
-            SketchLine sl = end ? ds.SketchLines.AddByTwoPoints(se.EndSketchPoint, pt2): ds.SketchLines.AddByTwoPoints(se.StartSketchPoint, pt2);
+            SketchLine sl = end ? ds.SketchLines.AddByTwoPoints(se.EndSketchPoint, pt2) : ds.SketchLines.AddByTwoPoints(se.StartSketchPoint, pt2);
             ds.ExitEdit();
             return u.getCurves<DrawingCurve>(dv, e => e.ModelGeometry.Equals(sl)).FirstOrDefault();
         }
@@ -1580,25 +2098,42 @@ namespace InvAddIn
         {
             LineSegment2d ext1 = dim.ExtensionLineOne as LineSegment2d, ext2 = dim.ExtensionLineTwo as LineSegment2d;
             Vector2d x = ext1.StartPoint.VectorTo(ext2.StartPoint), y = ext1.EndPoint.VectorTo(ext2.EndPoint);
-            if (x.AngleTo(y) > Math.PI/8) return false;
+            if (x.AngleTo(y) > Math.PI / 8) return false;
             return true;
         }
 
         public bool check(DrawingCurve dc)
         {
             return dc.StartPoint.X < dc.CenterPoint.X;
-//             Vector2d v1 = dc.CenterPoint.VectorTo(dc.StartPoint), v2 = dc.CenterPoint.VectorTo(dc.EndPoint);
-//             double a1 = v1.AngleTo(util.createVector2d(-1, -1)), a2 = v2.AngleTo(util.createVector2d(-1, -1));
-//             return (a2 - a1 < 0) ? true : false;
+            //             Vector2d v1 = dc.CenterPoint.VectorTo(dc.StartPoint), v2 = dc.CenterPoint.VectorTo(dc.EndPoint);
+            //             double a1 = v1.AngleTo(util.createVector2d(-1, -1)), a2 = v2.AngleTo(util.createVector2d(-1, -1));
+            //             return (a2 - a1 < 0) ? true : false;
         }
 
         public bool check(DrawingCurve dc, Point2d pt)
         {
             if (dc == null || dc.StartPoint == null || dc.EndPoint == null) return false;
-            return ((dc.StartPoint.IsEqualTo(pt) || dc.EndPoint.IsEqualTo(pt)) && dc.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d);
+            if ((dc.StartPoint.IsEqualTo(pt) || dc.EndPoint.IsEqualTo(pt)) && dc.ProjectedCurveType == Curve2dTypeEnum.kLineSegmentCurve2d)
+            {
+                return true;
+            }
+            else return false;
         }
 
-        public bool check(DrawingCurve dc, Func<Arc3d,bool>f)
+        public bool checkPar(DrawingCurve dc1, DrawingCurve dc2, Point2d pt)
+        {
+            var d1 = u.getTangent(dc1.Evaluator2D, 0.1, pt);
+            var d2 = u.getTangent(dc2.Evaluator2D, 0.1, pt);
+            Vector2d v1 = I.CV2d(d1[0], d1[1]), v2 = I.CV2d(d2[0], d2[1]);
+            return v1.IsParallelTo(v2);
+        }
+
+        public Point2d nonPt(DrawingCurve dc, Point2d pt)
+        {
+            return u.eq(dc.StartPoint, pt) ? dc.EndPoint : dc.StartPoint;
+        }
+
+        public bool check(DrawingCurve dc, Func<Arc3d, bool> f)
         {
             Edge e; Arc3d a;
             if (dc.CurveType == CurveTypeEnum.kCircularArcCurve && dc.ModelGeometry != null)
@@ -1622,7 +2157,7 @@ namespace InvAddIn
             }
             return r;
         }
-                        
+
         public bool except(HashSet<DrawingCurve> hs, DrawingCurve dc)
         {
             return !hs.Contains(dc);
@@ -1630,9 +2165,9 @@ namespace InvAddIn
 
         public void cenCurv(double tol = 0.01)
         {
-            ObjectsEnumerator col;    
+            ObjectsEnumerator col;
             col = dv.Parent.FindUsingPoint(cenLeft, tol);
-            if (col != null && col.Count != 0) { leftDC.set((DrawingCurveSegment)col[1]); leftCurv = false;}
+            if (col != null && col.Count != 0) { leftDC.set((DrawingCurveSegment)col[1]); leftCurv = false; }
             col = dv.Parent.FindUsingPoint(cenRight, tol);
             if (col != null && col.Count != 0) { rightDC.set((DrawingCurveSegment)col[1]); rightCurv = false; }
             col = dv.Parent.FindUsingPoint(cenTop, tol);
@@ -1651,7 +2186,7 @@ namespace InvAddIn
             foreach (DrawingCurve item in dv.DrawingCurves)
             {
                 cur.set(item.Segments[1]);
-                
+
                 if (leftCurv)
                 {
                     if (cur.minX < leftDC.minX) leftDC.set(cur.curve, cur.max, cur.min, cur.minX, cur.minY, cur.maxX, cur.maxY);
@@ -1724,7 +2259,7 @@ namespace InvAddIn
         public double getParamAtPoint(DrawingCurve dc, Point2d pt)
         {
             double[] param = new double[1];
-            double[] pts = new double[2] {pt.X, pt.Y };
+            double[] pts = new double[2] { pt.X, pt.Y };
             double[] guessParam = new double[1];
             double[] maxDeviat = new double[1];
             SolutionNatureEnum[] sne = new SolutionNatureEnum[1];
@@ -1735,9 +2270,9 @@ namespace InvAddIn
 
         public void addDims()
         {
-            leftDim = addDim(dv,bottomDC.curve, topDC.curve, PointIntentEnum.kCircularBottomPointIntent, PointIntentEnum.kCircularTopPointIntent,
+            leftDim = addDim(dv, bottomDC.curve, topDC.curve, PointIntentEnum.kCircularBottomPointIntent, PointIntentEnum.kCircularTopPointIntent,
                 bottomDC.rev, topDC.rev, /*bottomDC.min, topDC.max,*/rangeMin, tg.CreatePoint2d(rangeMin.X, rangeMax.Y), 15, DimensionTypeEnum.kVerticalDimensionType);
-            bottomDim = addDim(dv,leftDC.curve, rightDC.curve, PointIntentEnum.kCircularLeftPointIntent, PointIntentEnum.kCircularRightPointIntent,
+            bottomDim = addDim(dv, leftDC.curve, rightDC.curve, PointIntentEnum.kCircularLeftPointIntent, PointIntentEnum.kCircularRightPointIntent,
                 leftDC.rev, rightDC.rev, /*leftDC.min, leftDC.max ,*/rangeMin, tg.CreatePoint2d(rangeMax.X, rangeMin.Y), -15, DimensionTypeEnum.kHorizontalDimensionType);
             if (dv.IsFlatPatternView == false)
             {
@@ -1762,7 +2297,7 @@ namespace InvAddIn
             else { dim.Precision = prec; dim.Text.FormattedText = dim.Text.FormattedText + "*"; }
         }
 
-        public static LinearGeneralDimension addDim(DrawingView dv,object ent1, object ent2, PointIntentEnum pi1, PointIntentEnum pi2, bool rev1, bool rev2, /*Point2d pt1, Point2d pt2,*/ Point2d mpt1, Point2d mpt2, double offset=15, 
+        public static LinearGeneralDimension addDim(DrawingView dv, object ent1, object ent2, PointIntentEnum pi1, PointIntentEnum pi2, bool rev1, bool rev2, /*Point2d pt1, Point2d pt2,*/ Point2d mpt1, Point2d mpt2, double offset = 15,
             DimensionTypeEnum align = DimensionTypeEnum.kAlignedDimensionType)
         {
             //double [] param1 = new double[2] {pt1.X, pt1.Y}, param2 = new double[2] {pt2.X, pt2.Y};
@@ -1770,34 +2305,35 @@ namespace InvAddIn
             //((DrawingCurve)ent1).Evaluator2D.GetParamAtPoint(param1, p1,)
             PointIntentEnum pie = PointIntentEnum.kStartPointIntent;
             if (rev1) pie = PointIntentEnum.kEndPointIntent;
-            
-            GeometryIntent intent1 = (((DrawingCurve)ent1).ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d) ?           
-                dv.Parent.CreateGeometryIntent(ent1, pi1):
+
+            GeometryIntent intent1 = (((DrawingCurve)ent1).ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d) ?
+                dv.Parent.CreateGeometryIntent(ent1, pi1) :
                 dv.Parent.CreateGeometryIntent(ent1, pie);
             pie = PointIntentEnum.kStartPointIntent;
             if (!rev2) pie = PointIntentEnum.kEndPointIntent;
             GeometryIntent intent2 = (((DrawingCurve)ent2).ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d) ?
-                dv.Parent.CreateGeometryIntent(ent2, pi2) : 
+                dv.Parent.CreateGeometryIntent(ent2, pi2) :
                 dv.Parent.CreateGeometryIntent(ent2, pie);
             Vector2d vec = mpt1.VectorTo(mpt2);
             vec.ScaleBy(0.5);
             Point2d mpt = mpt1.Copy();
             mpt.TranslateBy(vec);
             Matrix2d mtx = I.tg.CreateMatrix2d();
-            mtx.SetToRotation(Math.PI/2, mpt);
+            mtx.SetToRotation(Math.PI / 2, mpt);
             vec.TransformBy(mtx);
             vec.Normalize();
-            vec.ScaleBy(offset/10);
+            vec.ScaleBy(offset / 10);
             mpt.TranslateBy(vec);
+            if (u.check(dv, intent1, intent2, align)) return null;
             return dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(mpt, intent1, intent2, align);
         }
 
-        public static void addHoleAnnotation(DrawingView dv,Sheet sh)
+        public static void addHoleAnnotation(DrawingView dv, Sheet sh)
         {
             Point2d pt = null; DrawingCurve dc = null;
             HashSet<Inventor.Box2d> boxes = new HashSet<Box2d>();
             List<Point2d> ptExct = new List<Point2d>();
-            pt = u.spiralPosition(dv, sh, 5, 5, dc.CenterPoint,ref ptExct);
+            pt = u.spiralPosition(dv, sh, 5, 5, dc.CenterPoint, ref ptExct);
             HoleThreadNote htn = sh.DrawingNotes.HoleThreadNotes.Add(pt, dc);
             addBox(sh, ref boxes);
         }
@@ -1831,15 +2367,15 @@ namespace InvAddIn
                 if (u.eq(cur.StartPoint.X, cur.EndPoint.X)) X = false;
                 n.setRev(X);
                 drawingCurves r; Point2d retPt = null;
-                    r = rang.OrderBy(c => u.getDist(c.curve.StartPoint, cur, 1000, ref retPt)).First(en => en.vert != X);
-                    double d = u.getDist(r.curve.StartPoint, n.curve, 1000, ref retPt);
+                r = rang.OrderBy(c => u.getDist(c.curve.StartPoint, cur, 1000, ref retPt)).First(en => en.vert != X);
+                double d = u.getDist(r.curve.StartPoint, n.curve, 1000, ref retPt);
 
-                    if (d < 1.2) offsetN = -10;
-                    else offsetN = 0;
+                if (d < 1.2) offsetN = -10;
+                else offsetN = 0;
 
-//                     offs = rang.OrderBy(c => util.getDist(cur.StartPoint, c.curve, 1000)).First(en => en.vert == X);
-//                     d = util.getDist(n.curve.StartPoint, offs.curve, 1000);
-                    addBendDim(r.curve, n.curve, offset, offsetN, X);
+                //                     offs = rang.OrderBy(c => util.getDist(cur.StartPoint, c.curve, 1000)).First(en => en.vert == X);
+                //                     d = util.getDist(n.curve.StartPoint, offs.curve, 1000);
+                addBendDim(r.curve, n.curve, offset, offsetN, X);
                 //if (X)
                 //addDim(r.curve, n.curve, PointIntentEnum.kCircularBottomPointIntent, PointIntentEnum.kCircularTopPointIntent,
                 //r.rev, n.rev, /*bottomDC.min, topDC.max,*/rangeMin, tg.CreatePoint2d(rangeMin.X, rangeMax.Y), 15, DimensionTypeEnum.kVerticalDimensionType);
@@ -1858,7 +2394,7 @@ namespace InvAddIn
                 LineSegment2d ls1 = (LineSegment2d)dc1.Segments[1].Geometry, ls2 = (LineSegment2d)dc2.Segments[1].Geometry;
                 if (ls1.Direction.IsParallelTo(ls2.Direction))
                 {
-                    Point2d pt1 = minPt(dc1, X:X), pt2 = minPt(dc2, X:X);
+                    Point2d pt1 = minPt(dc1, X: X), pt2 = minPt(dc2, X: X);
                     if (X)
                     {
                         if (pt1.X < dv.Position.X) offsetN = -offsetN;
@@ -1870,34 +2406,34 @@ namespace InvAddIn
                         if (pt1.Y < dv.Position.Y) offsetN = -offsetN;
                     }
                     Point2d midpt = u.midPt(pt1, pt2, offset / 10, offsetN / 10);
-                        Point2d intPt = minSeg(dc1, midpt);
-//                         if (midpt.DistanceTo(dc1.StartPoint) < midpt.DistanceTo(dc1.EndPoint))
-//                         {
-//                             intPt = dc1.EndPoint;
-//                         }
-//                         else intPt = dc1.StartPoint;
-                        GeometryIntent i1, i2;
-                        if (intPt != null)
+                    Point2d intPt = minSeg(dc1, midpt);
+                    //                         if (midpt.DistanceTo(dc1.StartPoint) < midpt.DistanceTo(dc1.EndPoint))
+                    //                         {
+                    //                             intPt = dc1.EndPoint;
+                    //                         }
+                    //                         else intPt = dc1.StartPoint;
+                    GeometryIntent i1, i2;
+                    if (intPt != null)
                         i1 = dv.Parent.CreateGeometryIntent(dc1, intPt);
-                        else i1 = dv.Parent.CreateGeometryIntent(dc1);
-//                         if (midpt.DistanceTo(dc2.StartPoint) < midpt.DistanceTo(dc2.EndPoint))
-//                         {
-//                             intPt = dc2.EndPoint;
-//                         }
-//                         else intPt = dc2.StartPoint;
-                        intPt = minSeg(dc2, midpt);
-                        if (intPt != null)
-                            i2 = dv.Parent.CreateGeometryIntent(dc2, intPt);
-                        else i2 = dv.Parent.CreateGeometryIntent(dc2);
-                        if (u.eq(dc1.StartPoint.X, dc1.EndPoint.X))   
-                            dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kHorizontalDimensionType,DimensionStyle: I.dimStyle);
-                        else dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kVerticalDimensionType, DimensionStyle: I.dimStyle);
+                    else i1 = dv.Parent.CreateGeometryIntent(dc1);
+                    //                         if (midpt.DistanceTo(dc2.StartPoint) < midpt.DistanceTo(dc2.EndPoint))
+                    //                         {
+                    //                             intPt = dc2.EndPoint;
+                    //                         }
+                    //                         else intPt = dc2.StartPoint;
+                    intPt = minSeg(dc2, midpt);
+                    if (intPt != null)
+                        i2 = dv.Parent.CreateGeometryIntent(dc2, intPt);
+                    else i2 = dv.Parent.CreateGeometryIntent(dc2);
+                    if (u.eq(dc1.StartPoint.X, dc1.EndPoint.X))
+                        dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kHorizontalDimensionType, DimensionStyle: I.dimStyle);
+                    else dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kVerticalDimensionType, DimensionStyle: I.dimStyle);
                     dim.CenterText();
-                        if (offset < 0)
-                            gabs.offsetN(dim);
-                        else gabs.offsetN(dim, -1);
-                        //dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kAlignedDimensionType);
-                        //dimStyle(dim, "Гибы", 1);
+                    if (offset < 0)
+                        gabs.offsetN(dim);
+                    else gabs.offsetN(dim, -1);
+                    //dim = dv.Parent.DrawingDimensions.GeneralDimensions.AddLinear(midpt, i1, i2, DimensionTypeEnum.kAlignedDimensionType);
+                    //dimStyle(dim, "Гибы", 1);
                 }
             }
         }
@@ -1967,7 +2503,7 @@ namespace InvAddIn
 
     public class Drawings : InvDoc.InvDocument<DrawingDocument>
     {
-        public Sheet sheet;
+        public new Sheet sheet;
         public DrawingView view;
         public GeometryIntent intent;
         public DrawingDimension dim;
@@ -1981,41 +2517,41 @@ namespace InvAddIn
             : base(drw)
         {
             sheet = drw.ActiveSheet;
-            Inventor.Application app =  Macros.StandardAddInServer.m_inventorApplication;
+            Inventor.Application app = Macros.StandardAddInServer.m_inventorApplication;
             col = app.TransientObjects.CreateObjectCollection();
             tg = app.TransientGeometry;
             try
             {
                 //clearCenter(sheet);
-            foreach (DrawingView view in sheet.DrawingViews)
-            {
-                foreach (DrawingCurve cur in view.DrawingCurves)
+                foreach (DrawingView view in sheet.DrawingViews)
                 {
-                    if (cur.CurveType == CurveTypeEnum.kCircleCurve && !hasCenter(cur,sheet))
+                    foreach (DrawingCurve cur in view.DrawingCurves)
                     {
-                        intent = sheet.CreateGeometryIntent(cur);
-                        sheet.Centermarks.Add(intent);                                                   
+                        if ((cur.CurveType == CurveTypeEnum.kCircleCurve || checkAngle(cur, 0.1)) && !hasCenter(cur, sheet))
+                        {
+                            intent = sheet.CreateGeometryIntent(cur);
+                            sheet.Centermarks.Add(intent);
+                        }
+                        //if (cur.CurveType == CurveTypeEnum.kCircularArcCurve)
+                        //{
+                        //    DrawingCurveSegment seg;
+                        //    if ((seg = cur.Segments[1]).GeometryType == Curve2dTypeEnum.kCircularArcCurve2d)
+                        //    {
+                        //        double ang = Math.Abs(((Arc2d)(cur.Segments[1].Geometry)).SweepAngle);
+                        //        int v = (int)(ang * 1000);
+                        //        if (v == 3141 && !hasCenter(cur, sheet))
+                        //        {
+                        //            intent = sheet.CreateGeometryIntent(cur);
+                        //            sheet.Centermarks.Add(intent);
+                        //        }
+                        //    }
+                        //}
                     }
-                    //if (cur.CurveType == CurveTypeEnum.kCircularArcCurve)
-                    //{
-                    //    DrawingCurveSegment seg;
-                    //    if ((seg = cur.Segments[1]).GeometryType == Curve2dTypeEnum.kCircularArcCurve2d)
-                    //    {
-                    //        double ang = Math.Abs(((Arc2d)(cur.Segments[1].Geometry)).SweepAngle);
-                    //        int v = (int)(ang * 1000);
-                    //        if (v == 3141 && !hasCenter(cur, sheet))
-                    //        {
-                    //            intent = sheet.CreateGeometryIntent(cur);
-                    //            sheet.Centermarks.Add(intent);
-                    //        }
-                    //    }
-                    //}
+                    if (center) return;
+                    removeFunc(centers, sheet);
+                    centers.Clear();
+                    removeFunc(centers, sheet, false);
                 }
-                if (center) return;
-                removeFunc(centers, sheet);
-                centers.Clear();
-                removeFunc(centers, sheet, false);
-            }
 
             }
             catch (Exception ex)
@@ -2045,7 +2581,7 @@ namespace InvAddIn
         {
             GeometryIntent intent1 = dc1.Parent.Parent.CreateGeometryIntent(dc1);
             GeometryIntent intent2 = dc1.Parent.Parent.CreateGeometryIntent(dc2);
-            Point2d mpt = midPoint(pt1, pt2, offset/10);
+            Point2d mpt = midPoint(pt1, pt2, offset / 10);
             dc1.Parent.Parent.DrawingDimensions.GeneralDimensions.AddLinear(mpt, intent1, intent2);
         }
 
@@ -2107,28 +2643,28 @@ namespace InvAddIn
                     }
                 }
                 if (dc1 == null)
-                foreach (DrawingCurve curv in ie)
-                {
-                    if (curv.Equals(dc)) continue;
-                    if (isEqualPoint(curv.Segments[1].StartPoint, dc.Segments[1].StartPoint) || isEqualPoint(curv.Segments[1].EndPoint, dc.Segments[1].StartPoint)) { dc1 = curv; break; }
-                }
+                    foreach (DrawingCurve curv in ie)
+                    {
+                        if (curv.Equals(dc)) continue;
+                        if (isEqualPoint(curv.Segments[1].StartPoint, dc.Segments[1].StartPoint) || isEqualPoint(curv.Segments[1].EndPoint, dc.Segments[1].StartPoint)) { dc1 = curv; break; }
+                    }
                 if (dc2 == null)
-                foreach (DrawingCurve curv in ie)
-                {
-                    if (curv.Equals(dc)) continue;
-                    if (isEqualPoint(curv.Segments[1].StartPoint, dc.Segments[1].EndPoint) || isEqualPoint(curv.Segments[1].EndPoint, dc.Segments[1].EndPoint)) { dc2 = curv; break; }
-                }
+                    foreach (DrawingCurve curv in ie)
+                    {
+                        if (curv.Equals(dc)) continue;
+                        if (isEqualPoint(curv.Segments[1].StartPoint, dc.Segments[1].EndPoint) || isEqualPoint(curv.Segments[1].EndPoint, dc.Segments[1].EndPoint)) { dc2 = curv; break; }
+                    }
             }
         }
 
         static public void gab(DrawingView dv)
         {
             TransientGeometry tg = I.tg;
-            Line2d left, top, right, bottom; 
-            DrawingCurve [] curves = new DrawingCurve[4];
-            Line2d [] seg = new Line2d[4];
+            Line2d left, top, right, bottom;
+            DrawingCurve[] curves = new DrawingCurve[4];
+            Line2d[] seg = new Line2d[4];
             Point2d[] pts = new Point2d[4];
-            left = tg.CreateLine2d(tg.CreatePoint2d(dv.Position.X - dv.Width/2, dv.Position.Y - dv.Height/2),
+            left = tg.CreateLine2d(tg.CreatePoint2d(dv.Position.X - dv.Width / 2, dv.Position.Y - dv.Height / 2),
                 tg.CreateUnitVector2d(0, 1));
             seg[0] = left;
             top = tg.CreateLine2d(tg.CreatePoint2d(dv.Position.X - dv.Width / 2, dv.Position.Y + dv.Height / 2),
@@ -2176,7 +2712,7 @@ namespace InvAddIn
             //    pt1 = pts[1];
             //}
             Vector2d vec = pt1.VectorTo(bottom.RootPoint); vec.Y = 0;
-            LinearGeneralDimension dim = addDim(curves[0],curves[2], -15, 0, pt2, pt1, DimensionTypeEnum.kVerticalDimensionType, vec);
+            LinearGeneralDimension dim = addDim(curves[0], curves[2], -15, 0, pt2, pt1, DimensionTypeEnum.kVerticalDimensionType, vec);
             DimensionStyle st = null;
             try
             {
@@ -2189,7 +2725,7 @@ namespace InvAddIn
             if (st != null) dim.Style = st;
             else { dim.Precision = 0; dim.Text.FormattedText = dim.Text.FormattedText + "*"; }
 
-            pt1 =  minPt(curves[1],true); pt2 = minPt(curves[3], true);
+            pt1 = minPt(curves[1], true); pt2 = minPt(curves[3], true);
             //if (curves[1].ProjectedCurveType == Curve2dTypeEnum.kCircularArcCurve2d && pts[2] != null)
             //{
             //    pt1 = pts[2];
@@ -2257,6 +2793,15 @@ namespace InvAddIn
             return Macros.StandardAddInServer.m_inventorApplication.TransientGeometry.CreatePoint2d(pts[0], pts[1]);
         }
 
+        static public Point2d getPointAtParam(LineSegment seg, double p)
+        {
+            double[] param = new double[1];
+            param[0] = p;
+            double[] pts = new double[2];
+            seg.Evaluator.GetPointAtParam(ref param, ref pts);
+            return Macros.StandardAddInServer.m_inventorApplication.TransientGeometry.CreatePoint2d(pts[0], pts[1]);
+        }
+
         static public Point2d getPointAtParam(DrawingCurve seg, double p)
         {
             double[] param = new double[1];
@@ -2274,7 +2819,7 @@ namespace InvAddIn
         //    DrawingCurve dc1 = sheet.DrawingViews[1].DrawingCurves.OfType<DrawingCurve>().FirstOrDefault
         //    foreach (DrawingCurve cur in sheet.DrawingViews[1].DrawingCurves)
         //    {
-                
+
         //    }
         //}
 
@@ -2304,7 +2849,7 @@ namespace InvAddIn
             Vector2d v1 = pt2.VectorTo(pt1);
             v1.ScaleBy(0.5);
             pt1.TranslateBy(v1);
-            if (o2 != 0) 
+            if (o2 != 0)
             {
                 v1.Normalize(); v1.ScaleBy(o2);
                 pt1.TranslateBy(v1);
@@ -2337,7 +2882,7 @@ namespace InvAddIn
             SurfaceTextureSymbol st = dim.Parent.SurfaceTextureSymbols.Add(col, SurfaceTextureTypeEnum.kMaterialRemovalProhibitedSurfaceType);
         }
 
-        static public void addSurfaceTextureSymbol(DrawingView dv ,DrawingCurve dc, double param, Vector2d dir)
+        static public void addSurfaceTextureSymbol(DrawingView dv, DrawingCurve dc, double param, Vector2d dir)
         {
             ObjectCollection col = Macros.StandardAddInServer.m_inventorApplication.TransientObjects.CreateObjectCollection();
             Point2d mp = getPointAtParam(dc, param);
@@ -2355,21 +2900,23 @@ namespace InvAddIn
 
         static public void addSSymbol(Sheet sh, string name, Point2d pt, string[] prompt = null)
         {
-           SketchedSymbolDefinition ssd = ((DrawingDocument)sh.Parent).SketchedSymbolDefinitions[name];
-           sh.SketchedSymbols.Add(ssd, pt, 0, 1, prompt);
+            SketchedSymbolDefinition ssd = ((DrawingDocument)sh.Parent).SketchedSymbolDefinitions[name];
+            sh.SketchedSymbols.Add(ssd, pt, 0, 1, prompt);
         }
 
-        static public void addIzv(DrawingDocument drw, string name, string date)
+        static public void addIzv(DrawingDocument drw, string name, string date, string author, string templ)
         {
             SketchedSymbolDefinition ssd = null;
-            ssd = drw.SketchedSymbolDefinitions.OfType<SketchedSymbolDefinition>().FirstOrDefault(e => e.Name == "Изв");
-            if (ssd == null) InvDoc.u.copySS("Изв", drw);
+            string izvName = "Изв";
+            if (author != null) izvName = "Изв_" + author;
+            ssd = drw.SketchedSymbolDefinitions.OfType<SketchedSymbolDefinition>().FirstOrDefault(e => e.Name == izvName);
+            if (ssd == null) InvDoc.u.copySS(izvName, drw, templ);
             Sheet sh = drw.Sheets[1];
             string num = "1";
             bool add = true;
             Point2d pt = sh.TitleBlock.Position;
-            pt.Y = pt.Y+3.5;
-            SketchedSymbol ss = getIzv(sh, name, date, ref num, ref add);
+            pt.Y = pt.Y + 3.5;
+            SketchedSymbol ss = getIzv(sh, name, date, izvName, ref num, ref add);
             if (ss != null)
             {
                 pt = ss.Position; pt.Y = pt.Y + 0.5;
@@ -2377,13 +2924,14 @@ namespace InvAddIn
             }
             if (add)
             {
-                addSSymbol(sh, "Изв", pt, new string[] { num, name, date });
+                drw.Sheets[1].Activate();
+                addSSymbol(sh, izvName, pt, new string[] { num, name, date });
             }
         }
 
-        static public SketchedSymbol getIzv(Sheet sh, string name, string date, ref string num, ref bool add)
+        static public SketchedSymbol getIzv(Sheet sh, string name, string date, string nIzv, ref string num, ref bool add)
         {
-            SketchedSymbol ss = sh.SketchedSymbols.OfType<SketchedSymbol>().LastOrDefault(s => s.Name == "Изв");
+            SketchedSymbol ss = sh.SketchedSymbols.OfType<SketchedSymbol>().LastOrDefault(s => s.Name.ToLower().StartsWith("изв"));
             if (ss != null)
             {
                 SketchedSymbolDefinition ssd = ss.Definition;
@@ -2411,6 +2959,7 @@ namespace InvAddIn
                 {
                     foreach (Centerline cl in item.Centerlines)
                     {
+                        if (cl.StartPoint == null || cl.EndPoint == null) continue;
                         if (x && (int)(cl.EndPoint.X * 1000) == (int)(cl.StartPoint.X * 1000))
                         {
                             flagX = true;
@@ -2440,7 +2989,7 @@ namespace InvAddIn
                 col.Add(cen);
                 IEnumerable<Centermark> ie = null;
                 if (x)
-                ie = centers.Where(c => (int)(c.Position.X * 1000) == (int)(cen.Position.X * 1000));
+                    ie = centers.Where(c => (int)(c.Position.X * 1000) == (int)(cen.Position.X * 1000));
                 else ie = centers.Where(c => (int)(c.Position.Y * 1000) == (int)(cen.Position.Y * 1000));
                 foreach (var item in ie)
                 {
@@ -2502,18 +3051,33 @@ namespace InvAddIn
             return c;
         }
 
+        public bool checkAngle(DrawingCurve cur, double r)
+        {
+            if (cur.CurveType == CurveTypeEnum.kCircularArcCurve)
+            {
+                var arc = cur.Segments[1].Geometry as Arc2d;
+                var view = cur.Parent;
+                var sc = view.Scale;
+                r *= sc;
+                if (u.eq(arc.Radius, r)) 
+                    return false;
+                if (u.eq(Math.Abs(arc.SweepAngle), Math.PI)) return true;
+            }
+            return false;
+        }
+
         public bool hasCenter(DrawingCurve cur, Sheet sheet)
         {
             foreach (Centermark cen in sheet.Centermarks)
             {
                 try
                 {
-                if (cen.AttachedEntity != null && cen.AttachedEntity is GeometryIntent && ((GeometryIntent)(cen.AttachedEntity)).Geometry.Equals(cur)) return true;
-                //else if (cur.CurveType == CurveTypeEnum.kCircleCurve && cur.CenterPoint.IsEqualTo(cen.Position)) return true;
-                else if (cen.AttachedEntity != null && cen.AttachedEntity is FlatPunchResult)
-                {
-                    cen.Delete();
-                }
+                    if (cen.AttachedEntity != null && cen.AttachedEntity is GeometryIntent && ((GeometryIntent)(cen.AttachedEntity)).Geometry.Equals(cur)) return true;
+                    //else if (cur.CurveType == CurveTypeEnum.kCircleCurve && cur.CenterPoint.IsEqualTo(cen.Position)) return true;
+                    else if (cen.AttachedEntity != null && cen.AttachedEntity is FlatPunchResult)
+                    {
+                        cen.Delete();
+                    }
                 }
                 catch
                 {
@@ -2544,8 +3108,10 @@ namespace InvAddIn
         public Point2d pt;
         public Inventor.TextBox tb;
         public BOMView bv;
+        public static List<BOMView> bvs;
         public BOMRowsEnumerator rowsEnum;
-        string pathXML;
+        public int countSpecSheet = 0;
+        //string pathXML;
         public ComponentDefinition oCompDef;
         public TableInv() { }
         public TableInv(AssemblyDocument asmDoc, String pathXML) : base(pathXML)
@@ -2553,7 +3119,7 @@ namespace InvAddIn
             tg = Macros.StandardAddInServer.m_inventorApplication.TransientGeometry;
             this.asmDoc = asmDoc;
             namePerfBase = asmDoc.PropertySets[3][2].Value.ToString();
-            countPerf = loadFromAsm(asmDoc);
+            countPerf = loadFromAsm(asmDoc, base.blocks);
             if (countPerf != 0)
             {
                 int count = countPerf; int start = 0;
@@ -2578,10 +3144,11 @@ namespace InvAddIn
         public TableInv(DrawingDocument drw, string pathXML) : base(pathXML)
         {
             doc = drw;
-            asmDoc = (AssemblyDocument)InvDoc.u.referendedDoc(doc as Document);//[doc.ReferencedDocuments.Count];
+            asmDoc = (AssemblyDocument)InvDoc.u.referendedDoc(doc);//[doc.ReferencedDocuments.Count];
             tg = ((Inventor.Application)doc.Parent).TransientGeometry;
             namePerfBase = asmDoc.PropertySets[3][2].Value.ToString();
-            countPerf = loadFromAsm(asmDoc);
+            if (asmDoc == null) return;
+            countPerf = loadFromAsm(asmDoc, base.blocks);
             if (countPerf != 0)
             {
                 int count = countPerf; int start = 0;
@@ -2603,7 +3170,7 @@ namespace InvAddIn
                 countPerf = count;
             }
         }
-        public void renumberBom(List<TableRow> rows, BOMView bv)
+        public void renumberBom(List<TableRow> rows, List<BOMView> bvs)
         {
             int i = 1; int val = 0;
             Dictionary<int, int> ins = new Dictionary<int, int>();
@@ -2622,62 +3189,38 @@ namespace InvAddIn
 
             foreach (var row in rows)
             {
-                foreach (Inventor.BOMRow BOMrow in bv.BOMRows)
+                foreach (var bv in bvs)
                 {
-                    dic.Clear();
-                    dic = propDoc(BOMrow);
-                    if (dic["PartNumber"] == row.cells[3].value && dic["desc"] == row.cells[4].value)
+                    foreach (Inventor.BOMRow BOMrow in bv.BOMRows)
                     {
-                        if (row.cells[2].value == "") continue;
-                        val = int.Parse(row.cells[2].value);
-                        BOMrow.ItemNumber = ins[val].ToString();
-                        break;
+                        dic.Clear();
+                        dic = propDoc(BOMrow);
+                        if (dic["PartNumber"] == row.cells[3].value && dic["desc"] == row.cells[4].value)
+                        {
+                            if (row.cells[2].value == "") continue;
+                            val = int.Parse(row.cells[2].value);
+                            BOMrow.ItemNumber = ins[val].ToString();
+                            break;
+                        }
                     }
                 }
             }
+            bvs.Clear();
         }
         public Dictionary<string, string> propDoc(BOMRow row)
         {
-            string partNumber, desc, note, length = "", width = "", thickness = "", dxf = "";
+            string partNumber, desc, note, length = "", width = "", thickness = "", dxf = "", format = "";
             if (row.ComponentDefinitions[1].Type != ObjectTypeEnum.kVirtualComponentDefinitionObject)
             {
                 Inventor.Document oDoc = (Inventor.Document)row.ComponentDefinitions[1].Document;
                 partNumber = oDoc.PropertySets[3][2].Value.ToString();
                 desc = oDoc.PropertySets[3][14].Value.ToString();
                 note = oDoc.PropertySets[1][5].Value.ToString();
-                if (oDoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
+                if (addFormat)
                 {
-                    SheetMetalComponentDefinition compDef = (SheetMetalComponentDefinition)((PartDocument)oDoc).ComponentDefinition;
-                    dxf = oDoc.PropertySets[1][7].Value.ToString();
-                    thickness = ((double)compDef.Thickness.Value * 10).ToString();
-                    if (compDef.HasFlatPattern)
-                    {
-                        FlatPattern fp = compDef.FlatPattern;
-                        length = ((double)fp.Length*10).ToString("#.#");
-                        width = ((double)fp.Width*10).ToString("#.#");
-                    }
-                }
-            }
-            else
-            {
-                VirtualComponentDefinition oVirtCompDef = (VirtualComponentDefinition)row.ComponentDefinitions[1];
-                partNumber = oVirtCompDef.PropertySets[3][2].Value.ToString();
-                desc = oVirtCompDef.PropertySets[3][14].Value.ToString();
-                note = oVirtCompDef.PropertySets[1][5].Value.ToString();
-            }
-            partNumber = partNumber.Trim();
-            Dictionary<string, string> dic = new Dictionary<string, string>();
-            dic.Add("PartNumber", partNumber); dic.Add("desc", desc); dic.Add("note", note);
-            dic.Add("dxf", dxf); dic.Add("thickness", thickness); dic.Add("FPLength", length); dic.Add("FPWidth", width);
-            return dic;
-        }
+                    format = u.getPropValue(oDoc, "format");
 
-        public static Dictionary<string, string> propDoc(Document oDoc)
-        {
-            string partNumber, desc, note, length = "", width = "", thickness = "", dxf = "";
-                partNumber = oDoc.PropertySets[3][2].Value.ToString();
-                desc = oDoc.PropertySets[3][14].Value.ToString();
-                note = oDoc.PropertySets[1][5].Value.ToString();
+                }
                 if (oDoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
                 {
                     SheetMetalComponentDefinition compDef = (SheetMetalComponentDefinition)((PartDocument)oDoc).ComponentDefinition;
@@ -2690,6 +3233,41 @@ namespace InvAddIn
                         width = ((double)fp.Width * 10).ToString("#.#");
                     }
                 }
+            }
+            else
+            {
+                VirtualComponentDefinition oVirtCompDef = (VirtualComponentDefinition)row.ComponentDefinitions[1];
+                partNumber = oVirtCompDef.PropertySets[3][2].Value.ToString();
+                desc = oVirtCompDef.PropertySets[3][14].Value.ToString();
+                note = oVirtCompDef.PropertySets[1][5].Value.ToString();
+            }
+
+            partNumber = partNumber.Trim();
+            Dictionary<string, string> dic = new Dictionary<string, string>();
+            dic.Add("PartNumber", partNumber); dic.Add("desc", desc); dic.Add("note", note);
+            dic.Add("dxf", dxf); dic.Add("thickness", thickness); dic.Add("FPLength", length); dic.Add("FPWidth", width);
+            if (addFormat) dic.Add("format", format);
+            return dic;
+        }
+
+        public static Dictionary<string, string> propDoc(Document oDoc)
+        {
+            string partNumber, desc, note, length = "", width = "", thickness = "", dxf = "";
+            partNumber = oDoc.PropertySets[3][2].Value.ToString();
+            desc = oDoc.PropertySets[3][14].Value.ToString();
+            note = oDoc.PropertySets[1][5].Value.ToString();
+            if (oDoc.SubType == "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}")
+            {
+                SheetMetalComponentDefinition compDef = (SheetMetalComponentDefinition)((PartDocument)oDoc).ComponentDefinition;
+                dxf = oDoc.PropertySets[1][7].Value.ToString();
+                thickness = ((double)compDef.Thickness.Value * 10).ToString();
+                if (compDef.HasFlatPattern)
+                {
+                    FlatPattern fp = compDef.FlatPattern;
+                    length = ((double)fp.Length * 10).ToString("#.#");
+                    width = ((double)fp.Width * 10).ToString("#.#");
+                }
+            }
             partNumber = partNumber.Trim();
             Dictionary<string, string> dic = new Dictionary<string, string>();
             dic.Add("PartNumber", partNumber); dic.Add("desc", desc); dic.Add("note", note);
@@ -2703,16 +3281,18 @@ namespace InvAddIn
             string ss = namePerfBase;
             int ind = ss.IndexOf('.');
             string ss1 = ss.Substring(ind, ss.Length - ind);
-            string type = namePerfBase.Substring(0, ss1.IndexOf("0")+ind);
+            string type = namePerfBase.Substring(0, ss1.IndexOf("0") + ind);
             XElement el = new XElement("Root");
             el = addRows(bv.BOMRows, el, namePerfBase, type);
             //el.Save("C:\\Temp.xml");
-            addRows(el, ss, type, null, this);
+            string rId = I.dPr().ReleaseId;
+            if (rId != null && rId != "") addRows(el, ss, type, null, this, rId);
+            else addRows(el, ss, type, null, this, "");
         }
 
-        public XElement addRows(BOMRowsEnumerator rowsEnum, XElement el ,string namePerfBase, string type)
+        public XElement addRows(BOMRowsEnumerator rowsEnum, XElement el, string namePerfBase, string type)
         {
-            string partNumber, desc, note, dxf, thickness, FPLength, FPWidth;
+            string partNumber, desc, note, dxf, thickness, FPLength, FPWidth, format = "";
             List<string[]> rs = new List<string[]>();
             foreach (BOMRow row in rowsEnum)
             {
@@ -2722,26 +3302,27 @@ namespace InvAddIn
                 if (row.BOMStructure == BOMStructureEnum.kPhantomBOMStructure) continue;
                 partNumber = dic["PartNumber"]; desc = dic["desc"]; note = dic["note"]; dxf = dic["dxf"]; thickness = dic["thickness"];
                 FPLength = dic["FPLength"]; FPWidth = dic["FPWidth"];
-
+                if (addFormat) format = dic["format"];
                 //if (el.Element("VarData") != null && row.ItemNumber.EndsWith()) continue;
                 string number = row.ItemNumber;
                 if (number.IndexOf(".") != -1) number = number.Substring(number.LastIndexOf('.') + 1, number.Length - number.LastIndexOf('.') - 1);
                 XElement data = new XElement("data", new XAttribute("Position", number),
                     new XAttribute("PartNumber", partNumber), new XAttribute("Description", desc), new XAttribute("Count", row.ItemQuantity.ToString()),
-                    new XAttribute("Note", note), new XAttribute("Dxf", dxf), new XAttribute("Thickness", thickness), new XAttribute("FPLength", FPLength), new XAttribute("FPWidth", FPWidth));
+                    new XAttribute("Note", note), new XAttribute("Dxf", dxf), new XAttribute("Thickness", thickness),
+                    new XAttribute("FPLength", FPLength), new XAttribute("FPWidth", FPWidth), new XAttribute("format", format));
                 //TableRow tr = perfRows.FirstOrDefault(r => r.cells[3].value == data.Attribute("PartNumber").Value && r.cells[4].value == data.Attribute("Description").Value);
 
 
                 bool add = true;
-//                 if (partNumber.IndexOf('.') != -1)
-//                 {
-//                     XElement tmpEl = XMLDoc.find(el, new Dictionary<string, string>() { { "PartNumber", partNumber }, { "Description", desc } });
-//                     if (tmpEl != null)
-//                     {
-//                         add = false;
-//                         XMLDoc.changeVal(tmpEl, new Dictionary<string, string>() { { "Count", (row.ItemQuantity + int.Parse(tmpEl.Attribute("Count").Value)).ToString() } });
-//                     }
-//                 }
+                //                 if (partNumber.IndexOf('.') != -1)
+                //                 {
+                //                     XElement tmpEl = XMLDoc.find(el, new Dictionary<string, string>() { { "PartNumber", partNumber }, { "Description", desc } });
+                //                     if (tmpEl != null)
+                //                     {
+                //                         add = false;
+                //                         XMLDoc.changeVal(tmpEl, new Dictionary<string, string>() { { "Count", (row.ItemQuantity + int.Parse(tmpEl.Attribute("Count").Value)).ToString() } });
+                //                     }
+                //                 }
                 if (add) el.Add(data);
                 if (row.ChildRows != null)
                 {
@@ -2754,7 +3335,104 @@ namespace InvAddIn
             return el;
         }
 
-        public void addToSheet(string name, int [] str)
+        public void setCountList()
+        {
+            string fn = "ГОСТ - Форма 2";
+            List<Sheet> specs = new List<Sheet>();
+            int count = 0;
+            TitleBlock titleFrom = null, titleTo = null;
+            titleFrom = doc.Sheets[1].TitleBlock;
+            Dictionary<TitleBlock, TitleBlock> tbs = new Dictionary<TitleBlock, TitleBlock>();
+            foreach (Sheet item in doc.Sheets)
+            {
+                if (item.Name.ToLower().StartsWith("spec"))
+                {
+                    specs.Add(item);
+                    if (specs.Count > countSpecSheet)
+                    {
+                        item.Delete();
+                        specs.Remove(item);
+                        continue;
+                    }
+
+                    if (item.TitleBlock != null)
+                    {
+                        tbs[item.TitleBlock] = titleFrom;
+                    }
+                }
+                else count++;
+            }
+            foreach (var item in tbs)
+            {
+                fillSheet(item.Key, item.Value, specs);
+            }
+            u.addProp((Document)doc, "Lists", count);
+            if (count > 1) u.addProp((Document)doc, "List", 1);
+            else u.addProp((Document)doc, "List", "");
+        }
+
+        public void fillSheet(TitleBlock titleTo, TitleBlock titleFrom, List<Sheet> specs)
+        {
+            var fFrom = titleFrom.Definition;
+            var dsTo = titleTo.Definition.Sketch;
+            var dsFrom = fFrom.Sketch;
+            MyXML xml = new MyXML(titleTo.Definition.Name + ".xml", "root");
+            foreach (var item in xml.elem.Elements())
+            {
+                if (item.Attribute("val") != null)
+                {
+                    string val = item.Attribute("val").Value.Trim();
+
+                    //double x = 0, y = 0;
+                    //MyXML.getDouble(item, "posX", ref x, 1);
+                    //MyXML.getDouble(item, "posY", ref y, 1);
+                    var name = item.Attribute("name").Value.Trim('<', '>', ' ');
+                    var tbTo = u.get<Inventor.TextBox>(dsTo.TextBoxes, e => e.FormattedText != null && e.FormattedText.Contains(name) &&
+                    e.FormattedText.Contains("Prompt"));
+                    if (tbTo == null) continue;
+                    if (val == "spec")
+                    {
+                        if (name == "Листов")
+                            titleTo.SetPromptResultText(tbTo, specs.Count.ToString());
+                        if (name == "Лист")
+                            if (specs.Count == 1) titleTo.SetPromptResultText(tbTo, "");
+                            else titleTo.SetPromptResultText(tbTo, "1");
+                    }
+                    if (val == "next")
+                    {
+                        if (name == "Лист")
+                        {
+                            var sh = titleTo.Parent.Name;
+                            var spl = sh.Split(':');
+                            spl = spl[0].Split('_');
+                            int num = int.Parse(spl[1]);
+                            titleTo.SetPromptResultText(tbTo, (num + 1).ToString());
+                        }
+                    }
+                    if (val == "first")
+                    {
+                        string find = name;
+                        var tbFrom = u.get<Inventor.TextBox>(dsFrom.TextBoxes, e => e.FormattedText != null && e.FormattedText.Contains(find));
+                        if (tbFrom == null) continue;
+                        var txt = titleFrom.GetResultText(tbFrom);
+                        var tr = item.Attribute("trim");
+                        if (tr != null)
+                        {
+                            var v = tr.Value;
+                            List<char> chs = new List<char>();
+                            foreach (var ch in v)
+                            {
+                                chs.Add(ch);
+                            }
+                            txt = txt.TrimEnd(chs.ToArray());
+                        }
+                        titleTo.SetPromptResultText(tbTo, txt);
+                    }
+                }
+            }
+        }
+
+        public void addToSheet(string name, int[] str, bool add = true)
         {
             Inventor.Application app = (Inventor.Application)(doc.Parent);
             app.ScreenUpdating = false;
@@ -2763,23 +3441,32 @@ namespace InvAddIn
                 Sheet sheet = doc.ActiveSheet;
 
                 pt = tg.CreatePoint2d();
-                pt.X = sheet.Width - 0.5; pt.Y = sheet.Height -0.5;
-                renumberBom(rows, bv);
+                pt.X = sheet.Width - 0.5; pt.Y = sheet.Height - 0.5;
+                if (bvs != null)
+                    renumberBom(rows, bvs);
+                else
+                {
+                    renumberBom(rows, new List<BOMView>() { bv });
+                }
                 Dictionary<int, string> drawGroup = new Dictionary<int, string>();
                 foreach (var item in group)
                 {
                     drawGroup.Add(item.Key, item.Value);
                 }
-//                 if (groupVar != null)
-//                 {
-//                     foreach (var item in groupVar)
-//                     {
-//                         drawGroup.Add(item.Key, item.Value);
-//                     }
-//                 }
+                //                 if (groupVar != null)
+                //                 {
+                //                     foreach (var item in groupVar)
+                //                     {
+                //                         drawGroup.Add(item.Key, item.Value);
+                //                     }
+                //                 }
                 if (cols.Count == 0) colIni();
                 formatRows.Clear();
-                addHeader();
+                if (add)
+                {
+                    addHeader();
+                }
+                //else addHeaderOrder();
                 forShow(0, 5000, group, true);
                 foreach (var item in formatRows)
                 {
@@ -2788,7 +3475,7 @@ namespace InvAddIn
                     {
                         foreach (var c in item.cells)
                         {
-                            c.paddingBottom = item.height*5;
+                            c.paddingBottom = item.height * 5;
                         }
                         item.height *= 15;
                     }
@@ -2796,49 +3483,83 @@ namespace InvAddIn
                 //double h = formatRows.Sum(e => e.height);
                 // double y = maxY(sheet);
                 int sum = 0;
-                    if (str[0] > formatRows.Count)
-                    {
-                        //pt.X = sheet.Width - 0.5; pt.Y = sheet.Height - 0.5;
-                        drawTable(name, formatRows, 0, formatRows.Count, tg.CreatePoint2d(0,0),ref pt,lastLineW: true);
+                if (str[0] > formatRows.Count)
+                {
+                    //pt.X = sheet.Width - 0.5; pt.Y = sheet.Height - 0.5;
+                    bool lw = true;
+                    if (add == false) lw = false;
+                    drawTable(name, formatRows, 0, formatRows.Count, tg.CreatePoint2d(0, 0), ref pt, lastLineW: lw);
+                    if (add == true)
                         addToSheet(sheet, name, ref pt);
-                    }
-                    else
+                    else addSheet(name, 1);
+                }
+                else
+                {
+                    int i = 0;
+                    int val = 0;
+                    while (sum <= formatRows.Count)
+                    //for (int i = 0; i < str.Length; i++)
                     {
-                        int i = 0;
-                        int val = 0;
-                        while (sum <= formatRows.Count)
-                        //for (int i = 0; i < str.Length; i++)
+                        try
                         {
-                            try
-                            {
-                                val = str[i];
-                            }
-                            catch 
-                            {
-                            }
-                            int start = sum;
-                            int end = val + sum + 1;
-                            if (end >= formatRows.Count) end = formatRows.Count;
-                            else
-                            while (formatRows[end - 2].cells[4].underline == true) { end--; }
+                            val = str[i];
+                        }
+                        catch
+                        {
+                        }
+                        int start = sum;
+                        int end;
+                        int offset = 1;
+                        if (blankRow) offset = 2;
+                        if (blankRow)
+                            end = val + sum + 1;
+                        else
+                            end = val + sum;
+                        if (end >= formatRows.Count) end = formatRows.Count;
+                        else
+                            while (formatRows[end - offset].cells[4].underline == true) { end--; }
+                        if (add)
+                        {
                             if (i == 0) addOrder(start + 1);
                             else addOrder(start);
-                            if (end == formatRows.Count-1) end = formatRows.Count;
-                            sum = end;
-                        if (i == 0)
-                        {
-                            //pt.X = sheet.Width - 0.5-0.8; pt.Y = sheet.Height - 0.5;
-                            drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0,0),ref pt, 3);
-                            addToSheet(sheet, name + '_' + i, ref pt);
                         }
                         else
                         {
+                            //if (i == 0) addHeaderOrder(start + 1);
+                            //else addHeaderOrder(start);
+                        }
+                        if (end == formatRows.Count - 1) end = formatRows.Count;
+                        sum = end;
+                        if (i == 0)
+                        {
+                            //pt.X = sheet.Width - 0.5-0.8; pt.Y = sheet.Height - 0.5;
+                            if (start < end)
+                            {
+                                drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0, 0), ref pt, 3);
+                                if (add)
+                                    addToSheet(sheet, name + '_' + i, ref pt);
+                                else addSheet(name + '_' + i, i + 1);
+                            }
+                        }
+                        else
+                        {
+                            if (blankRow && formatRows[start].cells[4].value != "" && formatRows[start].cells[4].underline == true)
+                            {
+                                start--;
+                            }
                             pt.X -= 18.5;
                             if (i != 1) pt.X -= 0.8;
-                            if (end == formatRows.Count) drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0,0), ref pt, offset: 8,lastLineW: true);
-                            else drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0,0), ref pt, offset: 8);
-                            addToSheet(sheet, name + '_' + i, ref pt);
-                            if (end == formatRows.Count) break;
+                            bool lw = true;
+                            if (add == false) lw = false;
+                            if (start < end)
+                            {
+                                if (end == formatRows.Count) drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0, 0), ref pt, offset: 8, lastLineW: lw);
+                                else drawTable(name + '_' + i, formatRows, start, end, tg.CreatePoint2d(0, 0), ref pt, offset: 8);
+                                if (add)
+                                    addToSheet(sheet, name + '_' + i, ref pt);
+                                else addSheet(name + '_' + i, i + 1);
+                            }
+                                if (end == formatRows.Count) break;
                         }
                         i++;
                         //int split = formatRows.Count - countRow(28.7 - h, y);
@@ -2851,7 +3572,7 @@ namespace InvAddIn
                     }
                 }
             }
-                catch (Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.ToString());
             }
@@ -2860,29 +3581,97 @@ namespace InvAddIn
                 app.ScreenUpdating = true;
             }
         }
-        public void addToSheet(Sheet sh,string name,ref Inventor.Point2d pos, bool del = false)
+        public void addSheet(string name, int num)
         {
-            try 
-	        {
-               var ss = sh.SketchedSymbols.OfType<SketchedSymbol>().Where(e => e.Name == name);
+            createSheet(num, name);
+            countSpecSheet++;
+        }
+        public void addToSheet(Sheet sh, string name, ref Inventor.Point2d pos, bool del = false)
+        {
+            try
+            {
+                var ss = sh.SketchedSymbols.OfType<SketchedSymbol>().Where(e => e.Name == name);
                 if (ss != null)
                     foreach (var item in ss)
                     {
                         pos = item.Position;
-                        item.Delete(); 
+                        item.Delete();
                     }
-	        }
-	        catch
-	        {
+            }
+            catch
+            {
 
-	        }
+            }
             if (!del) sh.SketchedSymbols.Add(doc.SketchedSymbolDefinitions[name], pos);
+        }
+
+        public void createSheet(int num, string spec, int w = 210, int h = 297)
+        {
+            num++;
+            string name = "шапка_спец_";
+            var drw = (DrawingDocument)I.aDoc();
+            var invDoc = new InvDoc.InvDocument<Document>((Document)drw);
+            invDoc.doc = (Document)drw;
+            Sheet sh;
+            if (drw.Sheets.Count < num)
+            {
+                sh = drw.Sheets.Add(DrawingSheetSizeEnum.kCustomDrawingSheetSize, Width: w / 10, Height: h / 10);
+                if (num == 2)
+                {
+                    sh = invDoc.sheet(sh, new List<string> { "ГОСТ - Доп. графы 1", "ГОСТ - Доп. графы 2" }, w, h,
+                        "ГОСТ - Форма 2");
+                    sh.Name = "Spec";
+                }
+                else
+                {
+                    string[] prompt = new string[] { (num - 1).ToString() };
+                    sh = invDoc.sheet(sh, new List<string> { "ГОСТ - Доп. графы 1", "ГОСТ - Доп. графы 2" }, w, h, "ГОСТ - Форма 2a спец", prompt: prompt);
+                    sh.Name = "Spec_" + (num - 2);
+                }
+            }
+            else sh = drw.Sheets[num];
+            if (num == 2) name += "1";
+            var pt = I.CP2d(sh.Width - 0.5, sh.Height - 0.5);
+            try
+            {
+                SketchedSymbol ss = null;
+                var sss = u.gets<SketchedSymbol>(sh.SketchedSymbols, el => el.Name.ToLower().StartsWith("spec"));
+                foreach (SketchedSymbol item in sss)
+                {
+                    item.Delete();
+                }
+                sss = sh.SketchedSymbols.OfType<SketchedSymbol>().Where(e => e.Name.ToLower() == name);
+                if (sss == null || sss.Count() == 0)
+                {
+                    SketchedSymbolDefinition ssd;
+                    try
+                    {
+                        ssd = drw.SketchedSymbolDefinitions[name];
+                    }
+                    catch (Exception)
+                    {
+                        u.copySS(name, doc, null);
+                        ssd = drw.SketchedSymbolDefinitions[name];
+                    }
+                    ss = sh.SketchedSymbols.Add(ssd, pt);
+                }
+                else ss = sss.ElementAt(0);
+                pt = ss.Position;
+                pt.Y -= offsetRow / 10;
+                if (num > 2) pt.X += 0.8;
+                ssd = drw.SketchedSymbolDefinitions[spec];
+                ss = sh.SketchedSymbols.Add(ssd, pt);
+            }
+            catch (Exception)
+            {
+            }
+
         }
 
         public double maxY(Sheet sh)
         {
             var ie = sh.Sketches.OfType<DrawingSketch>().First(e => e.Name == "Технические требования");
-            return (ie != null) ? ie.TextBoxes.OfType<Inventor.TextBox>().Max(e => e.RangeBox.MaxPoint.Y) + 1: 6.5;
+            return (ie != null) ? ie.TextBoxes.OfType<Inventor.TextBox>().Max(e => e.RangeBox.MaxPoint.Y) + 1 : 6.5;
         }
         public void saveInAsm(bool safeCustom = true)
         {
@@ -2894,7 +3683,7 @@ namespace InvAddIn
             if (safeCustom && cust.Count() > 0)
             {
                 int n = 0;
-                
+
                 string[] str = new string[cust.Count()];
                 string val; int k = 0; string name = "Custom";
                 foreach (var item in cust)
@@ -2911,11 +3700,11 @@ namespace InvAddIn
                 int n = 0;
 
                 for (int i = 0; i < countPerf; i++)
-			    {
+                {
 
-                    var ie = rows.Where(r => r.group > (i+1)*100 && r.group < (i+2)*100);
-                    string [] str = new string[ie.Count()];
-                    string val; int k = 0; string name = "Var" + String.Format("{0:00}",i);
+                    var ie = rows.Where(r => r.group > (i + 1) * 100 && r.group < (i + 2) * 100);
+                    string[] str = new string[ie.Count()];
+                    string val; int k = 0; string name = "Var" + String.Format("{0:00}", i);
                     foreach (var item in ie)
                     {
                         val = name + ';' + item.group + ';' + item.ToString();
@@ -2927,29 +3716,29 @@ namespace InvAddIn
             }
         }
 
-        public int loadFromAsm(AssemblyDocument asmDoc)
+        public int loadFromAsm(AssemblyDocument asmDoc, Dictionary<int, List<string>> standart)
         {
             VariableDataForSpec vd = new VariableDataForSpec((Document)asmDoc);
             List<string> vals = new List<string>();
             List<string> cust = new List<string>();
             List<TableRow> rs = new List<TableRow>(12);
-            vals = vd.AttribLoad("Var"); 
+            vals = vd.AttribLoad("Var");
             if (vals.Count == 0)
-            vals = getVar();
+                vals = getVar(standart);
             cust = vd.AttribLoad("Custom");
             if (vals.Count == 0 && cust.Count == 0) return 0;
             foreach (var item in cust)
             {
-                vals.Add(item); 
+                vals.Add(item);
             }
             TableRow tr, trBase = null; int count = 0;
             for (int i = 0; i < vals.Count; i++)
             {
                 string[] spl = vals[i].Split(';');
-                tr = addRow(spl.Skip(2).Take(11).ToArray(),rows);
+                tr = addRow(spl.Skip(2).Take(11).ToArray(), rows);
                 if (tr.cells[2].value == "") tr.number = 0;
                 else
-                tr.number = int.Parse(tr.cells[2].value);
+                    tr.number = int.Parse(tr.cells[2].value);
                 tr.group = int.Parse(spl[1]);
                 if (spl[0] == "Custom") tr.notNumber = true;
 
@@ -2985,58 +3774,87 @@ namespace InvAddIn
                     count = int.Parse(spl[0].Substring(3));
                 }
             }
-            return (count == 0)? count: count+1;
+            return (count == 0) ? count : count + 1;
         }
 
-        public static List<string> getVar()
+        public static List<string> getVar(Dictionary<int, List<string>> standart)
         {
             string name = InvDoc.u.referendedDoc(Macros.StandardAddInServer.m_inventorApplication.ActiveDocument).FullDocumentName;
+            var doc = I.aDoc();
+            if (doc.DocumentType == DocumentTypeEnum.kDrawingDocumentObject)
+            {
+                DrawingDocument drw = (DrawingDocument)doc;
+                var sh = drw.Sheets[1];
+                var dv = sh.DrawingViews[1];
+                name = dv.ReferencedDocumentDescriptor.FullDocumentName;
+            }
             //name = Regex.Replace(name, @"-\d\d", "");
             //name = Regex.Replace(name, @"\^\d\d", "");
             List<string> asms = TableInv.getAsms(name);
             if (asms.Count == 1) return new List<string>();
-            return TableInv.loadFromAsm(asms);
+            return TableInv.loadFromAsm(asms, standart);
         }
 
         public static List<string> getAsms(string name)
         {
             List<string> asms = new List<string>();
             asms.Add(name);
-            Regex regex = new Regex(@"(-\d{0,3}\w{0,3}\d{0,3}\w{0,2}\.\d*\.*\d*)(-*\d*).*(^*\d*)");
+            //Regex regex = new Regex(@"(-\d{0,3}\w{0,3}\d{0,3}\w{0,2}\.\d*\.*\d*)(-*\d*).*(^*\d*)");
+            Regex regex = new Regex(@"([^\.\\]*\.\d*\.*\d*)(-*\d*).*(^*\d*)");
             string v = "";
             Match m = regex.Match(name);
             if (m.Groups.Count > 1)
-            v = m.Groups[1].Value;
+                v = m.Groups[1].Value;
             string p = System.IO.Path.GetDirectoryName(name);
-            IEnumerable<string> files = System.IO.Directory.EnumerateFiles(p,"*.iam", System.IO.SearchOption.TopDirectoryOnly);
+            IEnumerable<string> files = System.IO.Directory.EnumerateFiles(p, "*.iam", System.IO.SearchOption.TopDirectoryOnly);
+            Dictionary<string, string> dic = new Dictionary<string, string>() { { "Е", "E" }, { "А", "A" } };
+            v = replChar(v, dic);
             foreach (var item in files)
             {
-                m = regex.Match(item);
-                if (m.Groups[1].Value == v && m.Groups[0].Value.IndexOf("^") != -1) 
+                string n = file.name(item);
+                m = regex.Match(n);
+                string f = m.Groups[1].Value;
+                if (f != null) f = replChar(f, dic);
+                if (f == v && m.Groups[0].Value.IndexOf("^") != -1)
                     asms.Add(item);
                 //if (item.IndexOf(System.IO.Path.GetFileNameWithoutExtension(name) + "^") != -1)
                 //if (regex.IsMatch(item)) 
                 //    asms.Add(item); 
             }
-            asms.Sort();
+            asms.Sort(new compareAsm());
             return asms;
         }
 
-        public static List<string> loadFromAsm(List<string> asmDocs)
+        public static string replChar(string str, Dictionary<string, string> ch)
+        {
+            string r = str;
+            foreach (var item in ch)
+            {
+                r = r.Replace(item.Key, item.Value);
+            }
+            return r;
+        }
+
+        public static List<string> loadFromAsm(List<string> asmDocs, Dictionary<int, List<string>> standart)
         {
             int count = asmDocs.Count;
             Documents docs = Macros.StandardAddInServer.m_inventorApplication.Documents;
             NameValueMap nvmOptions = I.objs.CreateNameValueMap();
             nvmOptions.Add("SkipAllUnresolvedFiles", true);
             List<List<string>> lst = new List<List<string>>();
+            //TableInv.bvs = new List<BOMView>();
             foreach (var item in asmDocs)
             {
                 AssemblyDocument asm = docs.OpenWithOptions(item, nvmOptions, false) as AssemblyDocument;
                 BOM bom = asm.ComponentDefinition.BOM;
-                BOMView bView = bom.BOMViews[1];
+                bom.StructuredViewEnabled = true;
+                bom.StructuredViewFirstLevelOnly = true;
+                BOMView bView = bom.BOMViews["Структурированный"];
+
+                //TableInv.bvs.Add(bView);
                 lst.Add(loadFromBOM(bView));
             }
-            List<string> fc = getVarFromAsm(lst);
+            List<string> fc = getVarFromAsm(lst, standart);
             return fc;
         }
 
@@ -3045,75 +3863,119 @@ namespace InvAddIn
             List<string> lst = new List<string>();
             foreach (BOMRow row in bView.BOMRows)
             {
-                String name = row.ReferencedFileDescriptor.FullFileName;  
+                String name = row.ReferencedFileDescriptor.FullFileName;
                 int count = row.ItemQuantity;
                 lst.Add(name + ";" + count.ToString() + ";" + row.BOMStructure);
             }
             return lst;
         }
 
-        public static List<string> getVarFromAsm(List<List<string>> lst)
+        public static HashSet<string> uniHS(List<List<string>> lst)
+        {
+            HashSet<string> u = new HashSet<string>();
+            foreach (var item in lst)
+            {
+                foreach (var e in item)
+                {
+                    u.Add(e);
+                }
+            }
+            return u;
+        }
+        public static List<string> distList(List<List<string>> lst, int num)
+        {
+            HashSet<string> u = new HashSet<string>();
+            for (int i = 0; i < lst.Count; i++)
+            {
+                if (i == num) continue;
+                List<string> tmp = lst[num].Except<string>(lst[i]).ToList();
+                foreach (var item in tmp)
+                {
+                    u.Add(item);
+                }
+            }
+            return u.ToList();
+        }
+
+        public static List<string> getVarFromAsm(List<List<string>> lst, Dictionary<int, List<string>> standart)
         {
             int k = 0;
-            List<string> first = lst[k];
-            //HashSet<string> hs = new HashSet<string>();
+            //HashSet<string> b = uniHS(lst);
+
+            List<string> first = distList(lst, k);
+            //distList(lst);
+            k++;
+
             List<string> retLst = new List<string>();
             List<List<string>> tmp = new List<List<string>>();
-            List<string> distFirst = first.Except<string>(lst[1]).ToList();
-            tmp.Add(distFirst);
+            //List<string> distFirst = first.Except<string>(lst[1]).ToList();
+            tmp.Add(first);
             //List<string> distFirst = uni.Except<string>(lst[0]).ToList();
-            int num = first.Count - distFirst.Count()+2;
-            //changeList(distFirst, num, 0);
-            //retLst.AddRange(distFirst);
-            for (int i = 1; i < lst.Count; i++)
+
+            int num = first.Count + 1;
+
+            for (int i = k; i < lst.Count; i++)
             {
-                //num++;
-                List<string> dist = lst[i].Except<string>(first).ToList();
-                tmp.Add(dist);
-                if (dist.Count > distFirst.Count) { k = i; first = lst[k]; i++; }
-                //changeList(dist, num, i);
-                //retLst.AddRange(dist);
+                tmp.Add(distList(lst, i));
             }
-            if (k != 0)
-            {
-                tmp.Clear();
-                for (int i = 0; i < lst.Count; i++)
-                {   
-                    List<string> dist = lst[i].Except<string>(first).ToList();
-                    if (i == k)
-                    {
-                        dist = first.Except<string>(lst[0]).ToList();
-                    }
-                    tmp.Add(dist);
-                }
-            }
-            
-            IEnumerable<string> uni = new List<string>();
-             for (int j = 0; j < tmp.Count; j++)
-             {
-                 uni = uni.Union<string>(tmp[j]);
-             }
-            string s = ""; 
-            for (int j = 0; j < tmp.Count; j++)
-            {
-                //retLst.AddRange(tmp[j]);
-                foreach (var item in uni)
-                {
-                    s = lst[j].Find(el => el.StartsWith(item.Substring(0, item.IndexOf(";"))));
-                    if (s != null && !tmp[j].Exists(e => e == s)) tmp[j].Add(s);
-                }
-            }
+            //             int num = first.Count - distFirst.Count()+2;
+            //             if (distFirst.Count() == 0) num = first.Count + 1;
+
+            // 
+            //             //changeList(distFirst, num, 0);
+            //             //retLst.AddRange(distFirst);
+            //             for (int i = 1; i < lst.Count; i++)
+            //             {
+            //                 //num++;
+            //                 List<string> dist = lst[i].Except<string>(first).ToList();
+            //                 tmp.Add(dist);
+            //                 if (dist.Count > distFirst.Count) { k = i; first = lst[k]; i++; }
+            //                 //changeList(dist, num, i);
+            //                 //retLst.AddRange(dist);
+            //             }
+            //             if (k != 0)
+            //             {
+            //                 tmp.Clear();
+            //                 for (int i = 0; i < lst.Count; i++)
+            //                 {   
+            //                     List<string> dist = lst[i].Except<string>(first).ToList();
+            //                     if (i == k)
+            //                     {
+            //                         dist = first.Except<string>(lst[0]).ToList();
+            //                     }
+            //                     tmp.Add(dist);
+            //                 }
+            //             }
+            //             
+            //             IEnumerable<string> uni = new List<string>();
+            //              for (int j = 0; j < tmp.Count; j++)
+            //              {
+            //                  uni = uni.Union<string>(tmp[j]);
+            //              }
+            //             string s = ""; 
+            //             for (int j = 0; j < tmp.Count; j++)
+            //             {
+            //                 //retLst.AddRange(tmp[j]);
+            //                 foreach (var item in uni)
+            //                 {
+            //                     s = lst[j].Find(el => el.StartsWith(item.Substring(0, item.IndexOf(";"))));
+            //                     if (s != null && !tmp[j].Exists(e => e == s)) tmp[j].Add(s);
+            //                 }
+            //             }
+
+
+            Dictionary<string, int> repl = new Dictionary<string, int>();
             for (int i = 0; i < tmp.Count; i++)
             {
                 //num++;
                 tmp[i].Sort(new compare());
-                changeList(tmp[i], num, i);
+                changeList(tmp[i], num, i, repl, standart);
                 retLst.AddRange(tmp[i]);
             }
             return retLst;
         }
 
-        public class compare: IComparer<string>
+        public class compare : IComparer<string>
         {
             public int Compare(string x, string y)
             {
@@ -3125,31 +3987,65 @@ namespace InvAddIn
             }
         }
 
-        public static void changeList(List<string> lst, int num, int isp)
+        public class compareAsm : IComparer<string>
+        {
+            public int Compare(string x, string y)
+            {
+                var splx = x.Split('^');
+                var sply = y.Split('^');
+                x = "00"; y = "00";
+                if (splx.Length == 2) x = splx[1];
+                if (sply.Length == 2) y = sply[1];
+                return String.Compare(x, y);
+            }
+        }
+
+        public static void changeList(List<string> lst, int num, int isp, Dictionary<string, int> repl, Dictionary<int, List<string>> standart)
         {
             Documents docs = Macros.StandardAddInServer.m_inventorApplication.Documents;
             NameValueMap nvmOptions = I.objs.CreateNameValueMap();
             nvmOptions.Add("SkipAllUnresolvedFiles", true);
             for (int i = 0; i < lst.Count; i++)
-			{
+            {
                 var spl = lst[i].Split(';');
                 string n = (isp + 1).ToString(), str = "";
-                Document doc = docs.OpenWithOptions(spl[0],nvmOptions,false);
+                Document doc = docs.OpenWithOptions(spl[0], nvmOptions, false);
                 string pn = InvDoc.u.getProp(doc, "Part Number").Value.ToString(),
                     desc = InvDoc.u.getProp(doc, "Description").Value.ToString(),
                     note = InvDoc.u.getProp(doc, "Comments").Value.ToString();
+                string key = pn + "-" + desc;
+                if (repl.ContainsKey(key)) num = repl[key];
+                else repl.Add(key, num);
                 str = num + ";" + pn + ";" + desc + ";" + spl[1];
-                if (pn == "") n += "30";
-                else 
+                pn = pn.Replace(" ", "");
+                if (pn == "")
+                {
+                    int k = -1;
+                    foreach (var item in standart)
+                    {
+                        foreach (var s in item.Value)
+                        {
+                            Regex st = new Regex(s, RegexOptions.IgnoreCase);
+                            if (st.IsMatch(desc))
+                            {
+                                k = item.Key;
+                                break;
+                            }
+                        }
+                    }
+                    if (k == -1) k = 40;
+                    n += k;
+                }
+                else
                 {
                     int l = pn.Length;
-                    if (pn[l-3] == '-') pn = pn.Remove(l-3);
+                    if (pn[l - 3] == '-') pn = pn.Remove(l - 3);
                     if (pn.EndsWith("0")) n += "10";
                     else n += "20";
                 }
-			    lst[i] = "Var" + isp.ToString("00") + ";" + n + ";;;" + str + ";" + note + ";;;;";
+                lst[i] = "Var" + isp.ToString("00") + ";" + n + ";;;" + str + ";" + note + ";;;;";
                 num++;
-			}
+            }
         }
 
         public int loadFromAsm(AssemblyDocument asmDoc, XElement el)
@@ -3162,7 +4058,7 @@ namespace InvAddIn
             for (int i = 0; i < vals.Count; i++)
             {
                 string[] spl = vals[i].Split(';');
-                el.Add(new XElement ("VarData", new XAttribute("Group", spl[1]), new XAttribute("Position", spl[4]), new XAttribute("PartNumber", spl[5]),
+                el.Add(new XElement("VarData", new XAttribute("Group", spl[1]), new XAttribute("Position", spl[4]), new XAttribute("PartNumber", spl[5]),
                     new XAttribute("Description", spl[6]), new XAttribute("Count", spl[7]), new XAttribute("Note", ""), new XAttribute("Dxf", ""), new XAttribute("Thickness", ""),
                     new XAttribute("FPLength", ""), new XAttribute("FPWidth", "")));
                 count++;
@@ -3170,17 +4066,45 @@ namespace InvAddIn
             return count;
         }
 
-        public void drawTable(string name, List<TableRow> rows, int rowStart, int rowEnd, Inventor.Point2d insPt, ref Point2d pt, int count = 2,double lw = 0.05,double offset = 0, bool lastLineW = false)
+        public void clearSketch(DrawingSketch ds, ref List<SketchEntity> ents)
         {
+            foreach (SketchEntity item in ds.SketchLines)
+            {
+
+                if (ents.Contains(item)) continue;
+                item.Delete();
+            }
+
+        }
+        public void clearTBoxes(DrawingSketch ds, ref List<Inventor.TextBox> tbs)
+        {
+            foreach (Inventor.TextBox item in ds.TextBoxes)
+            {
+                if (tbs.Contains(item)) continue;
+                item.Delete();
+            }
+        }
+
+        public void drawTable(string name, List<TableRow> rows, int rowStart, int rowEnd, Inventor.Point2d insPt, ref Point2d pt, int count = 2, double lw = 0.05, double offset = 0, bool lastLineW = false)
+        {
+            if (rowEnd <= rowStart) return;
+            List<SketchEntity> entyties = new List<SketchEntity>();
+            List<Inventor.TextBox> tbs = new List<Inventor.TextBox>();
             try
             {
+
                 ssd = doc.SketchedSymbolDefinitions.Add(name);
             }
             catch
             {
-                addToSheet(doc.ActiveSheet, name, ref pt, true);
-                doc.SketchedSymbolDefinitions[name].Delete();
-                ssd = doc.SketchedSymbolDefinitions.Add(name);
+                //foreach (Sheet item in doc.Sheets)
+                //{
+                //    addToSheet(item, name, ref pt, true);
+                //}
+
+                //doc.SketchedSymbolDefinitions[name].Delete();
+                //ssd = doc.SketchedSymbolDefinitions.Add(name);
+                ssd = doc.SketchedSymbolDefinitions[name];
             }
             int countColumns = 7;
             if (cols.Count != countColumns)
@@ -3188,62 +4112,135 @@ namespace InvAddIn
                 cols.RemoveRange(countColumns, 4);
             }
             count += rowStart;
+            if (lastLineW == false) count = 0;
             ssd.Edit(out ds);
+            //ds = ssd.Sketch;
+            //clearSketch(ds);
+            //ds.Edit();
+            //foreach (SketchEntity item in ds.SketchEntities)
+            //{
+            //    item.Delete();
+            //}
+            //ds.ExitEdit();
 
             double colsLen = cols.Sum(e => e.width);
             double rowsLen = 0;
+            Point2d tmp_pt = null, p1 = null, p2 = null;
+            SketchPoint sp = null;
             try
             {
-            for (int i = rowStart; i < rowEnd; i++)
-            {
-                sl = ds.SketchLines.AddByTwoPoints(insPt, tg.CreatePoint2d(insPt.X - colsLen, insPt.Y));
-                insPt.Y -= rows[i].height;
-                rowsLen += rows[i].height;
-                if (i < count) sl.LineWeight = lw;
-            }
-            sl = ds.SketchLines.AddByTwoPoints(insPt, tg.CreatePoint2d(insPt.X - colsLen, insPt.Y));
-            if (lastLineW) sl.LineWeight = lw;
-
-            insPt.X -= colsLen; insPt.Y = 0;
-            for (int i = 0; i < cols.Count; i++)
-            {
-                sl = ds.SketchLines.AddByTwoPoints(insPt, tg.CreatePoint2d(insPt.X, insPt.Y - rowsLen));
-                insPt.X += cols[i].width;
-                sl.LineWeight = lw;
-            }
-            sl = ds.SketchLines.AddByTwoPoints(insPt, tg.CreatePoint2d(insPt.X, insPt.Y - rowsLen));
-            sl.LineWeight = lw;
-            insPt.X -= colsLen;
-            for (int i = rowStart; i < rowEnd; i++)
-            {
-                var tr = rows[i];
-                insPt.Y -= tr.height;
-                for (int j = 0; j < countColumns; j++)
+                //var tmp_pt = I.CP2d(offset / 10, 0);
+                //var test_pt = checkPoint(ds, tmp_pt);
+                for (int i = rowStart; i < rowEnd; i++)
                 {
-                    var cell = tr.cells[j];
-                    if (cell.value != "") addText(cell, insPt,rows);
-                    insPt.X += cols[cell.colInd].width;
+                    p1 = insPt; p2 = I.CP2d(insPt.X - colsLen, insPt.Y);
+                    sl = addLine(p1, p2, ref entyties);
+                    insPt.Y -= rows[i].height;
+                    rowsLen += rows[i].height;
+                    if (i < count) sl.LineWeight = lw;
                 }
+                p1 = insPt; p2 = I.CP2d(insPt.X - colsLen, insPt.Y);
+                sl = addLine(p1, p2, ref entyties);
+                if (lastLineW) sl.LineWeight = lw;
+
+                insPt.X -= colsLen; insPt.Y = 0;
+                for (int i = 0; i < cols.Count; i++)
+                {
+                    p1 = insPt; p2 = I.CP2d(insPt.X, insPt.Y - rowsLen);
+                    sl = addLine(p1, p2, ref entyties);
+                    insPt.X += cols[i].width;
+                    sl.LineWeight = lw;
+                }
+                p1 = insPt; p2 = I.CP2d(insPt.X, insPt.Y - rowsLen);
+                sl = addLine(p1, p2, ref entyties);
+
+                //sl = ds.SketchLines.AddByTwoPoints(insPt, tg.CreatePoint2d(insPt.X, insPt.Y - rowsLen));
+                if (lastLineW)
+                    sl.LineWeight = lw;
                 insPt.X -= colsLen;
-            }
-            ds.SketchPoints.Add(tg.CreatePoint2d(offset/10, 0)).InsertionPoint = true;
-            ds.SketchPoints.Add(tg.CreatePoint2d(0, -rowsLen)).ConnectionPoint = true;
-            ssd.ExitEdit();
+                for (int i = rowStart; i < rowEnd; i++)
+                {
+                    var tr = rows[i];
+                    insPt.Y -= tr.height;
+                    for (int j = 0; j < countColumns; j++)
+                    {
+                        var cell = tr.cells[j];
+                        if (cell.value != "") addText(cell, insPt, rows, ref tbs);
+                        insPt.X += cols[cell.colInd].width;
+                    }
+                    insPt.X -= colsLen;
+                }
+                tmp_pt = I.CP2d(offset / 10, 0);
+                sp = checkPoint(ds, tmp_pt);
+                if (sp == null)
+                    ds.SketchPoints.Add(tg.CreatePoint2d(offset / 10, 0)).InsertionPoint = true;
+                else if (sp.InsertionPoint == false) sp.InsertionPoint = true;
+
+                tmp_pt = I.CP2d(0, -rowsLen);
+                sp = checkPoint(ds, tmp_pt);
+                if (sp == null)
+                    ds.SketchPoints.Add(tg.CreatePoint2d(offset / 10, 0)).ConnectionPoint = true;
+                else if (sp.ConnectionPoint == false) sp.ConnectionPoint = true;
+                clearSketch(ds, ref entyties);
+                clearTBoxes(ds, ref tbs);
+                //ds.SketchPoints.Add(tg.CreatePoint2d(0, -rowsLen)).ConnectionPoint = true;
+                ssd.ExitEdit();
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString());
+                //MessageBox.Show(ex.ToString());
             }
         }
-        private Inventor.TextBox addText(TableCell cell, Inventor.Point2d insPt, List<TableRow> rows)
+        public SketchLine addLine(Point2d p1, Point2d p2, ref List<SketchEntity> ents)
+        {
+            var se = checkRangeBox(ds, p1, p2, "Line");
+            if (se != null) { sl = (SketchLine)se;  sl.LineWeight = 0; }
+            else
+                sl = ds.SketchLines.AddByTwoPoints(p1, p2);
+            ents.Add((SketchEntity)sl);
+            return sl;
+        }
+        public SketchPoint checkPoint(DrawingSketch ds, Point2d pt)
+        {
+            foreach (SketchPoint item in ds.SketchPoints)
+            {
+                var p = item.Geometry;
+                if (u.eq(p, pt)) return item;
+
+            }
+            return null;
+        }
+        public SketchEntity checkRangeBox(DrawingSketch ds, Point2d p1, Point2d p2, string typ = "Line")
+        {
+            var b = I.Box(p2, p1);
+
+            foreach (SketchEntity item in ds.SketchLines)
+            {
+                var b1 = item.RangeBox;
+                if (u.eq(b, b1)) return item;
+            }
+            return null;
+        }
+        public Inventor.TextBox checkTBox(DrawingSketch ds, Point2d p1, Point2d p2)
+        {
+            var b = I.Box(p2, p1);
+
+            foreach (Inventor.TextBox item in ds.TextBoxes)
+            {
+                var b1 = item.RangeBox;
+                if (u.eq(b, b1)) return item;
+            }
+            return null;
+        }
+        private Inventor.TextBox addText(TableCell cell, Inventor.Point2d insPt, List<TableRow> rows, ref List<Inventor.TextBox> tsb)
         {
             Inventor.Point2d pt1, pt2;
             pt1 = tg.CreatePoint2d(insPt.X + cell.paddingLeft, insPt.Y + cell.paddingBottom);
             pt2 = tg.CreatePoint2d(insPt.X + cols[cell.colInd].width - cell.paddingRight, insPt.Y + rows[cell.rowInd].height - cell.paddingTop);
             //if (cell.rotation != 0) return formatText(cell, tg.CreatePoint2d(pt2.X, pt1.Y), tg.CreatePoint2d(pt1.X, pt2.Y));
-            return formatText(cell, pt1, pt2);
+            return formatText(cell, pt1, pt2, ref tsb);
         }
-        private Inventor.TextBox formatText(TableCell cell, Inventor.Point2d pt1, Inventor.Point2d pt2, TextStyle ts = null)
+        private Inventor.TextBox formatText(TableCell cell, Inventor.Point2d pt1, Inventor.Point2d pt2, ref List<Inventor.TextBox> tbs, TextStyle ts = null)
         {
             string format = "";
             if (cell.underline) format += " Underline ='True' ";
@@ -3255,18 +4252,27 @@ namespace InvAddIn
                 format = @"<StyleOverride" + format + @">" + cell.value + @"</StyleOverride>";
             else format = cell.value;
             if (cell.value.IndexOf('$') != -1) format = formatString(cell, '$');
-            tb = ds.TextBoxes.AddByRectangle(pt1, pt2, format);
-            if (ts != null) tb.Style = ts;
-            if (cell.fontSize != 3.5) tb.Style.FontSize = cell.fontSize / 10;
+            tb = checkTBox(ds, pt2, pt1);
+            if (tb == null)
+            {
+                tb = ds.TextBoxes.AddByRectangle(pt1, pt2, format);
+                if (ts != null) tb.Style = ts;
+                if (cell.fontSize != 3.5) tb.Style.FontSize = cell.fontSize / 10;
 
-            tb.SingleLineText = cell.single;
-            tb.HorizontalJustification = (Inventor.HorizontalTextAlignmentEnum)cell.horAlign;
-            tb.VerticalJustification = (Inventor.VerticalTextAlignmentEnum)cell.vertAlign;
-            tb.Rotation = cell.rotation;
-            tb.WidthScale = cell.widthScale;
+                tb.SingleLineText = cell.single;
+                tb.HorizontalJustification = (Inventor.HorizontalTextAlignmentEnum)cell.horAlign;
+                tb.VerticalJustification = (Inventor.VerticalTextAlignmentEnum)cell.vertAlign;
+                tb.Rotation = cell.rotation;
+                tb.WidthScale = cell.widthScale;
+            }
+            else
+            {
+                tb.FormattedText = format;
+            }
             double l = pt2.X - pt1.X;
             if (cell.rotation != 0) l = pt2.Y - pt1.Y;
-            if (tb.FittedTextWidth > l) tb.WidthScale = l / tb.FittedTextWidth * (cell.widthScale - 0.05); 
+            if (tb.FittedTextWidth > l) tb.WidthScale = l / tb.FittedTextWidth * (cell.widthScale - 0.05);
+            tbs.Add(tb);
             return tb;
         }
         private string formatString(TableCell txt, char c)

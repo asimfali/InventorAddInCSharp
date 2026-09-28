@@ -58,9 +58,9 @@ namespace InvAddIn
             }
             valXML = new List<string>();
             attrXML = new List<string>();
-            if (System.IO.File.Exists(@"C:\ProgramData\Autodesk\Inventor Addins\Stickers.xml"))
+            if (System.IO.File.Exists(I.p() + @"\Stickers.xml"))
             {
-                tbl = new InvDoc.XML(@"C:\ProgramData\Autodesk\Inventor Addins\Stickers.xml");
+                tbl = new InvDoc.XML(I.p() + @"\Stickers.xml");
                 tbl.ReadXML("Sticker", ref valXML, ref attrXML);
                 if (attrXML.Count != 0)
                 {
