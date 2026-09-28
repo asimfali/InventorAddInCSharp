@@ -121,6 +121,19 @@ namespace Macros
 
         public void Activate(Inventor.ApplicationAddInSite addInSiteObject, bool firstTime)
         {
+            // ошибка при запуске иначе молча выгружает аддин - показываем и пишем её в %TEMP%\Macros_error.txt
+            try { ActivateCore(addInSiteObject, firstTime); }
+            catch (Exception ex)
+            {
+                string fn = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Macros_error.txt");
+                try { System.IO.File.WriteAllText(fn, DateTime.Now + "\r\n" + I.p() + "\r\n" + ex.ToString()); } catch { }
+                MessageBox.Show("Ошибка запуска Macros:\n" + ex.Message + "\n\nПодробно: " + fn, "Macros");
+                throw;
+            }
+        }
+
+        void ActivateCore(Inventor.ApplicationAddInSite addInSiteObject, bool firstTime)
+        {
             // This method is called by Inventor when it loads the addin.
             // The AddInSiteObject provides access to the Inventor Application object.
             // The FirstTime flag indicates if the addin is loaded for the first time.

@@ -135,6 +135,16 @@ namespace InvAddIn
             st.count++;
         }
 
+        // строка состояния Inventor + журнал этапов glb\_progress.txt (время от начала) - видно, где остановилось
+        StreamWriter progress;
+        System.Diagnostics.Stopwatch progressClock = System.Diagnostics.Stopwatch.StartNew();
+        void status(string text)
+        {
+            try { I.app.StatusBarText = text; } catch { }
+            if (progress == null) return;
+            try { progress.WriteLine(string.Format("{0,8:0.0} с  {1}", progressClock.Elapsed.TotalSeconds, text)); progress.Flush(); } catch { }
+        }
+
         void error(string where, Exception e)
         {
             string k = where + ": " + e.GetType().Name + " - " + e.Message;
@@ -165,11 +175,13 @@ namespace InvAddIn
             string path = file.p(doc.FullFileName) + "glb";
             file.dir(path);
             outDir = path;
+            try { progress = new StreamWriter(path + "\\_progress.txt", false, new UTF8Encoding(true)); } catch { }
+            status("GLB: начало, " + doc.FullFileName + ", режим " + opt.Mode);
             int root = opt.Mode == GlbMode.Single ? single(doc, name) : assembly(doc, name);
             string fn = path + "\\" + name + (opt.Mode == GlbMode.Single ? "_single" : "") + ".glb";
             glb.save(fn, root);
             try { report(path + "\\" + name + (opt.Mode == GlbMode.Single ? "_single" : "") + "_report.txt"); } catch (Exception e) { error("Отчёт", e); }
-            I.app.StatusBarText = "GLB: " + fn;
+            status("GLB: сохранено " + fn);
             string msg = string.Format("{0}\nВершин: {1}\nТреугольников: {2} (до упрощения {7})\nДопуск упрощения: {8:0.###} мм\nМешей: {3}, материалов: {4}\nРазмер: {5:0.0} КБ\nВремя: {6:0.0} с",
                 fn, glb.vertices, glb.triangles, glb.meshCount, matIdx.Count, new FileInfo(fn).Length / 1024.0, sw.Elapsed.TotalSeconds,
                 stats.Values.Sum(x => (long)x.trisBefore * (opt.Mode == GlbMode.Single ? x.count : 1)), simplifyTol * 10);
@@ -184,7 +196,14 @@ namespace InvAddIn
                     (coarseOrderFail > 0 ? "\n(экранная сетка не подошла для " + coarseOrderFail + " тел - грубая тесселяция)" : "");
             if (errors.Count > 0)
                 msg += "\n\nОшибки:\n" + string.Join("\n", errors.Take(10).Select(kv => "[" + kv.Value + "] " + kv.Key));
-            MessageBox.Show(msg, "Экспорт в GLB");
+            status("GLB: готово");
+            try { progress.Close(); } catch { }
+            progress = null;
+            // окно - поверх Inventor (без владельца оно может уйти за главное окно, и Inventor выглядит зависшим)
+            var owner = new NativeWindow();
+            try { owner.AssignHandle(new IntPtr(I.app.MainFrameHWND)); } catch { }
+            MessageBox.Show(owner, msg, "Экспорт в GLB");
+            try { owner.ReleaseHandle(); } catch { }
         }
 
         #region обход документа
@@ -197,7 +216,10 @@ namespace InvAddIn
             public Asset app;
             public double[] world;
             public string name;
-            public string key { get { return docName(def) + "|" + index + "|" + (app == null ? "" : app.DisplayName); } }
+            // ключ тела вычисляется один раз: каждое обращение к Inventor (имя документа, материала) - COM-вызов,
+            // а ключ нужен в циклах по треугольникам (сотни тысяч раз)
+            string cachedKey;
+            public string key { get { return cachedKey ?? (cachedKey = docName(def) + "|" + index + "|" + (app == null ? "" : app.DisplayName)); } }
         }
 
         // Single: сначала по грубой сетке выясняем, какие грани видны снаружи,
@@ -247,7 +269,7 @@ namespace InvAddIn
             if (opt.CullHidden && opt.FinalCull)
                 try
                 {
-                    try { I.app.StatusBarText = "GLB: финальная видимость"; } catch { }
+                    status("GLB: финальная видимость");
                     var fw = System.Diagnostics.Stopwatch.StartNew();
                     finalRemoved = Visibility.cull(merged, opt.CullDirections, opt.CullResolution, 0,
                         backingMat >= 0 ? new HashSet<int> { backingMat } : null);
@@ -300,13 +322,13 @@ namespace InvAddIn
             foreach (var t in inst)
             {
                 if (coarse.ContainsKey(t.key)) continue;
-                try { I.app.StatusBarText = "GLB: внешние детали, сетка " + coarse.Count + "/" + inst.Count; } catch { }
+                status("GLB: внешние детали, сетка " + coarse.Count + "/" + inst.Count);
                 try { coarse[t.key] = bodyMesh(t.body); } catch (Exception e) { error("Грубая сетка тела", e); coarse[t.key] = null; }
             }
             float[] X, Y, Z; int[] tri, owner, ownerTri;
             worldMesh(inst, coarse, out X, out Y, out Z, out tri, out owner, out ownerTri);
             extTris = tri.Length / 3;
-            try { I.app.StatusBarText = "GLB: внешние детали, видимость (" + extTris + " тр.)"; } catch { }
+            status("GLB: внешние детали, видимость (" + extTris + " тр.)");
             bool[] vis = Visibility.visible(X, Y, Z, tri, opt.CullDirections, opt.CullResolution, opt.CullOpeningSize / 1000, 0,
                 opt.CullHoleSize / 1000, opt.SeeThroughTol / 1000);
             var total = new double[inst.Count];
@@ -371,7 +393,7 @@ namespace InvAddIn
             {
                 string k = t.key;
                 if (coarse.ContainsKey(k)) continue;
-                try { I.app.StatusBarText = "GLB: грубая сетка " + coarse.Count + "/" + inst.Count; } catch { }
+                status("GLB: грубая сетка " + coarse.Count + "/" + inst.Count);
                 try { coarse[k] = coarseMesh(t.body); } catch (Exception e) { error("Грубая сетка", e); coarse[k] = null; }
             }
             float[] X, Y, Z; int[] tri, owner, ownerTri;
@@ -379,7 +401,7 @@ namespace InvAddIn
             int nt = owner.Length;
             coarseTris = nt;
             coarseMs = cwc.ElapsedMilliseconds;
-            try { I.app.StatusBarText = "GLB: видимость (" + nt + " треугольников грубой сетки)"; } catch { }
+            status("GLB: видимость (" + nt + " треугольников грубой сетки)");
             bool[] two = null;
             if (opt.HoleBacking && opt.DropHoleWalls)
             {
@@ -409,12 +431,14 @@ namespace InvAddIn
                 two = new bool[tri.Length / 3];
                 for (int t = nt; t < two.Length; t++) two[t] = true;
             }
+            status("GLB: видимость - растеризация (" + (tri.Length / 3) + " тр., подложек " + coarseDisks + ")");
             // direct - видно снаружи напрямую, не через проёмы (нужно для перфорированных листов)
             bool[] direct = new bool[tri.Length / 3];
             bool[] vis = Visibility.visible(X, Y, Z, tri, opt.CullDirections, opt.CullResolution,
                 opt.CullSeeThrough ? opt.CullHoleSize / 1000 : 0, opt.CullKeepDepth / 1000,
                 opt.CullOpeningSize / 1000, opt.SeeThroughTol / 1000, two, direct);
 
+            status("GLB: видимость - разбор по граням");
             // видимые треугольники грубой сетки по телам (объединение по всем экземплярам)
             var visTri = new Dictionary<string, HashSet<int>>();
             foreach (var t in inst) if (!visTri.ContainsKey(t.key)) visTri[t.key] = new HashSet<int>();
@@ -438,25 +462,39 @@ namespace InvAddIn
                 var seen = new Dictionary<int, int>();
                 for (int t = 0; t < c.face.Length; t++) { int f = c.face[t]; int n; total.TryGetValue(f, out n); total[f] = n + 1; }
                 foreach (int t in kv.Value) { int f = c.face[t]; int n; seen.TryGetValue(f, out n); seen[f] = n + 1; vi.faces.Add(f); }
-                // частично видимые грани: запоминаем ячейки вокруг видимых треугольников
+                // частично видимые грани: ячейки вдоль видимых треугольников (точки с шагом полячейки),
+                // затем расширение на margin. Грань с чрезмерным числом ячеек не обрезаем - выгружаем целиком
+                var core = new Dictionary<int, HashSet<Key3>>();
+                var whole = new HashSet<int>();
+                int mc = (int)Math.Ceiling(margin / cs);
                 foreach (int t in kv.Value)
                 {
                     int f = c.face[t];
-                    if (!opt.TrimPartialFaces || seen[f] == total[f]) continue;
-                    HashSet<Key3> cells;
-                    if (!vi.cells.TryGetValue(f, out cells)) vi.cells[f] = cells = new HashSet<Key3>();
-                    double x0 = double.MaxValue, y0 = double.MaxValue, z0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue, z1 = double.MinValue;
-                    for (int k = 0; k < 3; k++)
-                    {
-                        int v = c.tri[3 * t + k];
-                        x0 = Math.Min(x0, c.P[3 * v]); x1 = Math.Max(x1, c.P[3 * v]);
-                        y0 = Math.Min(y0, c.P[3 * v + 1]); y1 = Math.Max(y1, c.P[3 * v + 1]);
-                        z0 = Math.Min(z0, c.P[3 * v + 2]); z1 = Math.Max(z1, c.P[3 * v + 2]);
-                    }
-                    for (long ix = (long)Math.Floor((x0 - margin) / cs); ix <= (long)Math.Floor((x1 + margin) / cs); ix++)
-                        for (long iy = (long)Math.Floor((y0 - margin) / cs); iy <= (long)Math.Floor((y1 + margin) / cs); iy++)
-                            for (long iz = (long)Math.Floor((z0 - margin) / cs); iz <= (long)Math.Floor((z1 + margin) / cs); iz++)
-                                cells.Add(new Key3(ix, iy, iz));
+                    if (!opt.TrimPartialFaces || seen[f] == total[f] || whole.Contains(f)) continue;
+                    var q = new Vec[3];
+                    for (int k = 0; k < 3; k++) { int v = c.tri[3 * t + k]; q[k] = new Vec(c.P[3 * v], c.P[3 * v + 1], c.P[3 * v + 2]); }
+                    double le = Math.Max((q[1] - q[0]).len(), Math.Max((q[2] - q[0]).len(), (q[2] - q[1]).len()));
+                    int n = Math.Max(1, (int)Math.Ceiling(le / (cs * 0.5)));
+                    HashSet<Key3> cc;
+                    if (!core.TryGetValue(f, out cc)) core[f] = cc = new HashSet<Key3>();
+                    if ((long)n * n / 2 + cc.Count > MaxTrimCells) { whole.Add(f); continue; }
+                    for (int i = 0; i <= n; i++)
+                        for (int j = 0; i + j <= n; j++)
+                        {
+                            Vec p = q[0] + (q[1] - q[0]) * ((double)i / n) + (q[2] - q[0]) * ((double)j / n);
+                            cc.Add(new Key3((long)Math.Floor(p.x / cs), (long)Math.Floor(p.y / cs), (long)Math.Floor(p.z / cs)));
+                        }
+                }
+                foreach (var fc in core)
+                {
+                    if (whole.Contains(fc.Key) || (long)fc.Value.Count * (2 * mc + 1) * (2 * mc + 1) * (2 * mc + 1) > 4 * MaxTrimCells) continue;
+                    var cells = new HashSet<Key3>();
+                    foreach (var k0 in fc.Value)
+                        for (int dx = -mc; dx <= mc; dx++)
+                            for (int dy = -mc; dy <= mc; dy++)
+                                for (int dz = -mc; dz <= mc; dz++)
+                                    cells.Add(new Key3(k0.x + dx, k0.y + dy, k0.z + dz));
+                    vi.cells[fc.Key] = cells;
                 }
                 // маленькие скрытые грани рядом с видимыми тоже выгружаем: их треугольники в грубой сетке
                 // бывают мельче пикселя, и тогда в поверхности остаётся дыра
@@ -732,7 +770,7 @@ namespace InvAddIn
             if (tessCache.TryGetValue(key, out m)) return m;
             m = new GlbMesh();
             cur = stats[key];
-            try { I.app.StatusBarText = "GLB (" + tessCache.Count + "): " + cur.name; } catch { }
+            status("GLB (" + tessCache.Count + "): " + cur.name);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var bm = new BodyMesher();
             Asset bodyApp = null;
@@ -981,6 +1019,7 @@ namespace InvAddIn
         int backingMat = -1, backingDisks;
         long finalRemoved = -1, finalMs;
         int coarseDisks, rescuedFaces;
+        const long MaxTrimCells = 500000;   // предел ячеек обрезки на грань (иначе грань выгружается целиком)
         List<string> hiddenList = new List<string>();
         int backingMaterial()
         {
@@ -2295,6 +2334,8 @@ namespace InvAddIn
         }
 
         // видимость треугольников снаружи (X,Y,Z в метрах, треугольники ориентированы наружу)
+        public static int MaxWorkers = 8;
+
         class Buf
         {
             public float[] zb, cl, cl2, sx, sy, sz;
@@ -2332,9 +2373,10 @@ namespace InvAddIn
             int r2 = holeClose > 0 ? (int)Math.Ceiling(holeClose / 2 * s) : 0;
             float tol2 = (float)holeTol;
             int r = (int)Math.Ceiling(closeSize / 2 * s);
-            // направления независимы - считаем параллельно, у каждого потока свои буферы
-            // (в vis только пишется true, гонка безопасна)
-            System.Threading.Tasks.Parallel.For(0, dirs, () => new Buf(nv, res), (di, state, B) =>
+            // направления независимы - считаем параллельно фиксированным числом своих потоков (не больше MaxWorkers),
+            // у каждого ровно один набор буферов: память ограничена (пул потоков .NET на долгих задачах добавляет потоки,
+            // и каждый выделял бы свои буферы по ~17 МБ). В vis только пишется true - гонка безопасна
+            Action<int, Buf> direction = (di, B) =>
             {
                 float[] zb = B.zb, cl = B.cl, cl2 = B.cl2, sx = B.sx, sy = B.sy, sz = B.sz;
                 int[] ib = B.ib;
@@ -2415,8 +2457,27 @@ namespace InvAddIn
                     if (directOut != null) { vis[t] = true; if (direct) directOut[t] = true; }
                     else if (direct) vis[t] = true;
                 }
-                return B;
-            }, B => { });
+            };
+            int workers = Math.Max(1, Math.Min(Math.Min(MaxWorkers, System.Environment.ProcessorCount), dirs));
+            var threads = new System.Threading.Thread[workers];
+            Exception fail = null;
+            for (int w = 0; w < workers; w++)
+            {
+                int wi = w;
+                threads[w] = new System.Threading.Thread(() =>
+                {
+                    try
+                    {
+                        var B = new Buf(nv, res);
+                        for (int di = wi; di < dirs; di += workers) direction(di, B);
+                    }
+                    catch (Exception e) { fail = e; }
+                }, 16 * 1024 * 1024);
+                threads[w].IsBackground = true;
+                threads[w].Start();
+            }
+            foreach (var t in threads) t.Join();
+            if (fail != null) throw new Exception("Видимость: " + fail.Message, fail);
 
             return vis;
         }

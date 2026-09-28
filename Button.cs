@@ -81,10 +81,31 @@ namespace InvAddIn
             }
         }
 
+        // горячая клавиша обязательна: если сочетание занято другой командой (E_FAIL), отбираем его у неё и назначаем повторно
         public void addShortCut(string s)
         {
-            if (m_buttonDefinition.IsShortcutOverridden == false)
-                m_buttonDefinition.OverrideShortcut = s;
+            if (m_buttonDefinition.IsShortcutOverridden && m_buttonDefinition.OverrideShortcut == s) return;
+            try { m_buttonDefinition.OverrideShortcut = s; return; }
+            catch (System.Runtime.InteropServices.COMException) { }
+
+            var owners = new System.Collections.Generic.List<string>();
+            foreach (ControlDefinition cd in InventorApplication.CommandManager.ControlDefinitions)
+            {
+                if (cd.InternalName == m_buttonDefinition.InternalName) continue;
+                string ov = "", def = "";
+                try { if (cd.IsShortcutOverridden) ov = cd.OverrideShortcut; } catch { }
+                try { def = cd.DefaultShortcut; } catch { }
+                if (!string.Equals(ov, s, StringComparison.OrdinalIgnoreCase) && !string.Equals(def, s, StringComparison.OrdinalIgnoreCase)) continue;
+                owners.Add(cd.InternalName + " (" + cd.DisplayName + ")");
+                try { cd.OverrideShortcut = ""; } catch { }
+            }
+            try { m_buttonDefinition.OverrideShortcut = s; }
+            catch (System.Runtime.InteropServices.COMException ex)
+            {
+                System.Windows.Forms.MessageBox.Show("Не удалось назначить горячую клавишу \"" + s + "\" команде \"" + m_buttonDefinition.DisplayName + "\".\n" +
+                    (owners.Count > 0 ? "Клавиша занята: " + string.Join(", ", owners) : "Занявшая её команда не найдена.") +
+                    "\n\n" + ex.Message, "Macros");
+            }
         }
 
         abstract protected void ButtonDefinition_OnExecute(NameValueMap context);

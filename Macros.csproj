@@ -134,7 +134,7 @@
   <ItemGroup>
     <Reference Include="autodesk.inventor.interop, Version=25.0.0.0, Culture=neutral, PublicKeyToken=d84147f8b4276564, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
       <HintPath>..\..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\Autodesk.Inventor.Interop\v4.0_25.0.0.0__d84147f8b4276564\autodesk.inventor.interop.dll</HintPath>
       <Private>False</Private>
     </Reference>
