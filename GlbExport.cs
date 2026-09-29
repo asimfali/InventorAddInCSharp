@@ -1260,6 +1260,7 @@ namespace InvAddIn
             if (!smcd.HasFlatPattern) { perfReport.Add("  нет развёртки (создайте развёртку в детали): " + doc.DisplayName); return null; }
             string dir = file.p(doc.FullFileName), dn = doc.DisplayName;
             if (dn.EndsWith(".ipt", StringComparison.OrdinalIgnoreCase)) dn = dn.Substring(0, dn.Length - 4);
+            if (dn.IndexOf('^') > 0) dn = dn.Substring(0, dn.IndexOf('^'));   // "(Люк PG11)^02" - хвост исполнения из сборки
             // обозначение (П4021E) и название (Стенка_боковая) из имени "КЭВ-П4021E.00.003 (Стенка боковая)"
             string des = dn, name = "";
             int br = dn.IndexOf('(');
@@ -1313,7 +1314,14 @@ namespace InvAddIn
                 else perfReport.Add("  развёртка изменилась (или старый формат) - текстура нарисована заново: " + System.IO.Path.GetFileName(pngPath));
             }
 
-            var cand = files.Where(f => { string b = norm(System.IO.Path.GetFileNameWithoutExtension(f)); return (nd == "" || b.Contains(nd)) && (nn == "" || b.Contains(nn)); }).ToList();
+            // обозначение - целиком, название - каждое слово хотя бы первыми 3 буквами ("Стенка_бок" для "Стенка боковая");
+            // неподходящий DXF потом отсеет совмещение по отверстиям
+            var words = nn.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries).Select(w => w.Length > 3 ? w.Substring(0, 3) : w).ToList();
+            var cand = files.Where(f =>
+            {
+                string b = norm(System.IO.Path.GetFileNameWithoutExtension(f));
+                return (nd == "" || b.Contains(nd)) && words.All(w => b.Contains(w));
+            }).ToList();
             // DXF, заданный вручную в файле .png.txt (строка dxf=...): берётся без перебора
             string forced = null;
             if (System.IO.File.Exists(metaPath))
