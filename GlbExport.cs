@@ -25,7 +25,18 @@ namespace InvAddIn
         public double PerfTexPxPerMm = 2;        //   разрешение текстуры, пикселей на мм
         public int PerfTexMax = 4096;            //   максимальный размер текстуры, px
         public int[] PerfColor = { 25, 25, 25 }; //   цвет отверстий в текстуре (sRGB)
+        public bool PerfMatte = true;            //   отверстия матовые, без металла (без бликов) - карта metallicRoughness
         public double PerfHoleMax = 60;          //   мм: наибольший габарит отверстия перфорации (овалы длиннее круглых)
+        public bool HoleTexture = true;          // Assembly: у листовых деталей все отверстия (и крепёжные) - вырезы в текстуре (прозрачные),
+                                                 //   по контурам развёртки + перфорация из DXF; стенки отверстий не выгружаются
+        public double HoleTexMax = 60;           //   мм: отверстия крупнее (проёмы) остаются геометрией
+        public double HoleTexMaxElong = 4;       //   узкие прорези (пробивки с перемычками, язычки) остаются геометрией:
+                                                 //   периметр²/(4π·площадь) больше этого (круг 1, овал 8x40 ~2, прорезь 1x40 ~13)
+        public double HoleTexHolePx = 4;         //   пикселей на самое мелкое отверстие детали (от него - разрешение текстуры)
+        public double HoleTexPxMin = 0.5, HoleTexPxMax = 2;   // пределы разрешения, пикселей на мм
+        public int HoleTexMaxSize = 2048;        //   наибольший размер текстуры, px (видеопамять слабых ПК)
+        public double HoleTexRing = 0;           //   ширина тёмного кольца вокруг отверстия, px (вместо линий рёбер); 0 - без кольца
+        public bool AssemblyNormals = false;     // Assembly: писать нормали (просмотрщик портала без освещения - не нужны)
         public int CircleSegments = 16;          // окружности (отверстия, трубы, контуры) не грубее этого числа сегментов
         public double SimplifyRatio = 0.0005;    // допуск упрощения сетки как доля диагонали модели (0 - без упрощения)
         public int SimplifyTimeLimitMs = 15000;  // предел времени упрощения одного тела
@@ -164,6 +175,8 @@ namespace InvAddIn
         {
             this.opt = opt;
             glb.Quantize = opt.Quantize;
+            glb.Normals = opt.Mode == GlbMode.Single || opt.AssemblyNormals;
+            cutMode = opt.Mode == GlbMode.Assembly && opt.HoleTexture;
             if (doc == null) return;
             if (doc.DocumentType != DocumentTypeEnum.kPartDocumentObject &&
                 doc.DocumentType != DocumentTypeEnum.kAssemblyDocumentObject) return;
@@ -199,6 +212,9 @@ namespace InvAddIn
                     string.Format("\nНевидимые: тел {0}, граней {1} - не создавались\nЧастично видимых граней {4}, обрезано треугольников {5}\nГрубая сетка ({2} тр.): {6:0.0} с, видимость: {3:0.0} с",
                     hiddenBodies, hiddenFaces, coarseTris, (cullMs - coarseMs) / 1000.0, partialFaces, trimmedTris, coarseMs / 1000.0) +
                     (coarseOrderFail > 0 ? "\n(экранная сетка не подошла для " + coarseOrderFail + " тел - грубая тесселяция)" : "");
+            if (cutMode)
+                msg += string.Format("\nВырезы текстурой: деталей {0}, стенок отверстий не выгружено {1}\nТекстуры: {2:0.0} Мпикс (~{3:0} МБ видеопамяти){4}",
+                    cutParts, droppedWalls, cutPixels / 1e6, cutPixels * 4 * 4 / 3.0 / (1 << 20), glb.Normals ? "" : "\nБез нормалей");
             if (errors.Count > 0)
                 msg += "\n\nОшибки:\n" + string.Join("\n", errors.Take(10).Select(kv => "[" + kv.Value + "] " + kv.Key));
             status("GLB: готово");
@@ -780,11 +796,15 @@ namespace InvAddIn
             var bm = new BodyMesher();
             faceUV.Clear();
             curTex = null;
-            if (inSingle && opt.PerforationTexture)
+            cutGrid.Clear();
+            if ((inSingle && opt.PerforationTexture) || cutMode)
                 try { curTex = perfTexture(def, key); }
                 catch (Exception e) { error("Текстура перфорации", e); perfReport.Add("  ошибка: " + e.Message + " - " + cur.name); }
             Asset bodyApp = null;
             try { bodyApp = body.Appearance; } catch { }
+            // вырезы текстурой: грани без координат развёртки (стенки отверстий, торцы) - после основных,
+            // когда уже известно, какие отверстия залиты
+            var later = new List<KeyValuePair<Face, int>>();
             int fi = -1;
             foreach (Face f in body.Faces)
             {
@@ -806,11 +826,22 @@ namespace InvAddIn
                         curCyl = cylMap(curTex, f);
                         if (curCyl != null) uv = curCyl.uv;
                     }
-                    if (uv != null) mat = texMat(mat, curTex.texture);
-                    addFace(f, bm, mat, cells, vis == null ? 0 : vis.cell, uv);
+                    if (uv != null) mat = texMat(mat, curTex);
+                    if (cutMode && curTex != null && uv == null) later.Add(new KeyValuePair<Face, int>(f, mat));
+                    else addFace(f, bm, mat, cells, vis == null ? 0 : vis.cell, uv);
                     curCyl = null;
                 }
                 catch (Exception e) { error("Грань", e); }
+            }
+            // те же материал и текстура (координаты - белый угол поля картинки): у листовой детали один примитив -
+            // в просмотрщике деталь скрывается/выделяется целиком, и вдвое меньше вызовов отрисовки
+            if (later.Count > 0)
+            {
+                var tex = curTex;
+                double[] white = { 1 / tex.sizeX, 1 / tex.sizeY };   // 1 мм от угла, в поле 2 мм вокруг развёртки
+                foreach (var kv in later)
+                    try { addFace(kv.Key, bm, texMat(kv.Value, tex), null, 0, p => white, true); }
+                    catch (Exception e) { error("Грань", e); }
             }
             addBackings(bm);
             cur.msFacets = sw.ElapsedMilliseconds;
@@ -838,7 +869,8 @@ namespace InvAddIn
 
         // cells - ячейки (размер cs, см), где грань видна; треугольники вне них не выгружаются
         // uv - координаты развёртки для грани с текстурой перфорации: её мелкие отверстия заливаются (их рисует текстура)
-        void addFace(Face f, BodyMesher bm, int mat, HashSet<Key3> cells = null, double cs = 0, Func<Vec, double[]> uv = null)
+        // wallCheck - грань без координат развёртки у детали с вырезами: стенка залитого отверстия не выгружается
+        void addFace(Face f, BodyMesher bm, int mat, HashSet<Key3> cells = null, double cs = 0, Func<Vec, double[]> uv = null, bool wallCheck = false)
         {
             int vc = 0, fc = 0;
             double[] v = new double[] { }, n = new double[] { };
@@ -876,6 +908,7 @@ namespace InvAddIn
                 tris.Add(a); tris.Add(b); tris.Add(c);
             }
             if (tris.Count == 0) return;
+            if (wallCheck && onCutLoops(P)) { droppedWalls++; return; }
             // тип поверхности не проверяем: у гнутой перфорации стенки отверстий - сплайны; форму определяет isHoleWall по сетке
             if (inSingle && opt.DropHoleWalls && f.SurfaceType != SurfaceTypeEnum.kPlaneSurface && isHoleWall(f, P, N))
             {
@@ -886,19 +919,22 @@ namespace InvAddIn
 
             bool flat = false;
             Func<List<Vec>, bool> fill = null;
+            var filled = new List<List<Vec>>();   // залитые контуры - в cutGrid, только если перетриангуляция удалась
             if (uv != null && curTex != null)
             {
                 {
                     var tex = curTex;
+                    double max = (cutMode ? opt.HoleTexMax : opt.PerfHoleMax) / 10;
                     fill = lp =>
                     {
-                        // мелкое отверстие, центр которого на развёртке совпадает с отверстием перфорации из DXF
+                        // мелкое отверстие, центр которого (середина габарита на развёртке) совпадает с отверстием текстуры
                         double x0 = lp.Min(q => q.x), x1 = lp.Max(q => q.x), y0 = lp.Min(q => q.y), y1 = lp.Max(q => q.y), z0 = lp.Min(q => q.z), z1 = lp.Max(q => q.z);
-                        if (new Vec(x1 - x0, y1 - y0, z1 - z0).len() > opt.PerfHoleMax / 10) return false;
-                        var c = new Vec();
-                        foreach (var q in lp) c = c + q;
-                        var t = uv(c * (1.0 / lp.Count));
-                        return tex.isPerf(tex.minX + t[0] * tex.sizeX, tex.maxY - t[1] * tex.sizeY);
+                        if (new Vec(x1 - x0, y1 - y0, z1 - z0).len() > max) return false;
+                        double u0 = double.MaxValue, u1 = double.MinValue, v0 = double.MaxValue, v1 = double.MinValue;
+                        foreach (var q in lp) { var t = uv(q); u0 = Math.Min(u0, t[0]); u1 = Math.Max(u1, t[0]); v0 = Math.Min(v0, t[1]); v1 = Math.Max(v1, t[1]); }
+                        bool r = tex.isPerf(tex.minX + (u0 + u1) / 2 * tex.sizeX, tex.maxY - (v0 + v1) / 2 * tex.sizeY);
+                        if (r && cutMode) filled.Add(lp);
+                        return r;
                     };
                 }
             }
@@ -907,13 +943,14 @@ namespace InvAddIn
             {
                 List<int> ct = null;
                 try { ct = cylRetri(curCyl, P, N, tris, fill); } catch (Exception e) { error("Цилиндр с перфорацией", e); }
-                if (ct != null) { tris = ct; cylOk++; } else cylFail++;
+                if (ct != null) { tris = ct; cylOk++; addCutLoops(filled); } else cylFail++;
+                filled.Clear();
             }
             if (opt.PlanarRetriangulate && f.SurfaceType == SurfaceTypeEnum.kPlaneSurface && fn.len() > 0)
             {
                 string why;
                 var rt = PlanarTriangulator.run(P, tris, fn.norm(), opt.PlanarMaxVertices, out why, fill);
-                if (rt != null) { tris = rt; flat = true; cur.planarOk++; }
+                if (rt != null) { tris = rt; flat = true; cur.planarOk++; addCutLoops(filled); }
                 else { cur.planarFail++; inc(planarWhy, why); }
             }
             inc(cur.byType, f.SurfaceType.ToString().Replace("Surface", "").Substring(1), tris.Count / 3);
@@ -950,6 +987,63 @@ namespace InvAddIn
                     bm.normal(g[id], fid, flat ? fnu : N[id].norm());
                 }
             for (int t = 0; t < tris.Count; t += 3) bm.tri(fid, g[tris[t]], g[tris[t + 1]], g[tris[t + 2]]);
+        }
+
+        // Assembly: отверстия листовых деталей - вырезы в текстуре
+        bool cutMode;
+        // отрезки залитых контуров текущего тела по ячейкам 2 мм: стенка отверстия лежит на них целиком
+        Dictionary<Key3, List<Vec[]>> cutGrid = new Dictionary<Key3, List<Vec[]>>();
+        const double CutCell = 0.2;
+
+        static Key3 cutCell(Vec p) { return new Key3((long)Math.Floor(p.x / CutCell), (long)Math.Floor(p.y / CutCell), (long)Math.Floor(p.z / CutCell)); }
+
+        void addCutLoops(List<List<Vec>> loops)
+        {
+            foreach (var lp in loops)
+                for (int i = 0; i < lp.Count; i++)
+                {
+                    Vec a = lp[i], b = lp[(i + 1) % lp.Count];
+                    var seg = new[] { a, b };
+                    Key3 ka = cutCell(a), kb = cutCell(b);
+                    for (long x = Math.Min(ka.x, kb.x); x <= Math.Max(ka.x, kb.x); x++)
+                        for (long y = Math.Min(ka.y, kb.y); y <= Math.Max(ka.y, kb.y); y++)
+                            for (long z = Math.Min(ka.z, kb.z); z <= Math.Max(ka.z, kb.z); z++)
+                            {
+                                var k = new Key3(x, y, z);
+                                List<Vec[]> l;
+                                if (!cutGrid.TryGetValue(k, out l)) cutGrid[k] = l = new List<Vec[]>();
+                                l.Add(seg);
+                            }
+                }
+        }
+
+        // все вершины грани (допуск - 10%) на залитых контурах: стенка отверстия, которое рисует текстура
+        bool onCutLoops(List<Vec> P)
+        {
+            if (cutGrid.Count == 0 || P.Count < 3) return false;
+            double tol = 1.5 * opt.Tolerance + 1e-4;
+            int on = 0, miss = 0;
+            foreach (Vec p in P)
+            {
+                Key3 c = cutCell(p);
+                bool hit = false;
+                for (int dx = -1; dx <= 1 && !hit; dx++)
+                    for (int dy = -1; dy <= 1 && !hit; dy++)
+                        for (int dz = -1; dz <= 1 && !hit; dz++)
+                        {
+                            List<Vec[]> l;
+                            if (!cutGrid.TryGetValue(new Key3(c.x + dx, c.y + dy, c.z + dz), out l)) continue;
+                            foreach (var s in l)
+                            {
+                                Vec d = s[1] - s[0];
+                                double L2 = Vec.dot(d, d), t = L2 > 0 ? Math.Max(0, Math.Min(1, Vec.dot(p - s[0], d) / L2)) : 0;
+                                if ((p - (s[0] + d * t)).len() <= tol) { hit = true; break; }
+                            }
+                        }
+                if (hit) on++;
+                else if (++miss > 0.1 * P.Count) return false;
+            }
+            return on >= 0.9 * P.Count;
         }
 
         class Hole { public Vec c, ax; public double r; }
@@ -1195,6 +1289,7 @@ namespace InvAddIn
             public int ax0, ax1;                    // оси плоскости развёртки
             public double minX, maxY, sizeX, sizeY; // мм, область текстуры
             public int texture = -1;
+            public byte[] png;   // картинка отверстий (из неё же - карта матовости)
             public string info;
             public List<double[]> perf = new List<double[]>();   // отверстия перфорации на развёртке: x, y, r (мм)
             Dictionary<long, List<int>> grid;
@@ -1290,7 +1385,7 @@ namespace InvAddIn
             string safe = new string(dn.Select(ch => System.IO.Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray());
             string pngPath = outDir + "\\" + safe + "_перфорация.png", metaPath = pngPath + ".txt";
             string region = string.Format(CultureInfo.InvariantCulture, "{0:0.00};{1:0.00};{2:0.00};{3:0.00}", pt.minX, maxX, minY, pt.maxY);
-            if (System.IO.File.Exists(pngPath) && System.IO.File.Exists(metaPath))
+            if (!cutMode && System.IO.File.Exists(pngPath) && System.IO.File.Exists(metaPath))
             {
                 string old = System.IO.File.ReadAllLines(metaPath, Encoding.UTF8).Where(l => l.StartsWith("region=")).Select(l => l.Substring(7)).FirstOrDefault() ?? "";
                 var a = old.Split(';'); var b = region.Split(';');
@@ -1305,6 +1400,7 @@ namespace InvAddIn
                         pt.perf.Add(new[] { double.Parse(q[0], CultureInfo.InvariantCulture), double.Parse(q[1], CultureInfo.InvariantCulture), double.Parse(q[2], CultureInfo.InvariantCulture) });
                     }
                     byte[] cached = System.IO.File.ReadAllBytes(pngPath);
+                    pt.png = cached;
                     pt.texture = glb.addTexture(cached);
                     pt.info = string.Format("  {0}: готовая текстура {1} ({2:0} КБ)", dn, System.IO.Path.GetFileName(pngPath), cached.Length / 1024.0);
                     perfReport.Add(pt.info);
@@ -1327,72 +1423,131 @@ namespace InvAddIn
             if (System.IO.File.Exists(metaPath))
                 forced = System.IO.File.ReadAllLines(metaPath, Encoding.UTF8).Where(l => l.StartsWith("dxf=")).Select(l => l.Substring(4).Trim()).FirstOrDefault();
             if (!string.IsNullOrEmpty(forced) && System.IO.File.Exists(forced)) { cand = new List<string> { forced }; perfReport.Add("  DXF задан вручную: " + forced); }
-            if (cand.Count == 0) { perfReport.Add("  нет DXF (" + des + " / " + name + ") в " + dir + "DXF: " + dn); return null; }
 
-            // отверстия развёртки (мм) - по грубой сетке её граней
-            var flatHoles = new List<double[]>();
-            foreach (Face f in fp.Body.Faces)
-            {
-                if (f.SurfaceType == SurfaceTypeEnum.kPlaneSurface) continue;
-                int vc = 0, fc = 0; double[] v = new double[] { }, n = new double[] { }; int[] ix = new int[] { };
-                try { f.CalculateFacets(coarseTol, out vc, out fc, out v, out n, out ix); } catch { continue; }
-                if (vc < 6) continue;
-                var P = new List<Vec>(); var N = new List<Vec>();
-                for (int i = 0; i < vc; i++) { P.Add(new Vec(v[3 * i], v[3 * i + 1], v[3 * i + 2])); N.Add(new Vec(n[3 * i], n[3 * i + 1], n[3 * i + 2])); }
-                if (!isHoleWall(P, N)) continue;
-                var h = holeOf(P, N);
-                flatHoles.Add(new[] { comp(h.c, pt.ax0) * 10, comp(h.c, pt.ax1) * 10, h.r * 10 });
-            }
-            if (flatHoles.Count < 3) { perfReport.Add("  в развёртке меньше 3 отверстий - не с чем совместить DXF: " + dn); return null; }
-
-            // лучший DXF: больше всего совпавших отверстий (при равенстве - из "не менять")
+            // Assembly (вырезы): DXF - только дополнение к отверстиям развёртки (перфорация, нарисованная в модели лишь по краю)
             DxfHoles bestD = null; Align2D bestA = null; string bestF = null;
-            foreach (string f in cand)
+            var flatHoles = new List<double[]>();
+            if (cand.Count == 0)
             {
-                DxfHoles d;
-                try { d = DxfHoles.read(f); } catch (Exception e) { error("DXF " + f, e); continue; }
-                // круги и центры дуг (концы овалов) - с ними совпадают центры стенок отверстий развёртки
-                var a = Align2D.find(d.circles.Concat(d.arcs).ToList(), flatHoles);
-                if (a == null) continue;
-                // при равенстве - DXF того же исполнения (_01 только для детали -01)
-                bool isp = dn.Contains("-01"), fisp = System.IO.Path.GetFileName(f).Contains("_01");
-                bool better = bestA == null || a.matched > bestA.matched ||
-                    (a.matched == bestA.matched && fisp == isp && System.IO.Path.GetFileName(bestF).Contains("_01") != isp);
-                if (better) { bestA = a; bestD = d; bestF = f; }
+                if (!cutMode) { perfReport.Add("  нет DXF (" + des + " / " + name + ") в " + dir + "DXF: " + dn); return null; }
             }
-            if (bestA == null || bestA.matched < Math.Max(3, 0.6 * flatHoles.Count))
+            else
             {
-                perfReport.Add(string.Format("  DXF не совместился ({0} из {1} отверстий): {2}", bestA == null ? 0 : bestA.matched, flatHoles.Count, dn));
-                return null;
+                // отверстия развёртки (мм) - по грубой сетке её граней
+                foreach (Face f in fp.Body.Faces)
+                {
+                    if (f.SurfaceType == SurfaceTypeEnum.kPlaneSurface) continue;
+                    int vc = 0, fc = 0; double[] v = new double[] { }, n = new double[] { }; int[] ix = new int[] { };
+                    try { f.CalculateFacets(coarseTol, out vc, out fc, out v, out n, out ix); } catch { continue; }
+                    if (vc < 6) continue;
+                    var P = new List<Vec>(); var N = new List<Vec>();
+                    for (int i = 0; i < vc; i++) { P.Add(new Vec(v[3 * i], v[3 * i + 1], v[3 * i + 2])); N.Add(new Vec(n[3 * i], n[3 * i + 1], n[3 * i + 2])); }
+                    if (!isHoleWall(P, N)) continue;
+                    var h = holeOf(P, N);
+                    flatHoles.Add(new[] { comp(h.c, pt.ax0) * 10, comp(h.c, pt.ax1) * 10, h.r * 10 });
+                }
+                if (flatHoles.Count < 3)
+                {
+                    perfReport.Add("  в развёртке меньше 3 отверстий - не с чем совместить DXF: " + dn);
+                    if (!cutMode) return null;
+                }
+                else
+                {
+                    // лучший DXF: больше всего совпавших отверстий (при равенстве - из "не менять")
+                    foreach (string f in cand)
+                    {
+                        DxfHoles d;
+                        try { d = DxfHoles.read(f); } catch (Exception e) { error("DXF " + f, e); continue; }
+                        // круги и центры дуг (концы овалов) - с ними совпадают центры стенок отверстий развёртки
+                        var a = Align2D.find(d.circles.Concat(d.arcs).ToList(), flatHoles);
+                        if (a == null) continue;
+                        // при равенстве - DXF того же исполнения (_01 только для детали -01)
+                        bool isp = dn.Contains("-01"), fisp = System.IO.Path.GetFileName(f).Contains("_01");
+                        bool better = bestA == null || a.matched > bestA.matched ||
+                            (a.matched == bestA.matched && fisp == isp && System.IO.Path.GetFileName(bestF).Contains("_01") != isp);
+                        if (better) { bestA = a; bestD = d; bestF = f; }
+                    }
+                    if (bestA == null || bestA.matched < Math.Max(3, 0.6 * flatHoles.Count))
+                    {
+                        perfReport.Add(string.Format("  DXF не совместился ({0} из {1} отверстий): {2}", bestA == null ? 0 : bestA.matched, flatHoles.Count, dn));
+                        if (!cutMode) return null;
+                        bestA = null; bestD = null; bestF = null;
+                    }
+                }
             }
 
-            // текстура: область развёртки, отверстия DXF - тёмные
-            double s = Math.Min(opt.PerfTexPxPerMm, opt.PerfTexMax / Math.Max(pt.sizeX, pt.sizeY));
+            // контуры отверстий текстуры на развёртке (мм): перфорация из DXF (крепёжные и прочие отверстия DXF не берутся -
+            // в Single они остаются настоящими), в Assembly - плюс все сквозные отверстия развёртки
+            var polys = new List<List<double[]>>();
+            if (bestA != null)
+                foreach (int k in perfLoops(bestD))
+                    if (bestD.loops[k].Count >= 3) polys.Add(bestD.loops[k].Select(p => bestA.apply(p[0], p[1])).ToList());
+            int dxfCount = polys.Count;
+            if (cutMode)
+            {
+                polys.AddRange(flatCutLoops(pt, dn));
+                if (polys.Count == 0) { perfReport.Add("  нет отверстий для текстуры: " + dn); return null; }
+            }
+            foreach (var lp in polys)
+            {
+                double x0 = lp.Min(p => p[0]), x1 = lp.Max(p => p[0]), y0 = lp.Min(p => p[1]), y1 = lp.Max(p => p[1]);
+                pt.perf.Add(new[] { (x0 + x1) / 2, (y0 + y1) / 2, Math.Max(x1 - x0, y1 - y0) / 2 });
+            }
+
+            // текстура: область развёртки. Single - отверстия DXF тёмные; Assembly - отверстия прозрачные (вырез по альфе),
+            // вокруг - тёмное кольцо вместо линий рёбер, разрешение - по самому мелкому отверстию
+            double s;
+            if (cutMode)
+            {
+                double dmin = polys.Min(lp => Math.Min(lp.Max(p => p[0]) - lp.Min(p => p[0]), lp.Max(p => p[1]) - lp.Min(p => p[1])));
+                s = Math.Max(opt.HoleTexPxMin, Math.Min(opt.HoleTexPxMax, opt.HoleTexHolePx / Math.Max(0.1, dmin)));
+                s = Math.Min(s, opt.HoleTexMaxSize / Math.Max(pt.sizeX, pt.sizeY));
+            }
+            else s = Math.Min(opt.PerfTexPxPerMm, opt.PerfTexMax / Math.Max(pt.sizeX, pt.sizeY));
             int W = Math.Max(1, (int)Math.Ceiling(pt.sizeX * s)), H = Math.Max(1, (int)Math.Ceiling(pt.sizeY * s));
             byte[] png;
             int holesDrawn = 0;
-            using (var bmp = new System.Drawing.Bitmap(W, H, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+            using (var bmp = new System.Drawing.Bitmap(W, H, cutMode ? System.Drawing.Imaging.PixelFormat.Format32bppArgb : System.Drawing.Imaging.PixelFormat.Format24bppRgb))
             {
                 using (var g = System.Drawing.Graphics.FromImage(bmp))
                 using (var dark = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(opt.PerfColor[0], opt.PerfColor[1], opt.PerfColor[2])))
                 {
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
                     g.Clear(System.Drawing.Color.White);
-                    // только перфорация: крепёжные и прочие отверстия остаются настоящими (сквозными) в геометрии
-                    foreach (int k in perfLoops(bestD))
+                    var all = polys.Select(lp => lp.Select(q => new System.Drawing.PointF((float)((q[0] - pt.minX) * s), (float)((pt.maxY - q[1]) * s))).ToArray()).ToList();
+                    if (!cutMode)
+                        foreach (var pts in all) { g.FillPolygon(dark, pts); holesDrawn++; }
+                    else
                     {
-                        var lp = bestD.loops[k];
-                        double cx = 0, cy = 0;
-                        foreach (var p in lp) { var q = bestA.apply(p[0], p[1]); cx += q[0]; cy += q[1]; }
-                        double lw = lp.Max(p => p[0]) - lp.Min(p => p[0]), lh = lp.Max(p => p[1]) - lp.Min(p => p[1]);
-                        pt.perf.Add(new[] { cx / lp.Count, cy / lp.Count, Math.Max(lw, lh) / 2 });
-                        var pts = bestD.loops[k].Select(p => { var q = bestA.apply(p[0], p[1]); return new System.Drawing.PointF((float)((q[0] - pt.minX) * s), (float)((pt.maxY - q[1]) * s)); }).ToArray();
-                        if (pts.Length >= 3) { g.FillPolygon(dark, pts); holesDrawn++; }
+                        // перо по контуру: внутренняя половина уйдёт под вырез, снаружи остаётся кольцо HoleTexRing
+                        if (opt.HoleTexRing > 0)
+                            using (var pen = new System.Drawing.Pen(dark.Color, (float)(2 * opt.HoleTexRing)))
+                                foreach (var pts in all) g.DrawPolygon(pen, pts);
+                        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                        g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                        using (var clear = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(0, 255, 255, 255)))
+                            foreach (var pts in all) { g.FillPolygon(clear, pts); holesDrawn++; }
                     }
                 }
                 using (var ms = new MemoryStream()) { bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png); png = ms.ToArray(); }
             }
+            pt.png = png;
             pt.texture = glb.addTexture(png);
+            if (cutMode)
+            {
+                cutParts++; cutPixels += (long)W * H;
+                try
+                {
+                    file.dir(outDir + "\\_отверстия");
+                    System.IO.File.WriteAllBytes(outDir + "\\_отверстия\\" + safe + ".png", png);
+                }
+                catch (Exception e) { error("Сохранение текстуры", e); }
+                pt.info = string.Format(CultureInfo.InvariantCulture, "  {0}: вырезов {1} (из DXF {2}{3}), {4}x{5} px ({6:0.##} px/мм, {7:0} КБ)",
+                    dn, holesDrawn, dxfCount, bestF == null ? "" : " " + System.IO.Path.GetFileName(bestF), W, H, s, png.Length / 1024.0);
+                perfReport.Add(pt.info);
+                perfCache[key] = pt;
+                return pt;
+            }
             try
             {
                 System.IO.File.WriteAllBytes(pngPath, png);
@@ -1407,6 +1562,167 @@ namespace InvAddIn
             perfReport.Add(pt.info);
             perfCache[key] = pt;
             return pt;
+        }
+        int cutParts;
+        long cutPixels;
+
+        // отверстия развёртки для вырезов (мм): внутренние контуры самой большой плоской грани, не крупнее HoleTexMax
+        // и сквозные - внутри контура нет другого материала развёртки (иначе это выштамповка, жалюзи и т.п.)
+        List<List<double[]>> flatCutLoops(PerfTex pt, string dn)
+        {
+            var res = new List<List<double[]>>();
+            Face top = null;
+            double best = 0;
+            foreach (Face f in pt.fp.Body.Faces)
+            {
+                if (f.SurfaceType != SurfaceTypeEnum.kPlaneSurface) continue;
+                double a = 0;
+                try { a = f.Evaluator.Area; } catch { }
+                if (a > best) { best = a; top = f; }
+            }
+            if (top == null) { perfReport.Add("  нет плоской грани развёртки: " + dn); return res; }
+            int vc = 0, fc = 0; double[] v = new double[] { }, n = new double[] { }; int[] ix = new int[] { };
+            top.CalculateFacets(opt.Tolerance, out vc, out fc, out v, out n, out ix);
+            int off = Array.IndexOf(ix, 0) >= 0 ? 0 : 1;
+            var keys = new Dictionary<Key3, int>();
+            var P = new List<Vec>(); var N = new List<Vec>();
+            var map = new int[vc];
+            for (int i = 0; i < vc; i++)
+            {
+                var p = new Vec(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
+                var k = new Key3(p);
+                int id;
+                if (!keys.TryGetValue(k, out id)) { id = P.Count; keys[k] = id; P.Add(p); N.Add(new Vec(n[3 * i], n[3 * i + 1], n[3 * i + 2])); }
+                map[i] = id;
+            }
+            var tris = new List<int>();
+            for (int t = 0; t < fc; t++)
+            {
+                int a = map[ix[3 * t] - off], b = map[ix[3 * t + 1] - off], c = map[ix[3 * t + 2] - off];
+                if (a == b || b == c || a == c) continue;
+                if (Vec.dot(Vec.cross(P[b] - P[a], P[c] - P[a]), N[a] + N[b] + N[c]) < 0) { int x = b; b = c; c = x; }
+                tris.Add(a); tris.Add(b); tris.Add(c);
+            }
+            string why;
+            var loops = PlanarTriangulator.boundaryLoops(tris, out why);
+            if (loops == null) { perfReport.Add("  контуры развёртки не разобраны (" + why + ") - вырезы только из DXF: " + dn); return res; }
+            var polys = loops.Select(l => l.Select(i => new[] { comp(P[i], pt.ax0) * 10, comp(P[i], pt.ax1) * 10 }).ToList()).ToList();
+            Func<List<double[]>, double> area = l =>
+            {
+                double s = 0;
+                for (int i = 0; i < l.Count; i++) { var a = l[i]; var b = l[(i + 1) % l.Count]; s += a[0] * b[1] - b[0] * a[1]; }
+                return Math.Abs(s) / 2;
+            };
+            int outer = 0;
+            for (int i = 1; i < polys.Count; i++) if (area(polys[i]) > area(polys[outer])) outer = i;
+
+            // материал развёртки в проекции: треугольники всего тела, кроме стенок (почти перпендикулярных листу), по ячейкам 20 мм
+            const double cell = 20;
+            Func<double, double, long> cl = (x, y) => ((long)Math.Floor(x / cell) << 32) ^ ((long)Math.Floor(y / cell) & 0xffffffffL);
+            var T = new List<double[]>();   // x0,y0,x1,y1,x2,y2
+            var grid = new Dictionary<long, List<int>>(LongCmp.I);
+            try
+            {
+                int bvc = 0, bfc = 0; double[] bv = new double[] { }, bn = new double[] { }; int[] bix = new int[] { };
+                pt.fp.Body.CalculateFacets(Math.Min(coarseTol, 0.02), out bvc, out bfc, out bv, out bn, out bix);
+                int boff = Array.IndexOf(bix, 0) >= 0 ? 0 : 1;
+                int nax = 3 - pt.ax0 - pt.ax1;
+                for (int t = 0; t < bfc; t++)
+                {
+                    var q = new Vec[3];
+                    for (int k = 0; k < 3; k++) { int i = bix[3 * t + k] - boff; q[k] = new Vec(bv[3 * i], bv[3 * i + 1], bv[3 * i + 2]); }
+                    Vec cr = Vec.cross(q[1] - q[0], q[2] - q[0]);
+                    if (cr.len() < 1e-12 || Math.Abs(comp(cr, nax)) < 0.3 * cr.len()) continue;
+                    var tr = new double[6];
+                    for (int k = 0; k < 3; k++) { tr[2 * k] = comp(q[k], pt.ax0) * 10; tr[2 * k + 1] = comp(q[k], pt.ax1) * 10; }
+                    int ti = T.Count;
+                    T.Add(tr);
+                    double x0 = Math.Min(tr[0], Math.Min(tr[2], tr[4])), x1 = Math.Max(tr[0], Math.Max(tr[2], tr[4]));
+                    double y0 = Math.Min(tr[1], Math.Min(tr[3], tr[5])), y1 = Math.Max(tr[1], Math.Max(tr[3], tr[5]));
+                    for (double x = Math.Floor(x0 / cell) * cell; x <= x1; x += cell)
+                        for (double y = Math.Floor(y0 / cell) * cell; y <= y1; y += cell)
+                        {
+                            long c = cl(x + cell / 2, y + cell / 2);
+                            List<int> l;
+                            if (!grid.TryGetValue(c, out l)) grid[c] = l = new List<int>();
+                            l.Add(ti);
+                        }
+                }
+            }
+            catch (Exception e) { error("Сетка развёртки", e); }
+            Func<double, double, bool> covered = (x, y) =>
+            {
+                List<int> l;
+                if (!grid.TryGetValue(cl(x, y), out l)) return false;
+                foreach (int ti in l)
+                {
+                    var t = T[ti];
+                    double d1 = (x - t[2]) * (t[1] - t[3]) - (t[0] - t[2]) * (y - t[3]);
+                    double d2 = (x - t[4]) * (t[3] - t[5]) - (t[2] - t[4]) * (y - t[5]);
+                    double d3 = (x - t[0]) * (t[5] - t[1]) - (t[4] - t[0]) * (y - t[1]);
+                    bool neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0;
+                    if (!(neg && pos)) return true;
+                }
+                return false;
+            };
+
+            int big = 0, blind = 0, slits = 0, knock = 0;
+            var cand = new List<int>();
+            var slot = new Dictionary<int, double[]>();   // узкий паз: концы x0,y0,x1,y1 и ширина
+            for (int i = 0; i < polys.Count; i++)
+            {
+                if (i == outer) continue;
+                var lp = polys[i];
+                double x0 = lp.Min(p => p[0]), x1 = lp.Max(p => p[0]), y0 = lp.Min(p => p[1]), y1 = lp.Max(p => p[1]);
+                if (Math.Sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0)) > opt.HoleTexMax) { big++; continue; }
+                double per = 0;
+                for (int k = 0; k < lp.Count; k++) { var a = lp[k]; var b = lp[(k + 1) % lp.Count]; per += Math.Sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1])); }
+                double sq = area(lp);
+                if (sq <= 0 || per * per / (4 * Math.PI * sq) > opt.HoleTexMaxElong) { slits++; continue; }
+                // точка внутри контура - центр самого большого треугольника его триангуляции
+                var coords = lp.SelectMany(p => p).ToArray();
+                var et = Earcut.run(coords, new int[0]);
+                double bx = 0, by = 0, ba = -1;
+                for (int t = 0; t + 2 < et.Count; t += 3)
+                {
+                    double ax = coords[2 * et[t]], ay = coords[2 * et[t] + 1], qx = coords[2 * et[t + 1]], qy = coords[2 * et[t + 1] + 1], rx = coords[2 * et[t + 2]], ry = coords[2 * et[t + 2] + 1];
+                    double ar = Math.Abs((qx - ax) * (ry - ay) - (rx - ax) * (qy - ay));
+                    if (ar > ba) { ba = ar; bx = (ax + qx + rx) / 3; by = (ay + qy + ry) / 3; }
+                }
+                if (ba < 0 || covered(bx, by)) { blind++; continue; }
+                cand.Add(i);
+                // паз: длина (самые далёкие точки контура) больше 2,5 ширины (ширина ~ 2 * площадь / периметр)
+                double w = 2 * sq / per, L = 0;
+                int ea = 0, eb = 0;
+                for (int a = 0; a < lp.Count; a++)
+                    for (int b = a + 1; b < lp.Count; b++)
+                    {
+                        double d = Math.Sqrt((lp[a][0] - lp[b][0]) * (lp[a][0] - lp[b][0]) + (lp[a][1] - lp[b][1]) * (lp[a][1] - lp[b][1]));
+                        if (d > L) { L = d; ea = a; eb = b; }
+                    }
+                if (L > 2.5 * w) slot[i] = new[] { lp[ea][0], lp[ea][1], lp[eb][0], lp[eb][1], w };
+            }
+            // пробивка (прорези с перемычками - язычок под люверс, выбивной проём): конец паза почти упирается
+            // в другой контур - такие пазы остаются геометрией, как и узкие прорези
+            foreach (int i in cand)
+            {
+                double[] sl;
+                if (!slot.TryGetValue(i, out sl)) { res.Add(polys[i]); continue; }
+                double gap = Math.Max(3, 2 * sl[4]);
+                bool bridged = false;
+                for (int e = 0; e < 2 && !bridged; e++)
+                    for (int k = 0; k < polys.Count && !bridged; k++)
+                    {
+                        if (k == i || k == outer) continue;
+                        foreach (var q in polys[k])
+                            if ((q[0] - sl[2 * e]) * (q[0] - sl[2 * e]) + (q[1] - sl[2 * e + 1]) * (q[1] - sl[2 * e + 1]) <= gap * gap) { bridged = true; break; }
+                    }
+                if (bridged) knock++; else res.Add(polys[i]);
+            }
+            perfReport.Add(string.Format("  {0}: сквозных отверстий развёртки {1}{2}{3}{4}", dn, res.Count,
+                big > 0 ? ", крупных (геометрией) " + big : "", slits + knock > 0 ? ", узких прорезей и пробивок (геометрией) " + (slits + knock) : "",
+                blind > 0 ? ", несквозных контуров " + blind : ""));
+            return res;
         }
 
         // контуры DXF, которые являются перфорацией: одинаковые отверстия (до PerfHoleMax) группой не меньше PerforationMinHoles,
@@ -1482,31 +1798,35 @@ namespace InvAddIn
                     Vertex fv = null;
                     try { fv = pt.fp.GetFlatPatternEntity(v) as Vertex; } catch { }
                     if (fv == null) continue;
-                    pairs.Add(new[] { new Vec(v.Point.X, v.Point.Y, v.Point.Z), new Vec(fv.Point.X, fv.Point.Y, fv.Point.Z) });
+                    // точка развёртки - только в её плоскости: вершины могут прийти с верхней или нижней стороны листа
+                    var fq = new Vec(fv.Point.X, fv.Point.Y, fv.Point.Z);
+                    pairs.Add(new[] { new Vec(v.Point.X, v.Point.Y, v.Point.Z), new Vec(comp(fq, pt.ax0), comp(fq, pt.ax1), 0) });
                 }
             }
             catch { }
-            if (pairs.Count < 3) { faceMapFail++; return null; }
+            if (pairs.Count < 3) { mapFail("плоская: Inventor не дал вершин развёртки (" + pairs.Count + ")"); return null; }
             // опорный треугольник: p0, самая дальняя p1, самая удалённая от прямой p2
             Vec p0 = pairs[0][0];
             var i1 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => (pairs[i][0] - p0).len()).First();
             Vec d1 = (pairs[i1][0] - p0).norm();
             var i2 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => Vec.cross(d1, pairs[i][0] - p0).len()).First();
-            if (Vec.cross(d1, pairs[i2][0] - p0).len() < 1e-4) { faceMapFail++; return null; }
+            if (Vec.cross(d1, pairs[i2][0] - p0).len() < 1e-4) { mapFail("плоская: вершины на одной прямой"); return null; }
             Vec q0 = pairs[0][1];
             Vec e1 = d1, en = Vec.cross(pairs[i1][0] - p0, pairs[i2][0] - p0).norm(), e2 = Vec.cross(en, e1);
             Vec f1 = (pairs[i1][1] - q0).norm(), fnn = Vec.cross(pairs[i1][1] - q0, pairs[i2][1] - q0).norm(), f2 = Vec.cross(fnn, f1);
             Func<Vec, Vec> map = p => { Vec d = p - p0; return q0 + f1 * Vec.dot(d, e1) + f2 * Vec.dot(d, e2); };
             foreach (var pr in pairs)
-                if ((map(pr[0]) - pr[1]).len() > 0.02) { faceMapFail++; return null; }   // не изометрия - не та вершина
+                if ((map(pr[0]) - pr[1]).len() > 0.03) { mapFail("плоская: вершины не совпали с развёрткой"); return null; }   // не изометрия
             faceMapOk++;
             return p =>
             {
-                Vec q = map(p);
-                return new[] { (comp(q, pt.ax0) * 10 - pt.minX) / pt.sizeX, (pt.maxY - comp(q, pt.ax1) * 10) / pt.sizeY };
+                Vec q = map(p);   // x, y - уже в плоскости развёртки (см)
+                return new[] { (q.x * 10 - pt.minX) / pt.sizeX, (pt.maxY - q.y * 10) / pt.sizeY };
             };
         }
         int faceMapOk, faceMapFail;
+        Dictionary<string, int> mapWhy = new Dictionary<string, int>();
+        void mapFail(string why) { faceMapFail++; inc(mapWhy, why); }
 
         // цилиндрическая грань <-> развёртка: (угол вокруг оси, координата вдоль оси) -> точка развёртки (мм), линейно;
         // коэффициенты подбираются по соответствию вершин (в них и радиус нейтрального слоя)
@@ -1544,7 +1864,7 @@ namespace InvAddIn
         {
             Cylinder g = null;
             try { g = f.Geometry as Cylinder; } catch { }
-            if (g == null) { faceMapFail++; return null; }
+            if (g == null) { mapFail("цилиндр: нет геометрии Cylinder"); return null; }
             var cm = new CylMap { pt = pt, R = g.Radius };
             cm.C = new Vec(g.BasePoint.X, g.BasePoint.Y, g.BasePoint.Z);
             cm.ax = new Vec(g.AxisVector.X, g.AxisVector.Y, g.AxisVector.Z).norm();
@@ -1563,7 +1883,7 @@ namespace InvAddIn
                 }
             }
             catch { }
-            if (pairs.Count < 3) { faceMapFail++; return null; }
+            if (pairs.Count < 3) { mapFail("цилиндр: Inventor не дал вершин развёртки (" + pairs.Count + ")"); return null; }
             { Vec d = pairs[0][0] - cm.C; cm.th0 = Math.Atan2(Vec.dot(d, cm.v0), Vec.dot(d, cm.u0)); }
             // МНК: x = a*th + b*t + c (и так же y)
             var A = new double[3, 3]; var bx = new double[3]; var by = new double[3];
@@ -1573,15 +1893,15 @@ namespace InvAddIn
                 double x = comp(pr[1], pt.ax0) * 10, y = comp(pr[1], pt.ax1) * 10;
                 for (int i = 0; i < 3; i++) { for (int j = 0; j < 3; j++) A[i, j] += r[i] * r[j]; bx[i] += r[i] * x; by[i] += r[i] * y; }
             }
-            if (!solve3(A, bx, cm.mx) || !solve3(A, by, cm.my)) { faceMapFail++; return null; }
+            if (!solve3(A, bx, cm.mx) || !solve3(A, by, cm.my)) { mapFail("цилиндр: вершины вырождены"); return null; }
             double det = cm.mx[0] * cm.my[1] - cm.mx[1] * cm.my[0];
-            if (Math.Abs(det) < 1e-9) { faceMapFail++; return null; }
+            if (Math.Abs(det) < 1e-9) { mapFail("цилиндр: вершины вырождены"); return null; }
             cm.inv = new[] { cm.my[1] / det, -cm.mx[1] / det, -cm.my[0] / det, cm.mx[0] / det };
             foreach (var pr in pairs)
             {
                 var q = cm.flat(pr[0]);
                 double ex = q[0] - comp(pr[1], pt.ax0) * 10, ey = q[1] - comp(pr[1], pt.ax1) * 10;
-                if (ex * ex + ey * ey > 0.3 * 0.3) { faceMapFail++; return null; }   // не развёртка цилиндра
+                if (ex * ex + ey * ey > 0.3 * 0.3) { mapFail("цилиндр: вершины не совпали с развёрткой"); return null; }
             }
             faceMapOk++;
             return cm;
@@ -1696,18 +2016,57 @@ namespace InvAddIn
             return r;
         }
 
-        // материал с текстурой перфорации (копия исходного)
-        int texMat(int mat, int tex)
+        // материал с текстурой перфорации (копия исходного) + карта матовости: отверстия - шероховатость 1, без металла (без бликов)
+        int texMat(int mat, PerfTex pt)
         {
-            long k = ((long)mat << 32) | (uint)tex;
+            long k = ((long)mat << 32) | (uint)pt.texture;
             int id;
             if (texMats.TryGetValue(k, out id)) return id;
             GlbMat src;
             if (!matObj.TryGetValue(mat, out src)) src = new GlbMat();
-            var m = new GlbMat { name = src.name + " (перфорация)", r = src.r, g = src.g, b = src.b, a = src.a, metallic = src.metallic, roughness = src.roughness, texture = tex };
+            var m = new GlbMat { name = src.name + (cutMode ? " (отверстия)" : " (перфорация)"), r = src.r, g = src.g, b = src.b, a = src.a, metallic = src.metallic, roughness = src.roughness, texture = pt.texture, alphaMask = cutMode };
+            // вырезы: карта матовости не нужна - в отверстиях ничего не рисуется
+            if (opt.PerfMatte && pt.png != null && !cutMode)
+                try
+                {
+                    m.mrTexture = glb.addTexture(matteMap(pt.png, src.roughness, src.metallic, (opt.PerfColor[0] + opt.PerfColor[1] + opt.PerfColor[2]) / 3));
+                    m.metallic = 1; m.roughness = 1;   // значения берутся из карты
+                }
+                catch (Exception e) { error("Карта матовости", e); }
             id = glb.addMaterial(m);
             texMats[k] = id;
             return id;
+        }
+
+        // карта metallicRoughness (G - шероховатость, B - металличность) по картинке отверстий: тёмное - отверстие
+        static byte[] matteMap(byte[] png, double rough, double metal, int darkLevel)
+        {
+            using (var ms = new MemoryStream(png))
+            using (var src = new System.Drawing.Bitmap(ms))
+            using (var bmp = new System.Drawing.Bitmap(src.Width, src.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+            {
+                using (var g = System.Drawing.Graphics.FromImage(bmp)) g.DrawImage(src, 0, 0, src.Width, src.Height);
+                var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+                var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+                var buf = new byte[data.Stride * bmp.Height];
+                System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+                for (int y = 0; y < bmp.Height; y++)
+                    for (int x = 0; x < bmp.Width; x++)
+                    {
+                        int o = y * data.Stride + 3 * x;   // BGR
+                        // всё, что не белое, - матовое: отверстия и любые рисунки другим цветом (по самому тёмному каналу,
+                        // чтобы насыщенный цвет, например красный, тоже был полностью матовым); край - плавный
+                        double mn = Math.Min(buf[o], Math.Min(buf[o + 1], buf[o + 2]));
+                        double hole = Math.Max(0, Math.Min(1, (255 - mn) / Math.Max(1, 255 - darkLevel)));
+                        double r = rough + (1 - rough) * hole, mt = metal * (1 - hole);
+                        buf[o] = (byte)Math.Round(mt * 255);        // B - металличность
+                        buf[o + 1] = (byte)Math.Round(r * 255);     // G - шероховатость
+                        buf[o + 2] = 255;                           // R - не используется
+                    }
+                System.Runtime.InteropServices.Marshal.Copy(buf, 0, data.Scan0, buf.Length);
+                bmp.UnlockBits(data);
+                using (var outMs = new MemoryStream()) { bmp.Save(outMs, System.Drawing.Imaging.ImageFormat.Png); return outMs.ToArray(); }
+            }
         }
         #endregion
 
@@ -1732,6 +2091,7 @@ namespace InvAddIn
             {
                 sb.AppendLine(string.Format("== Текстура перфорации (граней с координатами развёртки: {0}, не удалось: {1}; цилиндров перетриангулировано {2}, не удалось {3}) ==",
                     faceMapOk, faceMapFail, cylOk, cylFail));
+                foreach (var kv in mapWhy.OrderByDescending(x => x.Value)) sb.AppendLine("  не сопоставлено с развёрткой: " + kv.Value + " - " + kv.Key);
                 foreach (var l in perfReport) sb.AppendLine(l);
                 sb.AppendLine();
             }
@@ -3527,6 +3887,8 @@ namespace InvAddIn
         public double r = 0.8, g = 0.8, b = 0.8, a = 1, metallic = 0, roughness = 0.5;
         public bool doubleSided;
         public int texture = -1;   // индекс текстуры glTF (baseColorTexture) или -1
+        public int mrTexture = -1; // metallicRoughnessTexture или -1
+        public bool alphaMask;     // вырезы по альфе текстуры (alphaMode MASK)
 
         static readonly string[] metalWords = { "металл", "сталь", "метал", "оцинк", "алюмин", "хром", "латун", "медь", "нерж",
             "metal", "steel", "alumin", "chrome", "brass", "copper", "zinc", "galvan", "iron" };
@@ -3669,9 +4031,11 @@ namespace InvAddIn
             sb.Append(",\"pbrMetallicRoughness\":{\"baseColorFactor\":[")
               .Append(num(m.r)).Append(',').Append(num(m.g)).Append(',').Append(num(m.b)).Append(',').Append(num(m.a))
               .Append("]").Append(m.texture >= 0 ? ",\"baseColorTexture\":{\"index\":" + m.texture + "}" : "")
+              .Append(m.mrTexture >= 0 ? ",\"metallicRoughnessTexture\":{\"index\":" + m.mrTexture + "}" : "")
               .Append(",\"metallicFactor\":").Append(num(m.metallic))
               .Append(",\"roughnessFactor\":").Append(num(m.roughness)).Append('}');
-            if (m.a < 0.999) sb.Append(",\"alphaMode\":\"BLEND\"");
+            if (m.alphaMask) sb.Append(",\"alphaMode\":\"MASK\",\"alphaCutoff\":0.5");
+            else if (m.a < 0.999) sb.Append(",\"alphaMode\":\"BLEND\"");
             if (m.doubleSided) sb.Append(",\"doubleSided\":true");
             sb.Append('}');
             materials.Add(sb.ToString());
@@ -3679,7 +4043,34 @@ namespace InvAddIn
         }
 
         public bool Quantize = true;             // KHR_mesh_quantization: позиции uint16, нормали int8, индексы uint16
+        public bool Normals = true;              // false - без NORMAL, вершины, разделённые только нормалями (острые рёбра), сливаются
         List<string> images = new List<string>(), textures = new List<string>();
+
+        // слияние вершин с одинаковыми позицией и текстурными координатами (копия примитива без нормалей)
+        static GlbPrim weld(GlbPrim p)
+        {
+            var r = new GlbPrim();
+            if (p.uv != null) r.uv = new List<float>();
+            var map = new Dictionary<string, int>();
+            var remap = new int[p.vcount];
+            for (int i = 0; i < p.vcount; i++)
+            {
+                float u = 0, v = 0;
+                if (p.uv != null && 2 * i + 1 < p.uv.Count) { u = p.uv[2 * i]; v = p.uv[2 * i + 1]; }
+                string k = string.Format(ci, "{0:R};{1:R};{2:R};{3:R};{4:R}", p.pos[3 * i], p.pos[3 * i + 1], p.pos[3 * i + 2], u, v);
+                int id;
+                if (!map.TryGetValue(k, out id))
+                {
+                    id = map.Count; map[k] = id;
+                    r.pos.Add(p.pos[3 * i]); r.pos.Add(p.pos[3 * i + 1]); r.pos.Add(p.pos[3 * i + 2]);
+                    r.nrm.Add(0); r.nrm.Add(0); r.nrm.Add(0);
+                    if (r.uv != null) { r.uv.Add(u); r.uv.Add(v); }
+                }
+                remap[i] = id;
+            }
+            foreach (int i in p.idx) r.idx.Add(remap[i]);
+            return r;
+        }
 
         // PNG в буфер GLB; возвращает индекс текстуры
         public int addTexture(byte[] png)
@@ -3708,6 +4099,7 @@ namespace InvAddIn
             {
                 GlbPrim p = kv.Value;
                 if (p.idx.Count == 0) continue;
+                if (!Normals) p = weld(p);
                 if (dq == null) { prims.Add(primFloat(p, kv.Key)); continue; }
                 // куски не больше 65535 вершин - индексы uint16
                 var map = new Dictionary<int, int>();
@@ -3753,7 +4145,7 @@ namespace InvAddIn
             var ib = new byte[idx.Count * 2];
             for (int i = 0; i < idx.Count; i++) { ib[2 * i] = (byte)(idx[i] & 0xff); ib[2 * i + 1] = (byte)(idx[i] >> 8); }
             int ap = accessor(view(pos, 34962, 8), 5123, vc, "VEC3", qmin, qmax);
-            int an = accessor(view(nrm, 34962, 4), 5120, vc, "VEC3", null, null, true);
+            string an = Normals ? ",\"NORMAL\":" + accessor(view(nrm, 34962, 4), 5120, vc, "VEC3", null, null, true) : "";
             string uvAttr = "";
             if (p.uv != null)
             {
@@ -3768,7 +4160,7 @@ namespace InvAddIn
             }
             int ai = accessor(view(ib, 34963), 5123, idx.Count, "SCALAR", null, null);
             vertices += vc;
-            return string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0},\"NORMAL\":{1}{4}}},\"indices\":{2},\"material\":{3}}}", ap, an, ai, mat, uvAttr);
+            return string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0}{1}{4}}},\"indices\":{2},\"material\":{3}}}", ap, an, ai, mat, uvAttr);
         }
 
         string primFloat(GlbPrim p, int mat)
@@ -3782,7 +4174,7 @@ namespace InvAddIn
                     max[k] = Math.Max(max[k], p.pos[3 * i + k]);
                 }
             int ap = accessor(view(floats(p.pos), 34962), 5126, vc, "VEC3", min, max);
-            int an = accessor(view(floats(p.nrm), 34962), 5126, vc, "VEC3", null, null);
+            string an = Normals ? ",\"NORMAL\":" + accessor(view(floats(p.nrm), 34962), 5126, vc, "VEC3", null, null) : "";
             string uvAttr = "";
             if (p.uv != null)
             {
@@ -3806,7 +4198,7 @@ namespace InvAddIn
             int ai = accessor(view(ib, 34963), ct, p.idx.Count, "SCALAR", null, null);
             vertices += vc;
             triangles += p.idx.Count / 3;
-            return string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0},\"NORMAL\":{1}{4}}},\"indices\":{2},\"material\":{3}}}", ap, an, ai, mat, uvAttr);
+            return string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0}{1}{4}}},\"indices\":{2},\"material\":{3}}}", ap, an, ai, mat, uvAttr);
         }
 
         public int addNode(string name, double[] m, int mesh, List<int> children)
