@@ -37,6 +37,8 @@ namespace InvAddIn
         public int HoleTexMaxSize = 2048;        //   наибольший размер текстуры, px (видеопамять слабых ПК)
         public double HoleTexRing = 0;           //   ширина тёмного кольца вокруг отверстия, px (вместо линий рёбер); 0 - без кольца
         public bool AssemblyNormals = false;     // Assembly: писать нормали (просмотрщик портала без освещения - не нужны)
+        public bool AssemblyEdges = true;        // Assembly: рёбра модели (границы граней) - линии в GLB, просмотрщик рисует их
+                                                 //   вместо вычисленных по углу (без линий на гранях сфер/торов/сгибов и на швах сетки)
         public int CircleSegments = 16;          // окружности (отверстия, трубы, контуры) не грубее этого числа сегментов
         public double SimplifyRatio = 0.0005;    // допуск упрощения сетки как доля диагонали модели (0 - без упрощения)
         public int SimplifyTimeLimitMs = 15000;  // предел времени упрощения одного тела
@@ -178,6 +180,8 @@ namespace InvAddIn
             glb.Normals = opt.Mode == GlbMode.Single || opt.AssemblyNormals;
             cutMode = opt.Mode == GlbMode.Assembly && opt.HoleTexture;
             if (doc == null) return;
+            if (opt.Mode == GlbMode.Assembly && opt.AssemblyEdges)
+                glb.LineMaterial = glb.addMaterial(new GlbMat { name = "Рёбра", r = 0, g = 0, b = 0, metallic = 0, roughness = 1 });
             if (doc.DocumentType != DocumentTypeEnum.kPartDocumentObject &&
                 doc.DocumentType != DocumentTypeEnum.kAssemblyDocumentObject) return;
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -214,7 +218,8 @@ namespace InvAddIn
                     (coarseOrderFail > 0 ? "\n(экранная сетка не подошла для " + coarseOrderFail + " тел - грубая тесселяция)" : "");
             if (cutMode)
                 msg += string.Format("\nВырезы текстурой: деталей {0}, стенок отверстий не выгружено {1}\nТекстуры: {2:0.0} Мпикс (~{3:0} МБ видеопамяти){4}",
-                    cutParts, droppedWalls, cutPixels / 1e6, cutPixels * 4 * 4 / 3.0 / (1 << 20), glb.Normals ? "" : "\nБез нормалей");
+                    cutParts, droppedWalls, cutPixels / 1e6, cutPixels * 4 * 4 / 3.0 / (1 << 20), glb.Normals ? "" : "\nБез нормалей") +
+                    (glb.LineMaterial >= 0 ? "\nРёбер модели: " + glb.lineCount : "");
             if (errors.Count > 0)
                 msg += "\n\nОшибки:\n" + string.Join("\n", errors.Take(10).Select(kv => "[" + kv.Value + "] " + kv.Key));
             status("GLB: готово");
@@ -859,7 +864,7 @@ namespace InvAddIn
             try { bm.simplify(simplifyTol); } catch (Exception e) { error("Упрощение", e); }
             if (bm.timedOut) inc(planarWhy, "упрощение остановлено по времени: " + cur.name);
             foreach (var kv in bm.failures) inc(planarWhy, "после упрощения: " + kv.Key, kv.Value);
-            bm.emit(m, opt.Scale, (fid, pos) => { Func<Vec, double[]> fu; return faceUV.TryGetValue(fid, out fu) ? fu(pos) : null; });
+            bm.emit(m, opt.Scale, (fid, pos) => { Func<Vec, double[]> fu; return faceUV.TryGetValue(fid, out fu) ? fu(pos) : null; }, glb.LineMaterial >= 0);
             curTex = null;
             cur.msSimplify = sw.ElapsedMilliseconds;
             tessCache[key] = m;
@@ -942,8 +947,10 @@ namespace InvAddIn
             if (curCyl != null && fill != null)
             {
                 List<int> ct = null;
-                try { ct = cylRetri(curCyl, P, N, tris, fill); } catch (Exception e) { error("Цилиндр с перфорацией", e); }
-                if (ct != null) { tris = ct; cylOk++; addCutLoops(filled); } else cylFail++;
+                string cwhy = null;
+                try { ct = cylRetri(curCyl, P, N, tris, fill, out cwhy); } catch (Exception e) { error("Цилиндр с перфорацией", e); }
+                if (ct != null) { tris = ct; cylOk++; addCutLoops(filled); }
+                else if (cwhy != null) { cylFail++; inc(mapWhy, "цилиндр не перетриангулирован (" + cwhy + ")"); }
                 filled.Clear();
             }
             if (opt.PlanarRetriangulate && f.SurfaceType == SurfaceTypeEnum.kPlaneSurface && fn.len() > 0)
@@ -1021,7 +1028,9 @@ namespace InvAddIn
         bool onCutLoops(List<Vec> P)
         {
             if (cutGrid.Count == 0 || P.Count < 3) return false;
-            double tol = 1.5 * opt.Tolerance + 1e-4;
+            // край отверстия на изогнутом листе Inventor разбивает для стенки и для листа по-разному: расхождение до
+            // двух хордовых допусков и больше - берём с запасом (0,3 мм), ложных совпадений на таком расстоянии нет
+            double tol = Math.Max(0.03, 3 * opt.Tolerance);
             int on = 0, miss = 0;
             foreach (Vec p in P)
             {
@@ -1529,6 +1538,7 @@ namespace InvAddIn
                             foreach (var pts in all) { g.FillPolygon(clear, pts); holesDrawn++; }
                     }
                 }
+                if (cutMode) whiteRgb(bmp);
                 using (var ms = new MemoryStream()) { bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png); png = ms.ToArray(); }
             }
             pt.png = png;
@@ -1565,6 +1575,24 @@ namespace InvAddIn
         }
         int cutParts;
         long cutPixels;
+
+        // цвет прозрачных пикселей - белый: при фильтрации текстуры край выреза смешивается с белым, а не с чёрным
+        // (иначе вокруг отверстий серая кайма); тёмное кольцо (HoleTexRing) непрозрачно и не меняется
+        static void whiteRgb(System.Drawing.Bitmap bmp)
+        {
+            var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+            var data = bmp.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadWrite, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            var buf = new byte[data.Stride * bmp.Height];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buf, 0, buf.Length);
+            for (int y = 0; y < bmp.Height; y++)
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    int o = y * data.Stride + 4 * x;   // BGRA
+                    if (buf[o + 3] < 255) { buf[o] = 255; buf[o + 1] = 255; buf[o + 2] = 255; }
+                }
+            System.Runtime.InteropServices.Marshal.Copy(buf, 0, data.Scan0, buf.Length);
+            bmp.UnlockBits(data);
+        }
 
         // отверстия развёртки для вырезов (мм): внутренние контуры самой большой плоской грани, не крупнее HoleTexMax
         // и сквозные - внутри контура нет другого материала развёртки (иначе это выштамповка, жалюзи и т.п.)
@@ -1805,18 +1833,43 @@ namespace InvAddIn
             }
             catch { }
             if (pairs.Count < 3) { mapFail("плоская: Inventor не дал вершин развёртки (" + pairs.Count + ")"); return null; }
-            // опорный треугольник: p0, самая дальняя p1, самая удалённая от прямой p2
-            Vec p0 = pairs[0][0];
-            var i1 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => (pairs[i][0] - p0).len()).First();
-            Vec d1 = (pairs[i1][0] - p0).norm();
-            var i2 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => Vec.cross(d1, pairs[i][0] - p0).len()).First();
-            if (Vec.cross(d1, pairs[i2][0] - p0).len() < 1e-4) { mapFail("плоская: вершины на одной прямой"); return null; }
-            Vec q0 = pairs[0][1];
-            Vec e1 = d1, en = Vec.cross(pairs[i1][0] - p0, pairs[i2][0] - p0).norm(), e2 = Vec.cross(en, e1);
-            Vec f1 = (pairs[i1][1] - q0).norm(), fnn = Vec.cross(pairs[i1][1] - q0, pairs[i2][1] - q0).norm(), f2 = Vec.cross(fnn, f1);
-            Func<Vec, Vec> map = p => { Vec d = p - p0; return q0 + f1 * Vec.dot(d, e1) + f2 * Vec.dot(d, e2); };
-            foreach (var pr in pairs)
-                if ((map(pr[0]) - pr[1]).len() > 0.03) { mapFail("плоская: вершины не совпали с развёрткой"); return null; }   // не изометрия
+            // опорный треугольник: p0, самая дальняя p1, самая удалённая от прямой p2; p0 перебирается -
+            // одна неверная пара (Inventor дал вершину другой стороны листа или соседней грани) не губит всю грань
+            Func<Vec, Vec> map = null;
+            int bestIn = -1;
+            double worst = 0;
+            for (int s0 = 0; s0 < pairs.Count; s0++)
+            {
+                Vec p0 = pairs[s0][0];
+                var i1 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => (pairs[i][0] - p0).len()).First();
+                Vec d1 = (pairs[i1][0] - p0).norm();
+                var i2 = Enumerable.Range(0, pairs.Count).OrderByDescending(i => Vec.cross(d1, pairs[i][0] - p0).len()).First();
+                if (Vec.cross(d1, pairs[i2][0] - p0).len() < 1e-4) continue;
+                Vec q0 = pairs[s0][1];
+                Vec e1 = d1, en = Vec.cross(pairs[i1][0] - p0, pairs[i2][0] - p0).norm(), e2 = Vec.cross(en, e1);
+                Vec fr = pairs[i1][1] - q0, fc = Vec.cross(fr, pairs[i2][1] - q0);
+                if (fr.len() < 1e-4 || fc.len() < 1e-6) continue;   // на развёртке точки на одной прямой (стенка, торец)
+                Vec f1 = fr.norm(), fnn = fc.norm(), f2 = Vec.cross(fnn, f1);
+                Func<Vec, Vec> m = p => { Vec d = p - p0; return q0 + f1 * Vec.dot(d, e1) + f2 * Vec.dot(d, e2); };
+                int inl = 0;
+                double w = 0;
+                foreach (var pr in pairs) { double e = (m(pr[0]) - pr[1]).len(); if (e <= 0.03) inl++; else w = Math.Max(w, e); }
+                if (inl > bestIn) { bestIn = inl; map = m; worst = w; }
+                if (inl == pairs.Count) break;
+            }
+            if (map == null) { mapFail("плоская: вершины на одной прямой"); return null; }
+            // изометрия: совпасть должны почти все пары (не меньше 3 и 75%)
+            if (bestIn < Math.Max(3, 0.75 * pairs.Count))
+            {
+                mapFail("плоская: вершины не совпали с развёрткой");
+                double area = 0;
+                try { area = f.Evaluator.Area; } catch { }
+                if (area > 10)
+                    perfReport.Add(string.Format(CultureInfo.InvariantCulture, "  ! {0}: плоская грань {1:0} см² не сопоставлена с развёрткой (совпало {2} из {3} вершин, расхождение до {4:0.#} мм)",
+                        cur == null ? "" : cur.name, area, bestIn, pairs.Count, worst * 10));
+                return null;
+            }
+            if (bestIn < pairs.Count) inc(mapWhy, "плоская: сопоставлена без части вершин (неверные пары отброшены)");
             faceMapOk++;
             return p =>
             {
@@ -1931,11 +1984,11 @@ namespace InvAddIn
 
         // перетриангуляция цилиндрической грани на развёртке: отверстия перфорации заливаются,
         // по образующим добавляются опорные точки (кривизна), вершины контура остаются на месте
-        List<int> cylRetri(CylMap cm, List<Vec> P, List<Vec> N, List<int> tris, Func<List<Vec>, bool> fill)
+        // why - причина неудачи (null - заливать нечего, сетка Inventor годится)
+        List<int> cylRetri(CylMap cm, List<Vec> P, List<Vec> N, List<int> tris, Func<List<Vec>, bool> fill, out string why)
         {
-            string why;
             var loops = PlanarTriangulator.boundaryLoops(tris, out why);
-            if (loops == null || loops.Count == 0) return null;
+            if (loops == null || loops.Count == 0) { why = "контуры: " + (why ?? "нет"); return null; }
             Func<List<int>, double> area2 = l =>
             {
                 double s = 0;
@@ -1952,7 +2005,7 @@ namespace InvAddIn
                 if (fill != null && fill(l.Select(i => P[i]).ToList())) { filled++; continue; }
                 kept.Add(l);
             }
-            if (filled == 0) return null;   // заливать нечего - сетка Inventor годится
+            if (filled == 0) { why = null; return null; }   // заливать нечего - сетка Inventor годится
 
             // 2D-контуры для проверки "внутри"
             Func<List<int>, List<double[]>> poly = l => l.Select(i => cm.flat(P[i])).ToList();
@@ -2004,7 +2057,12 @@ namespace InvAddIn
                 if (Vec.dot(cr, N[a] + N[b] + N[c]) < 0) { int x = b; b = c; c = x; }
                 res.Add(a); res.Add(b); res.Add(c);
             }
-            if (res.Count == 0 || Math.Abs(got - expect) > Math.Abs(expect) * 1e-3) return null;
+            if (res.Count == 0 || Math.Abs(got - expect) > Math.Abs(expect) * 1e-3)
+            {
+                why = string.Format(CultureInfo.InvariantCulture, "площадь развёртки не сошлась: {0:0.##} из {1:0.##} см², отверстий залито {2}, оставлено {3}", got, expect, filled, kept.Count);
+                return null;
+            }
+            why = null;
             return res;
         }
 
@@ -3314,9 +3372,11 @@ namespace InvAddIn
 
         // выгрузка в меш: вершина дублируется только там, где различаются нормали или материал
         // uvOf(грань, точка в см) - текстурные координаты или null
-        public void emit(GlbMesh m, double scale, Func<int, Vec, double[]> uvOf = null)
+        // edges - ещё и рёбра модели: рёбра сетки между разными гранями Inventor и открытые (граница или шов)
+        public void emit(GlbMesh m, double scale, Func<int, Vec, double[]> uvOf = null, bool edges = false)
         {
             var map = new Dictionary<Key3, int>[faceMat.Count == 0 ? 0 : faceMat.Max() + 1];
+            var first = edges ? new Dictionary<long, int>(LongCmp.I) : null;   // (материал, вершина) -> индекс в примитиве
             for (int t = 0; t < TF.Count; t++)
             {
                 int f = TF[t], mat = faceMat[f];
@@ -3348,9 +3408,54 @@ namespace InvAddIn
                             while (p.uv.Count < 2 * (p.vcount - 1)) p.uv.Add(0);
                             p.uv.Add((float)uv[0]); p.uv.Add((float)uv[1]);
                         }
+                        if (first != null && !first.ContainsKey(nk(v, mat))) first[nk(v, mat)] = li;
                     }
                     p.idx.Add(li);
                 }
+            }
+            if (!edges) return;
+            // ребро сетки -> грань первого треугольника и признак "рисовать": один треугольник или разные грани
+            var eFace = new Dictionary<long, int>(LongCmp.I);
+            var eDraw = new Dictionary<long, bool>(LongCmp.I);
+            for (int t = 0; t < TF.Count; t++)
+                for (int k = 0; k < 3; k++)
+                {
+                    int a = T[3 * t + k], b = T[3 * t + (k + 1) % 3];
+                    long e = nk(Math.Min(a, b), Math.Max(a, b));
+                    int f;
+                    if (!eFace.TryGetValue(e, out f)) { eFace[e] = TF[t]; eDraw[e] = true; }
+                    else eDraw[e] = f != TF[t];
+                }
+            // вершина на границе граней: её треугольники из разных граней Inventor
+            var vFace = new Dictionary<int, int>();
+            var vMulti = new HashSet<int>();
+            for (int t = 0; t < TF.Count; t++)
+                for (int k = 0; k < 3; k++)
+                {
+                    int v = T[3 * t + k], f;
+                    if (!vFace.TryGetValue(v, out f)) vFace[v] = TF[t];
+                    else if (f != TF[t]) vMulti.Add(v);
+                }
+            var eCount = new Dictionary<long, int>(LongCmp.I);
+            for (int t = 0; t < TF.Count; t++)
+                for (int k = 0; k < 3; k++)
+                {
+                    int a = T[3 * t + k], b = T[3 * t + (k + 1) % 3], c;
+                    long e = nk(Math.Min(a, b), Math.Max(a, b));
+                    eCount.TryGetValue(e, out c); eCount[e] = c + 1;
+                }
+            foreach (var kv in eDraw)
+            {
+                if (!kv.Value) continue;
+                int a = (int)(kv.Key >> 32), b = (int)(kv.Key & 0xffffffff), mat = faceMat[eFace[kv.Key]];
+                // открытое ребро (шов, где вершины соседних кусков сетки не совпали) - только на границе граней;
+                // шов внутри одной грани (ряды разбиения цилиндра после упрощения) - не ребро модели
+                if (eCount[kv.Key] == 1 && !(vMulti.Contains(a) && vMulti.Contains(b))) continue;
+                int la, lb;
+                if (!first.TryGetValue(nk(a, mat), out la) || !first.TryGetValue(nk(b, mat), out lb)) continue;
+                GlbPrim p = m.get(mat);
+                if (p.lines == null) p.lines = new List<int>();
+                p.lines.Add(la); p.lines.Add(lb);
             }
         }
     }
@@ -3866,6 +3971,7 @@ namespace InvAddIn
         public List<float> pos = new List<float>(), nrm = new List<float>();
         public List<float> uv;   // текстурные координаты (только у материалов с текстурой)
         public List<int> idx = new List<int>();
+        public List<int> lines;  // рёбра модели (пары вершин) - границы граней BRep, как "тонированный с рёбрами" в Inventor
         public int vcount { get { return pos.Count / 3; } }
     }
 
@@ -4044,6 +4150,8 @@ namespace InvAddIn
 
         public bool Quantize = true;             // KHR_mesh_quantization: позиции uint16, нормали int8, индексы uint16
         public bool Normals = true;              // false - без NORMAL, вершины, разделённые только нормалями (острые рёбра), сливаются
+        public int LineMaterial = -1;            // материал рёбер модели (GlbPrim.lines - примитив LINES на тех же вершинах); -1 - не писать
+        public long lineCount;
         List<string> images = new List<string>(), textures = new List<string>();
 
         // слияние вершин с одинаковыми позицией и текстурными координатами (копия примитива без нормалей)
@@ -4069,6 +4177,16 @@ namespace InvAddIn
                 remap[i] = id;
             }
             foreach (int i in p.idx) r.idx.Add(remap[i]);
+            if (p.lines != null)
+            {
+                r.lines = new List<int>();
+                var seen = new HashSet<long>(LongCmp.I);
+                for (int i = 0; i + 1 < p.lines.Count; i += 2)
+                {
+                    int a = remap[p.lines[i]], b = remap[p.lines[i + 1]];
+                    if (a != b && seen.Add(((long)Math.Min(a, b) << 32) | (uint)Math.Max(a, b))) { r.lines.Add(a); r.lines.Add(b); }
+                }
+            }
             return r;
         }
 
@@ -4106,7 +4224,7 @@ namespace InvAddIn
                 var chunk = new List<int>();
                 for (int t = 0; t < p.idx.Count; t += 3)
                 {
-                    if (map.Count > 65535 - 3) { prims.Add(primQuant(p, map, chunk, dq, kv.Key)); map.Clear(); chunk.Clear(); }
+                    if (map.Count > 65535 - 3) { prims.Add(primQuant(p, map, chunk, dq, kv.Key, prims)); map.Clear(); chunk.Clear(); }
                     for (int k = 0; k < 3; k++)
                     {
                         int v = p.idx[t + k], li;
@@ -4114,7 +4232,7 @@ namespace InvAddIn
                         chunk.Add(li);
                     }
                 }
-                if (chunk.Count > 0) prims.Add(primQuant(p, map, chunk, dq, kv.Key));
+                if (chunk.Count > 0) prims.Add(primQuant(p, map, chunk, dq, kv.Key, prims));
                 triangles += p.idx.Count / 3;
             }
             if (prims.Count == 0) return -1;
@@ -4123,7 +4241,8 @@ namespace InvAddIn
             return meshes.Count - 1;
         }
 
-        string primQuant(GlbPrim p, Dictionary<int, int> map, List<int> idx, double[] dq, int mat)
+        // lineOut - сюда же примитив рёбер (LINES на той же POSITION) для рёбер, обе вершины которых в этом куске
+        string primQuant(GlbPrim p, Dictionary<int, int> map, List<int> idx, double[] dq, int mat, List<string> lineOut = null)
         {
             int vc = map.Count;
             var pos = new byte[vc * 8];   // uint16 x3 + выравнивание до 8
@@ -4160,6 +4279,23 @@ namespace InvAddIn
             }
             int ai = accessor(view(ib, 34963), 5123, idx.Count, "SCALAR", null, null);
             vertices += vc;
+            if (lineOut != null && p.lines != null && LineMaterial >= 0)
+            {
+                var li = new List<int>();
+                for (int i = 0; i + 1 < p.lines.Count; i += 2)
+                {
+                    int a, b;
+                    if (map.TryGetValue(p.lines[i], out a) && map.TryGetValue(p.lines[i + 1], out b)) { li.Add(a); li.Add(b); }
+                }
+                if (li.Count > 0)
+                {
+                    var lb = new byte[li.Count * 2];
+                    for (int i = 0; i < li.Count; i++) { lb[2 * i] = (byte)(li[i] & 0xff); lb[2 * i + 1] = (byte)(li[i] >> 8); }
+                    int al = accessor(view(lb, 34963), 5123, li.Count, "SCALAR", null, null);
+                    lineOut.Add(string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0}}},\"indices\":{1},\"material\":{2},\"mode\":1}}", ap, al, LineMaterial));
+                    lineCount += li.Count / 2;
+                }
+            }
             return string.Format(ci, "{{\"attributes\":{{\"POSITION\":{0}{1}{4}}},\"indices\":{2},\"material\":{3}}}", ap, an, ai, mat, uvAttr);
         }
 
